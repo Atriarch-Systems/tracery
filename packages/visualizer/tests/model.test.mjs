@@ -5,7 +5,7 @@ import { VISUALIZER_CONTRACT_VERSION } from '../dist/types.js';
 
 const freeze = value => { Object.freeze(value); for (const item of Object.values(value)) if (item && typeof item === 'object' && !Object.isFrozen(item)) freeze(item); return value; };
 test('contract version and immutable consumer data survive engine mutation', () => {
-  assert.equal(VISUALIZER_CONTRACT_VERSION, 1);
+  assert.equal(VISUALIZER_CONTRACT_VERSION, 2);
   const nodes = freeze([{ id:'a',label:'Inbox',position:{x:10,y:20,anchored:true}, data:{domain:'consumer'} },{id:'b',label:'Worker'}]);
   const edges = freeze([{id:'request',source:'a',target:'b',label:'request',count:1}]);
   const graph = reconcile(emptyGraph(),nodes,edges);

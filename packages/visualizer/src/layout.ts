@@ -15,7 +15,9 @@ export function placeBranches<N>(nodes: readonly ActivityNode<N>[], edges: reado
     if (old) positions.set(node.id, old);
   }
   const pending = nodes.filter(n => !positions.has(n.id));
-  const parentOf = (node: ActivityNode) => node.layout?.parentId ?? edges.find(e => e.target === node.id && e.source !== node.id)?.source;
+  // 'data' edges never imply placement parenthood (SPEC §3); 'call' and 'spawn' do.
+  const parentOf = (node: ActivityNode) => node.layout?.parentId ??
+    edges.find(e => e.target === node.id && e.source !== node.id && (e.kind ?? 'call') !== 'data')?.source;
   const collides = (x: number, y: number, size: {width: number; height: number}) => [...positions.values()].some(p =>
     Math.abs(p.x - x) < (p.width + size.width) / 2 + 28 && Math.abs(p.y - y) < (p.height + size.height) / 2 + 24);
   const insert = (node: ActivityNode) => {

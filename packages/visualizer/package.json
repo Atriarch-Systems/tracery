@@ -1,6 +1,6 @@
 {
   "name": "@atriarch/activity-visualizer",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "license": "MIT",
   "description": "Consumer-configured React canvas for live nodes and directed activity edges.",
   "type": "module",

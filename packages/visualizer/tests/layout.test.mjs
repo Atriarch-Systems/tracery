@@ -29,3 +29,38 @@ test('parent can arrive later in array; missing parents and cycles remain finite
  assert.equal(nodes[0].position,undefined);
  assert.equal(placeBranches([],[],result.positions).positions.size,0);
 });
+test('data edges are never a placement parent; spawn edges are valid parents', () => {
+  // Two anchored roots land in the same left column (x=0) at different rows (y), so 'y' is
+  // what distinguishes which one actually acted as the child's placement parent.
+  // 'real' is a call-edge parent, 'observer' only reaches the node via a data edge.
+  const nodes = [
+    {id:'real', label:'Real parent', position:{x:0,y:0,anchored:true}},
+    {id:'observer', label:'Data-only observer', position:{x:0,y:0,anchored:true}},
+    {id:'child', label:'Child'},
+  ];
+  const edges = [
+    {id:'data-edge', source:'observer', target:'child', kind:'data'},
+    {id:'call-edge', source:'real', target:'child', kind:'call'},
+  ];
+  const result = placeBranches(nodes, edges);
+  const real = result.positions.get('real'), observer = result.positions.get('observer'), child = result.positions.get('child');
+  assert.notEqual(real.y, observer.y, 'the two anchored roots must land in different rows for this test to distinguish parents');
+  // Placed beside its call-edge parent ('real'), not the data-only 'observer'.
+  assert.equal(child.y, real.y);
+  assert.notEqual(child.y, observer.y);
+  assert.ok(child.x > real.x);
+
+  // With only a data edge available, the node has no placement parent (falls back to a root slot).
+  const dataOnly = placeBranches(
+    [{id:'observer', label:'Observer', position:{x:0,y:0,anchored:true}}, {id:'orphan', label:'Orphan'}],
+    [{id:'d', source:'observer', target:'orphan', kind:'data'}],
+  );
+  assert.equal(dataOnly.positions.get('orphan').x, 0);
+
+  // A spawn edge is a valid placement parent, same as the default 'call'.
+  const spawned = placeBranches(
+    [{id:'parent', label:'Parent', position:{x:0,y:0,anchored:true}}, {id:'child2', label:'Spawned child'}],
+    [{id:'s', source:'parent', target:'child2', kind:'spawn'}],
+  );
+  assert.ok(spawned.positions.get('child2').x > spawned.positions.get('parent').x);
+});

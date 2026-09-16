@@ -110,3 +110,30 @@ run the Playwright suite against the running container, fix any cross-package
 break found (you may edit any package for integration fixes; list every file you
 touched). Root README: what it is, three usage modes, quick start for each,
 package table, licensing summary.
+
+## H — Claude Code plugin
+
+Owns: `plugins/claude-code`, `docs/CLAUDE-CODE-PLUGIN.md`. Starts after D (needs a
+running hub to test against) and after the hook-payload research note in
+`docs/research/claude-code-hooks.md` exists.
+Deliver: a Claude Code plugin (`.claude-plugin/plugin.json`, `hooks/hooks.json`,
+`hooks/emit.mjs`, `README.md`) that maps hook events to Activity events and
+posts them to a hub. Mapping: SessionStart → root start of flow `session_id`
+(actor `agent:claude-code`, kind `agent`, label from cwd basename + model);
+UserPromptSubmit → `annotate` on the root op (prompt length, never the text);
+PreToolUse → op `start` (op = `tool_use_id`, node `tool:<tool_name>`, kind `tool`,
+context = a redacted summary of `tool_input`: file paths, command name, byte counts);
+PostToolUse → op `end` success; tool failure hook → op `end` error with the error
+class or first line; Agent tool PreToolUse → also emits the child link so the
+subagent's SessionStart (if it carries its own session id) or its tool calls
+attach as a child flow via `link.parentFlow`/`parentOp`; SubagentStop → child
+flow end; Stop / SessionEnd → flow end; PreCompact → annotate. The emitter is a
+single zero-dependency Node script: reads the hook JSON from stdin, builds
+events, POSTs to `${ACTIVITY_HUB_URL}/v1/events` with `ACTIVITY_API_KEY`, 2 s
+timeout, spools to `${TMP}/atriarch-activity/spool.ndjson` on failure and
+drains the spool on the next call, always exits 0, logs nothing to stdout.
+Include a `/activity` skill that prints the hub deep link for the current
+session. Tests: node:test feeding recorded hook payloads through the mapper and
+asserting the emitted events pass core's `validateEvent`; an end-to-end test
+that runs the emitter against a hub started from `apps/hub` and checks the flow
+appears with a spawn edge to a subagent flow.

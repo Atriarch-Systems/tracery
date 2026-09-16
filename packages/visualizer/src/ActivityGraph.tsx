@@ -5,6 +5,8 @@ import { forceCollide } from 'd3-force';
 import type { ActivityGraphProps, ActivityNode } from './types.js';
 import { emptyGraph, reconcile, box, isNodeActive, type RuntimeGraph, type RuntimeNode, type RuntimeEdge } from './model.js';
 import { drawNode, drawLink } from './drawing.js';
+import { drawGroups, groupAlpha } from './groups.js';
+import { detectDoubleClick, emptyDoubleClickState, type DoubleClickState } from './activate.js';
 
 /** No transports, agent catalogs, invocation reducers, or business data live here. */
 export function ActivityGraph<N = unknown, E = unknown>(props: ActivityGraphProps<N, E>) {
@@ -13,6 +15,7 @@ export function ActivityGraph<N = unknown, E = unknown>(props: ActivityGraphProp
   const api = useRef<ForceGraphMethods<RuntimeNode, RuntimeEdge> | undefined>(undefined);
   const runtime = useRef<RuntimeGraph>(emptyGraph());
   const lastKey = useRef(layoutKey);
+  const lastClick = useRef<DoubleClickState>(emptyDoubleClickState());
   const [graph, setGraph] = useState<RuntimeGraph>(emptyGraph);
   const [size, setSize] = useState({ width: 1000, height: 700 });
   const [systemReduced, setSystemReduced] = useState(false);
@@ -65,7 +68,8 @@ export function ActivityGraph<N = unknown, E = unknown>(props: ActivityGraphProp
     const force = api.current;
     force.d3Force('center', null);
     force.d3Force('charge')?.strength(props.layoutMode === 'guided' ? 0 : -90);
-    force.d3Force('link')?.distance(180).strength(props.layoutMode === 'guided' ? 0 : 0.025);
+    force.d3Force('link')?.distance(180).strength(props.layoutMode === 'guided' ? 0 :
+      (link: RuntimeEdge) => (link.spec.kind === 'data' || link.spec.kind === 'spawn') ? 0 : 0.025);
     force.d3Force('collision', forceCollide<RuntimeNode>(n => Math.hypot(box(n).w, box(n).h) / 2 + 9).strength(props.layoutMode === 'guided' ? 0 : .85));
     force.d3Force('home', (alpha: number) => {
       for (const n of runtime.current.nodes) {
@@ -106,25 +110,37 @@ export function ActivityGraph<N = unknown, E = unknown>(props: ActivityGraphProp
     setLocalSelected(node?.id ?? null);
     onNodeSelect?.(node as ActivityNode<N> | null);
   };
+  const groups = props.groups ?? [];
 
   return <div ref={host} className={props.className} style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden', ...props.style }}
-    role="region" tabIndex={0} aria-label={props.ariaLabel ?? 'Activity graph. Arrow keys select nodes; Escape clears selection; F fits the view.'}
+    role="region" tabIndex={0} aria-label={props.ariaLabel ?? 'Activity graph. Arrow keys select nodes; Enter activates the selected node; Escape clears selection; F fits the view.'}
     onPointerDown={() => { api.current?.resumeAnimation(); }}
     onPointerUp={() => setInteraction(n => n + 1)} onWheel={() => setInteraction(n => n + 1)}
     onKeyDown={event => {
       if (event.key === 'Escape') { select(null); event.preventDefault(); }
       if (event.key.toLowerCase() === 'f') { fitView(); event.preventDefault(); }
+      if (event.key === 'Enter' && selected) {
+        const node = nodes.find(n => n.id === selected);
+        if (node) props.onNodeActivate?.(node);
+        event.preventDefault();
+      }
       if (['ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowUp'].includes(event.key) && nodes.length) {
         const index = nodes.findIndex(n => n.id === selected), direction = ['ArrowLeft', 'ArrowUp'].includes(event.key) ? -1 : 1;
         select(nodes[(index + direction + nodes.length) % nodes.length]); event.preventDefault();
       }
     }}>
     {Renderer && <Renderer ref={api} graphData={graph} width={size.width} height={size.height}
-      backgroundColor="rgba(0,0,0,0)" nodeCanvasObject={(n, ctx) => drawNode(n, ctx, selected ?? null, reduced)}
+      backgroundColor="rgba(0,0,0,0)" nodeCanvasObject={(n, ctx) => drawNode(n, ctx, selected ?? null, reduced, groupAlpha(n, groups))}
       linkCanvasObject={(l, ctx) => drawLink(l, ctx, selected ?? null, reduced)}
+      onRenderFramePre={ctx => drawGroups(ctx, groups, runtime.current.nodes)}
       nodeLabel={() => ''} linkLabel={() => ''} autoPauseRedraw={false}
       nodePointerAreaPaint={(n, color, ctx) => { const {w,h} = box(n); ctx.fillStyle = color; ctx.fillRect(n.x-w/2,n.y-h/2,w,h); }}
-      onNodeClick={n => select(n.spec)} onBackgroundClick={() => select(null)}
+      onNodeClick={n => {
+        select(n.spec);
+        const { activated, next } = detectDoubleClick(lastClick.current, n.id, Date.now());
+        lastClick.current = next;
+        if (activated) props.onNodeActivate?.(n.spec as ActivityNode<N>);
+      }} onBackgroundClick={() => select(null)}
       onNodeDragEnd={n => {
         if (n.spec.position?.anchored) { n.fx = n.homeX; n.fy = n.homeY; }
         if (props.layoutMode === 'guided' && !n.spec.position?.anchored) {
