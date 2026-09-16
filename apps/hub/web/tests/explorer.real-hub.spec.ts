@@ -10,7 +10,18 @@
  * Once `apps/hub` builds, running `npm run build` at the repo root (which
  * builds `apps/hub/web` first, then `apps/hub`, in workspace dependency
  * order) followed by `npm test` here runs this for real: no code changes
- * needed, it starts detecting `dist/` + `bin/hub.mjs` on its own.
+ * needed, it starts detecting `dist/` + `bin/hub.mjs` on its own -- that
+ * spawns a throwaway local hub on a fixed test port.
+ *
+ * SPEC.md §8 acceptance 5 also asks this to run "against the running
+ * container" from acceptance step 3. Set `ACTIVITY_HUB_URL` (and
+ * `ACTIVITY_API_KEY`, needing `ingest`+`read`+`admin` -- the dev key printed
+ * in `docker logs` has all three) to point this spec at any already-running
+ * hub -- a Docker container, or otherwise -- instead of spawning a local
+ * one; it seeds the same fixture trace there and skips the spawn/kill of a
+ * child process. The target hub's workspace should be empty (or at least
+ * free of any other data in workspace "default") before this runs, since
+ * these tests assert exact counts (e.g. "the flow list shows three flows").
  */
 import { test, expect, type Page } from '@playwright/test';
 import { spawn, type ChildProcess } from 'node:child_process';
@@ -25,9 +36,13 @@ const hubRoot = path.resolve(__dirname, '../../'); // apps/hub
 const hubBin = path.join(hubRoot, 'bin', 'hub.mjs');
 const hubDistExists = fs.existsSync(path.join(hubRoot, 'dist')) && fs.existsSync(hubBin);
 
+const EXTERNAL_HUB_URL = process.env.ACTIVITY_HUB_URL?.trim();
+const EXTERNAL_API_KEY = process.env.ACTIVITY_API_KEY?.trim();
+const useExternalHub = Boolean(EXTERNAL_HUB_URL && EXTERNAL_API_KEY);
+
 const PORT = 18971;
-const BASE_URL = `http://127.0.0.1:${PORT}`;
-const API_KEY = 'e2e-test-key';
+const BASE_URL = useExternalHub ? EXTERNAL_HUB_URL!.replace(/\/+$/, '') : `http://127.0.0.1:${PORT}`;
+const API_KEY = useExternalHub ? EXTERNAL_API_KEY! : 'e2e-test-key';
 const WORKSPACE = 'default';
 
 async function waitForHealthy(timeoutMs = 20_000): Promise<void> {
@@ -67,20 +82,27 @@ async function primeSession(page: Page): Promise<void> {
 }
 
 test.describe('real hub', () => {
-  test.skip(!hubDistExists, 'apps/hub is not built yet (no dist/ or bin/hub.mjs) -- this spec runs once workstream D ships it');
+  test.skip(
+    !useExternalHub && !hubDistExists,
+    'apps/hub is not built yet (no dist/ or bin/hub.mjs) -- this spec runs once workstream D ships it, or point it at an already-running hub with ACTIVITY_HUB_URL/ACTIVITY_API_KEY',
+  );
 
-  let hub: ChildProcess;
+  let hub: ChildProcess | undefined;
 
   test.beforeAll(async () => {
-    hub = spawn(process.execPath, [hubBin], {
-      cwd: hubRoot,
-      env: {
-        ...process.env,
-        ACTIVITY_PORT: String(PORT),
-        ACTIVITY_API_KEYS: JSON.stringify([{ id: 'e2e', key: API_KEY, workspace: WORKSPACE, roles: ['ingest', 'read', 'admin'] }]),
-      },
-      stdio: 'pipe',
-    });
+    if (useExternalHub) {
+      console.log(`explorer.real-hub.spec.ts: targeting external hub at ${BASE_URL} (ACTIVITY_HUB_URL set)`);
+    } else {
+      hub = spawn(process.execPath, [hubBin], {
+        cwd: hubRoot,
+        env: {
+          ...process.env,
+          ACTIVITY_PORT: String(PORT),
+          ACTIVITY_API_KEYS: JSON.stringify([{ id: 'e2e', key: API_KEY, workspace: WORKSPACE, roles: ['ingest', 'read', 'admin'] }]),
+        },
+        stdio: 'pipe',
+      });
+    }
     await waitForHealthy();
     await seedFixtureTrace();
   });

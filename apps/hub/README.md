@@ -175,6 +175,7 @@ lands.
 export interface HubExtensions {
   onRequestAuthed?(ctx: { request: FastifyRequest; auth: AuthContext }): void | Promise<void>;
   registerRoutes?(app: FastifyInstance, ctx: HubContext): void | Promise<void>;
+  onLiveFrame?(ctx: { auth: AuthContext; frame: ActivityFrame }): ActivityFrame | null;
 }
 ```
 
@@ -185,9 +186,14 @@ export interface HubExtensions {
   `keys`, `requireAuth`), for adding routes like `/v1/license` or RBAC
   filtering hooks. It runs after every built-in route is registered and
   before the UI's catch-all 404 handler, so ee's routes are never shadowed.
+- `onLiveFrame` runs from `live.ts`'s `send()` before every frame goes out
+  over `WS /v1/live` -- the one send path `registerRoutes`'s Fastify `onSend`
+  hook can't reach, since the live feed writes to the raw WebSocket outside
+  Fastify's response pipeline. Return the frame (unchanged, or with a
+  filtered `events` array) to send it, or `null` to drop it entirely.
 
-Neither hook is invoked by anything in this package; ee (or a test) passes
-them into `createServer` directly.
+None of these hooks are invoked by anything in this package; ee (or a test)
+passes them into `createServer` directly.
 
 ## Development
 

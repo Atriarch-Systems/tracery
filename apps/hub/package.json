@@ -7,10 +7,10 @@
   "bin": {
     "activity-hub": "./bin/hub.mjs"
   },
-  "files": ["dist", "bin", "README.md", "LICENSE"],
+  "files": ["dist", "bin", "ee/dist", "ee/LICENSE", "ee/scripts", "README.md", "LICENSE"],
   "scripts": {
     "build": "tsc -p tsconfig.json && npm run build:ee",
-    "build:ee": "tsc -p ee/tsconfig.json",
+    "build:ee": "tsc -b ee/tsconfig.json",
     "test": "node --test tests/*.test.mjs && npm run test:ee",
     "test:ee": "node --test ee/tests/*.test.mjs",
     "start": "node bin/hub.mjs",

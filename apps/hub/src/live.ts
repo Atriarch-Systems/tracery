@@ -11,6 +11,7 @@ import { authenticate, AuthError, type AuthContext } from './auth.js';
 import type { ApiKeyConfig } from './config.js';
 import type { EventStore } from './store/types.js';
 import type { MetricsRegistry } from './metrics.js';
+import type { HubExtensions } from './server-context.js';
 
 const HEARTBEAT_MS = 15_000;
 const SEND_DEADLINE_MS = 2_000;
@@ -19,6 +20,8 @@ export interface LiveDeps {
   readonly store: EventStore;
   readonly keys: readonly ApiKeyConfig[];
   readonly metrics: MetricsRegistry;
+  /** Optional enterprise extensions (SPEC.md §7). Only `onLiveFrame` is used here. */
+  readonly extensions?: HubExtensions;
 }
 
 interface LiveQuery {
@@ -87,7 +90,9 @@ export function registerLive(app: FastifyInstance, deps: LiveDeps): void {
 
     const send = (frame: ActivityFrame): void => {
       if (closed || socket.readyState !== socket.OPEN) return;
-      sendWithDeadline(socket, frame, drop);
+      const filtered = deps.extensions?.onLiveFrame ? deps.extensions.onLiveFrame({ auth, frame }) : frame;
+      if (filtered === null) return; // dropped by an extension (e.g. rbac scope filtering)
+      sendWithDeadline(socket, filtered, drop);
     };
 
     void frameFor(initialAfter).then(send);

@@ -95,7 +95,7 @@ export async function createServer(config: Config, extensions?: HubExtensions): 
   registerFlowsRoutes(app, ctx);
   registerTracesRoutes(app, ctx);
   registerWorkspacesRoutes(app, ctx);
-  registerLive(app, { store, keys, metrics });
+  registerLive(app, { store, keys, metrics, extensions });
 
   app.get('/v1/openapi.json', { schema: { hide: true } }, async () => app.swagger());
 

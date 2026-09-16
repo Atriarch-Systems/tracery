@@ -4,6 +4,7 @@
  * without creating a cycle back through `server.ts`.
  */
 import type { FastifyInstance, FastifyRequest } from 'fastify';
+import type { ActivityFrame } from '@atriarch/activity-core/contract';
 import type { AuthContext } from './auth.js';
 import type { ApiKeyConfig, Config, Role } from './config.js';
 import type { EventStore } from './store/types.js';
@@ -34,4 +35,16 @@ export interface HubExtensions {
   onRequestAuthed?(ctx: { readonly request: FastifyRequest; readonly auth: AuthContext }): void | Promise<void>;
   /** Runs once at boot with the live app and hub context, so ee can register its own routes (e.g. `/v1/license`) or add RBAC filtering via fastify hooks. */
   registerRoutes?(app: FastifyInstance, ctx: HubContext): void | Promise<void>;
+  /**
+   * Called from `live.ts`'s `send()` before every frame goes out over
+   * `WS /v1/live` -- the one send path `registerRoutes`'s Fastify `onSend`
+   * hook can't reach, since the live feed writes straight to the raw
+   * WebSocket outside Fastify's response pipeline. Return the frame
+   * (unchanged, or with a filtered `events` array) to send it, or `null` to
+   * drop it entirely -- e.g. a delta `events` frame whose one event ends up
+   * outside a scoped key's rbac scope. Not invoked for anything but the live
+   * feed; ordinary HTTP reads stay filtered through `registerRoutes`'s
+   * `onSend` hook.
+   */
+  onLiveFrame?(ctx: { readonly auth: AuthContext; readonly frame: ActivityFrame }): ActivityFrame | null;
 }
