@@ -1,0 +1,16 @@
+{
+  "name": "@atriarch/activity-visualizer",
+  "version": "0.2.0",
+  "license": "MIT",
+  "description": "Consumer-configured React canvas for live nodes and directed activity edges.",
+  "type": "module",
+  "files": ["dist", "README.md", "LICENSE"],
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" },
+    "./types": { "types": "./dist/types.d.ts", "import": "./dist/types.js" }
+  },
+  "scripts": { "build": "tsc -p tsconfig.json", "test": "node --test tests/*.test.mjs", "prepack": "npm run build" },
+  "peerDependencies": { "react": ">=18 <20", "react-dom": ">=18 <20" },
+  "dependencies": { "d3-force": "^3.0.0", "react-force-graph-2d": "^1.29.1" },
+  "devDependencies": { "typescript": "^5.0.0", "@types/react": "^19.0.0", "react": "^19.0.0", "react-dom": "^19.0.0", "@types/d3-force": "^3.0.0" }
+}

@@ -1,0 +1,387 @@
+# Atriarch Activity — specification (v1)
+
+Atriarch Activity turns agent activity events into live, inspectable graphs. An
+application pushes small events ("op X started on node Y in flow Z"); the library
+or the hub turns them into flows, node histories and a drawable graph. When one
+flow spawns another (an agent starting a subagent), the child links to its parent
+and the whole tree renders as one trace.
+
+Three ways to use it:
+
+1. **Library.** Import `@atriarch/activity-core` + `@atriarch/activity-react` and
+   render the graph in your own app from your own event stream.
+2. **Hub.** Run `@atriarch/activity-hub` as a container. Apps push events with a
+   client SDK; the hub stores, sorts, serves and draws. Nothing renders in the app.
+3. **Both.** Embed the React explorer in your app but point it at the hub.
+
+## Non-goals (v1)
+
+- Not an OpenTelemetry replacement. It carries graph-shaped activity, not spans
+  with arbitrary attributes for every function call. Producers may put an OTel
+  `trace_id` in `context` to cross-link.
+- Not a log store. `context` is bounded (64 KB per event) and the hub sweeps by retention.
+- No raw prompts, secrets or PII by default. Producers own that decision.
+
+## Repository layout
+
+```
+packages/core          @atriarch/activity-core        contract, validation, journal, reducers, trace assembly (no DOM, no React)
+packages/visualizer    @atriarch/activity-visualizer  the canvas component (moved from agentkit, MIT)
+packages/react         @atriarch/activity-react       ActivityExplorer composite + hooks (live feed, hub client)
+packages/client        @atriarch/activity-client      TS emitter SDK (batching HTTP transport) + hub read client
+clients/python         atriarch-activity              Python emitter SDK, stdlib only, namespace package atriarch.activity
+apps/hub               @atriarch/activity-hub         standalone server + hosted UI (apps/hub/web) + Dockerfile + k8s
+apps/hub/ee            enterprise layer (license gate, audit log, RBAC) under a commercial license
+docs/                  SPEC.md (this), PLAN.md (workstreams), ENTERPRISE.md
+```
+
+npm workspaces, Node >= 22.13 (for `node:sqlite`), TypeScript 5, ESM only,
+`node --test` for tests. Python 3.11, stdlib only, pytest for tests. CI runs on
+self-hosted runners only.
+
+## 1. Contract
+
+The wire types live in [`packages/core/src/contract.ts`](../packages/core/src/contract.ts).
+Read that file first; this section defines the semantics.
+
+### Identity and deduplication
+
+- `id` is the dedup key. Re-sending an event with the same id is a no-op
+  (`duplicates` in the batch result). Producers retry batches freely.
+- `flow` + `op` identify a call instance. One `start` per op; later `start`s for
+  the same op are ignored (first wins). `update` and `annotate` may repeat. One
+  `end` per op; later `end`s are ignored.
+- `flow` + `node` identify a graph node. `kind`, `label` update the node when
+  present; the last observed value wins.
+- Edge identity is `(source node, target node, relation)` inside a flow.
+  Counts are the number of distinct `start` ops observed on that edge; `end`
+  and `update` never add to a count.
+
+### Ordering
+
+Events are processed in `(ts, seq ?? 0, arrival)` order inside a flow. Hub
+consumers use the hub `cursor`. Late events for a retained flow are always
+accepted and re-projected; a flow with an `end` on every op is complete but
+still accepts late children (a late `start` reopens it).
+
+### Op lifecycle
+
+| Event | Effect on the op |
+| --- | --- |
+| `start` | creates the op; `status = running`; `startedAt = ts`; context merged |
+| `update` | context shallow-merged; `status` applied if given (a producer may report `error` mid-op) |
+| `end` | `endedAt = ts`; `status` required (default `success` if absent); `durationMs` recorded; context merged |
+| `annotate` | appended to the op timeline verbatim; does not merge into context or change status |
+
+An `end`/`update`/`annotate` whose op has no `start` still creates the op with
+`startedAt = undefined` and marks the flow `partial` (evidence of a node, never an
+invented call count or edge visit).
+
+### Flow
+
+A flow is defined by its first `root: true` start. A flow with events but no root
+start is `partial`. Flow fields: `id`, `label` (root op's `label ?? name`), `actor`
+(root event's actor, else first actor seen), `startedAt`, `endedAt` (max end ts
+when no op is open), `status` (`error` if any op errored, else `running` if any op
+open, else `unknown` if partial, else `complete`), `link`, `trace` (resolved trace
+id), `ops`, `nodes`, `edges`.
+
+### Trace resolution
+
+`trace` for a flow = `link.trace` if set, else the `trace` of the flow named by
+`link.parentFlow` if that flow is known, else `link.parentFlow` (the parent may
+arrive later), else the flow's own id. A flow with no link is a trace root.
+Cycles in links are broken by treating the first flow seen as the root.
+
+### Mapping from Virali's pipeline journal (schema_version 1)
+
+| Virali | Activity |
+| --- | --- |
+| `invocation_id` | `flow` |
+| `operation_id` | `op` |
+| `component_id` | `node` |
+| `parent_operation_id`, `parent_component_id` | `parentOp`, `parentNode` |
+| `event` | `type` |
+| `kind`, `name`, `relation`, `root`, `status`, `duration_ms` | same, camel-cased |
+| `metadata` | `context` |
+| `metadata.source_component_id` | `dataFrom` |
+| `timestamp` (seconds) | `ts` (milliseconds) |
+| `event_id` | `id` |
+| `sequence` | `seq` |
+
+The Virali adapter is a follow-up in the Virali repo, not part of this repo.
+
+## 2. Core reducers (`@atriarch/activity-core`)
+
+All pure, renderer-free, importable in Node and browsers.
+
+```ts
+// validation
+validateEvent(raw: unknown): { ok: true; event: ActivityEvent } | { ok: false; reason: string }
+validateBatch(raw: unknown): { ok: true; batch: ActivityBatch } | { ok: false; reason: string }
+
+// journal: bounded, deduplicating, ordered event log
+class Journal { constructor(opts?: { maxEvents?: number })
+  append(events: readonly ActivityEvent[]): { added: ActivityEvent[]; duplicates: number }
+  events(): readonly ActivityEvent[]           // ordered
+  flowIds(): readonly string[]
+  eventsForFlow(flow: string): readonly ActivityEvent[]
+  partial: boolean                              // true once eviction has dropped events
+}
+
+// flows
+buildFlows(events: readonly ActivityEvent[]): ReadonlyMap<string, Flow>
+buildFlow(events: readonly ActivityEvent[]): Flow           // single-flow fast path
+
+interface Flow { id; label; actor?; status; partial; startedAt?; endedAt?; link?; trace;
+  ops: ReadonlyMap<string, OpRecord>; nodes: ReadonlyMap<string, NodeRecord>; edges: readonly EdgeRecord[] }
+interface OpRecord { id; node; name; kind?; status; startedAt?; endedAt?; durationMs?;
+  parentOp?; parentNode?; root; relation; dataFrom?; context: ActivityContext;
+  timeline: readonly TimelineEntry[]; tags: readonly string[] }
+interface TimelineEntry { ts; type: ActivityEventType; status?; context?: ActivityContext; eventId }
+interface NodeRecord { id; label; kind?; ops: readonly string[]; status; running: number;
+  firstSeenAt; lastSeenAt; lastOpName?; errorCount: number }
+interface EdgeRecord { source; target; relation; count; ops: readonly string[]; lastAt; kind: 'call' | 'data' }
+
+// traces
+assembleTrace(flows: ReadonlyMap<string, Flow>, anyFlowInTrace: string): Trace
+interface Trace { root: string; flows: readonly Flow[]; links: readonly { parent: string; child: string; parentOp?; parentNode? }[];
+  missing: readonly string[] /* parentFlow ids referenced but never observed */ }
+ancestors(flows, flow): readonly string[]      // root-first chain
+
+// projection to the visualizer contract
+type Scope = { mode: 'flow'; flow: string } | { mode: 'ancestors'; flow: string } | { mode: 'trace'; trace: string }
+project(flows: ReadonlyMap<string, Flow>, scope: Scope, options?: ProjectOptions): Projection
+interface ProjectOptions { catalog?: (node: NodeRecord, flow: Flow) => NodePresentation; now?: number;
+  history?: { keepCompletedMs?: number } }
+interface Projection { nodes: ActivityNode<NodeData>[]; edges: ActivityEdge<EdgeData>[]; groups: FlowGroup[] }
+interface NodeData { flow: string; node: NodeRecord; ops: OpRecord[] }
+interface EdgeData { flow: string; edge: EdgeRecord }
+interface FlowGroup { id: string; label: string; flow: string; nodeIds: string[]; actor?: ActivityActor; status: Flow['status'] }
+```
+
+Projection rules:
+
+- In `flow` scope node ids are the raw `node` ids. In `ancestors` and `trace`
+  scope node ids are `${actor.id ?? flow.id}::${node}` so two agents' `llm:main`
+  stay apart while one agent's repeated flows in a trace merge onto shared nodes.
+- Each flow in a multi-flow scope becomes a `FlowGroup`; the visualizer draws a
+  hull behind its nodes. Ancestors scope renders the chain root-first, the chosen
+  flow highlighted, ancestors dimmed.
+- A child flow's root node gets an edge from `link.parentNode` (or the parent
+  flow's root node when unknown) with `relation: 'spawn'`, `kind: 'spawn'`, and
+  `layout.parentId` pointing at that node so `placeBranches` grows the subgraph
+  beside its spawner.
+- Node `status`: `error` if any op on it errored, `running` if any op open, else `idle`.
+  `active = running > 0`. `activity.highlighted = true` for flows in scope,
+  `completedAt = flow.endedAt`, `updatedAt = node.lastSeenAt`.
+- `detail` = last op name; `footer` = `${ops.length} ops` (or `${errorCount} errors`).
+- `dataFrom` edges have `kind: 'data'`, are dashed, and do not affect placement parents.
+- Self edges (parent node === node) are suppressed but the op stays in the node history.
+- `catalog` lets the caller map `kind` to `NodePresentation`; a default catalog
+  ships (`agent`, `subagent`, `llm`, `tool`, `memory`, `guard`, `human`, `service`, fallback).
+
+`@atriarch/activity-core` depends on `@atriarch/activity-visualizer/types` for
+the `ActivityNode` / `ActivityEdge` / `NodePresentation` types only (a type-only
+import; no renderer code is pulled in).
+
+## 3. Visualizer (`@atriarch/activity-visualizer`) additions
+
+Keep the existing contract (`VISUALIZER_CONTRACT_VERSION` becomes 2). Add:
+
+- `ActivityNode.group?: string` and `ActivityGraphProps.groups?: readonly { id; label; accent?; dimmed?: boolean }[]`.
+  Grouped nodes get a rounded convex hull drawn beneath them with the label at the
+  top-left. Dimmed groups render at 45% alpha. Groups are presentation only.
+- `ActivityEdge.kind?: 'call' | 'data' | 'spawn'`. `data` draws dashed; `spawn`
+  draws a thicker double-headed accent and is excluded from force link strength.
+- `ActivityGraphProps.onNodeActivate?: (node) => void` fired on double-click / Enter
+  (used to jump into a child flow from a trace view).
+- `placeBranches` accepts `edges` with `kind` and ignores `data` edges when
+  choosing a parent.
+- Tests for each; SSR test still passes; `npm pack` produces a tarball that Virali
+  can drop into `vendor/` unchanged in shape.
+
+## 4. React explorer (`@atriarch/activity-react`)
+
+```tsx
+<ActivityExplorer
+  source={useHubSource({ baseUrl, workspace, apiKey })}   // or useJournalSource(journal)
+  initialScope={{ mode: 'flow', flow }}
+  catalog={myCatalog}
+  renderInspector={(selection) => ...}    // optional override
+/>
+```
+
+Composite of: connection status, flow picker (latest N flows, active ones first,
+"follow latest" default), scope switch (This flow / With ancestors / Whole trace),
+`ActivityGraph` in guided layout with `placeBranches`, an inspector panel
+showing the selected node's ops newest-first with status, timing, merged context
+(pretty JSON, collapsible) and the annotate timeline, and a group legend in trace
+mode. Double-clicking a child flow's group (or a spawn edge target) switches scope
+to that flow. Keyboard: `1/2/3` switch scope. Tailwind is not required; styles are
+inline or a single CSS module with CSS variables for theming (`--activity-bg`,
+`--activity-fg`, `--activity-accent`).
+
+Hooks: `useHubSource` (WS live feed with snapshot + reconnect from cursor, falls
+back to polling `GET /v1/flows/:id/events?after=`), `useJournalSource` (in-process
+journal), `useProjection(source, scope, options)`.
+
+## 5. Client SDKs
+
+### TypeScript (`@atriarch/activity-client`)
+
+```ts
+const tracer = new ActivityTracer({ transport: httpTransport({ baseUrl, apiKey, workspace }),
+  actor: { id: 'agent:saga', kind: 'agent' }, flushIntervalMs: 250, maxBatch: 500 });
+const flow = tracer.startFlow({ label: 'Triage CVE-2026-1234', link?: { parentFlow, parentOp, parentNode } });
+const op = flow.start({ node: 'llm:main', name: 'llm.provider', kind: 'llm', parent?: parentOp, context: {...} });
+op.update({ context: { tokens: 120 } }); op.annotate({ context: { note: 'retry' } });
+op.end({ status: 'success', context: {...} });          // durationMs computed from performance.now()
+const child = flow.spawnLink(op);                         // → ActivityLink for a subagent's startFlow
+flow.end(); await tracer.flush(); await tracer.close();
+```
+
+Transports: `httpTransport` (batches, retries with backoff, never throws into
+the caller, drops with a counter when the queue exceeds `maxQueue`),
+`memoryTransport` (tests), `journalTransport(journal)` (in-process, feeds
+`@atriarch/activity-core` directly for the library-only path). Ids are ULIDs
+generated locally (no dependency; implement the 26-char Crockford ULID).
+
+`HubClient` (read side): `listFlows`, `getFlow`, `getTrace`, `events(flow, after)`,
+`live(filter, onFrame)` returning a disposer; Node and browser (`WebSocket` global).
+
+### Python (`clients/python`, distribution `atriarch-activity`, module `atriarch.activity`)
+
+Same shape: `ActivityTracer`, `Flow`, `Op`, `HttpTransport` (background thread,
+`queue.Queue`, `urllib.request`, bounded, never blocks the producer),
+`MemoryTransport`. Context managers: `with flow.op(node=..., name=...) as op:`
+ends with `error` on exception (class name only, no message). `contextvars`
+carry the current flow/op so nested calls get `parentOp` without plumbing.
+`flow.spawn_link(op)` returns a dict for a subagent. No third-party deps.
+Type hints, `py.typed`, PEP-420 namespace (no `atriarch/__init__.py`).
+
+## 6. Hub (`@atriarch/activity-hub`)
+
+Fastify 5 on Node 22. Configuration by environment variables (documented in
+`apps/hub/README.md`), all with defaults so `docker run -p 8971:8971 image`
+works with an in-memory store and a printed dev API key.
+
+### HTTP API (all under `/v1`, JSON, OpenAPI 3.1 served at `/v1/openapi.json`)
+
+| Method | Path | Auth | Purpose |
+| --- | --- | --- | --- |
+| POST | `/events` | ingest | batch ingest; body `ActivityBatch`; returns `ActivityBatchResult`; 207 when some rejected |
+| GET | `/flows` | read | list flows: `?limit=50&before=<cursor>&status=&actor=&trace=&q=` newest first |
+| GET | `/flows/:id` | read | `Flow` summary + node/edge records (no events) |
+| GET | `/flows/:id/events` | read | `ActivityFrame` snapshot; `?after=<cursor>` for incremental |
+| GET | `/traces/:id` | read | `Trace` with all member flows |
+| GET | `/traces/:id/events` | read | all events for the trace |
+| GET | `/workspaces` | admin | list workspaces and their stats |
+| DELETE | `/flows/:id` | admin | delete a flow and its events |
+| GET | `/healthz`, `/readyz` | none | liveness / readiness |
+| GET | `/metrics` | none or metrics token | Prometheus text: events ingested, rejected, duplicates, flows, store size, ws clients |
+| WS | `/v1/live?workspace=&flow=&trace=&after=` | read (query `?token=` or header) | `ActivityFrame`s: snapshot then events, heartbeat every 15 s |
+| GET | `/` and `/ui/*` | none (UI does its own key entry) | hosted explorer |
+
+Errors are `{ error: { code, message } }`. Every request gets `x-request-id`.
+
+### Auth
+
+API keys. `ACTIVITY_API_KEYS` is a JSON array: `[{ "id": "saga", "key": "...", "workspace": "default", "roles": ["ingest","read"] }]`;
+or `ACTIVITY_API_KEYS_FILE` path. A key with `workspace: "*"` and role `admin`
+is the operator key. With no keys configured the hub generates one dev key at
+boot, logs it, and grants all roles on workspace `default`. Keys are compared in
+constant time. `Authorization: Bearer <key>` or `x-api-key`. The workspace of a
+request is the key's workspace, or the batch/query `workspace` when the key is
+`*`. Requests never see another workspace's data.
+
+### Storage
+
+`EventStore` interface in `apps/hub/src/store/types.ts`:
+`append`, `flowEvents`, `traceEvents`, `listFlows`, `flowSummary`, `deleteFlow`,
+`subscribe`, `sweep`, `stats`, `close`. Two implementations: `MemoryStore`
+(default, bounded) and `SqliteStore` (`node:sqlite`, WAL, file path from
+`ACTIVITY_SQLITE_PATH`, default `/data/activity.db` in the container). Flow
+summaries are materialised on append (a `flows` table) so listing is O(limit).
+The trace id of a flow is resolved on append and stored; when a parent arrives
+after a child, the child's stored trace is corrected. Postgres is a documented
+follow-up behind the same interface.
+
+### Retention
+
+`ACTIVITY_RETENTION_HOURS` (default 72) and `ACTIVITY_MAX_EVENTS_PER_WORKSPACE`
+(default 500k). A sweeper runs every minute, deletes the oldest complete flows
+first, never a running flow younger than the retention window. `sweep` results
+feed `/metrics`.
+
+### Live feed
+
+Subscribers register a filter (workspace, optional flow or trace). Ingest
+fans out accepted events after the store commits. A slow client gets a 2-second
+send deadline then is dropped. Reconnect with `after=<cursor>` replays from the
+store; if the cursor is older than what the store holds, a `snapshot` with
+`truncated: true` is sent.
+
+### Hosted UI (`apps/hub/web`)
+
+Vite + React 19 + `@atriarch/activity-react`. Built to `apps/hub/web/dist` and
+served by the hub as static files. First load asks for a read key (kept in
+`sessionStorage`), then shows the workspace's flows. Deep links:
+`/ui/flows/:id`, `/ui/traces/:id`.
+
+### Packaging
+
+- `apps/hub/Dockerfile`: multi-stage, builds workspaces, final `node:22-alpine`
+  image with only production deps, non-root user, `VOLUME /data`, `EXPOSE 8971`,
+  `HEALTHCHECK` on `/healthz`.
+- `apps/hub/docker-compose.yaml`: hub + volume, example keys file.
+- `apps/hub/k8s/`: Deployment, Service, PVC, example Secret; plain manifests (Kustomize-friendly).
+- `npx @atriarch/activity-hub` starts the server (bin entry).
+
+## 7. Enterprise layer (`apps/hub/ee`)
+
+Open core. Everything outside `apps/hub/ee` is MIT. `apps/hub/ee/LICENSE` is the
+Atriarch Commercial License (source-available, use requires a valid license key).
+
+- **License key**: `ACTIVITY_LICENSE_KEY` is `base64url(payload).base64url(ed25519 signature)`;
+  payload `{ sub, org, features: string[], seats?, exp }`. Verified with an
+  embedded public key via `node:crypto` (`crypto.verify(null, data, publicKey, sig)` for ed25519).
+  A CLI `apps/hub/ee/scripts/mint-license.mjs` signs with a private key from a file
+  (never committed; a dev keypair is generated on demand into `.gitignore`d paths).
+  `GET /v1/license` reports status. Expired keys keep the hub running with ee
+  features disabled and a warning; the community edition never needs a key.
+- **Audit log** (`feature: audit`): every authenticated request records
+  `{ ts, keyId, workspace, method, path, status, flows touched }` to the store;
+  `GET /v1/audit?after=&limit=` (admin) and `GET /v1/audit/export` (NDJSON).
+- **RBAC** (`feature: rbac`): keys may carry `scope: { actors?: string[], tags?: string[] }`
+  constraints; reads and lists are filtered, ingests outside the constraint rejected.
+- **SSO (OIDC) for the hosted UI** is designed but deferred; `docs/ENTERPRISE.md`
+  lists it as roadmap with the intended flow.
+
+## 8. Testing and acceptance
+
+Every package has `npm test` using `node --test` against `dist/` (build first,
+same convention as the visualizer). Python uses pytest. Acceptance for the whole
+repo, executed by the integration workstream:
+
+1. `npm ci && npm run build && npm test` green at the root on Node 22.
+2. `python -m pytest clients/python` green on 3.11 (3.13 acceptable locally).
+3. `docker build -f apps/hub/Dockerfile .` succeeds; `docker run` with no env
+   prints a dev key and serves `/healthz`, `/v1/openapi.json`, `/ui/`.
+4. A demo script (`scripts/demo.mjs`) drives the TS client to emit a parent flow
+   that spawns two child flows (one via the Python client), then asserts through
+   the hub API that: the trace has three flows; the child trace ids equal the
+   parent flow id; `project(trace)` has two `spawn` edges; the live WS delivered
+   every event with a monotonic cursor; a duplicate resend reports `duplicates`.
+5. Playwright (`apps/hub/web/tests`) loads the hosted UI against the demo data
+   and checks: the flow list shows three flows, the trace scope shows three
+   groups, clicking a node shows its context in the inspector, double-clicking a
+   child group switches scope.
+6. Reduced motion, SSR import, and the visualizer's existing tests still pass.
+
+## 9. Decisions owed to Dan
+
+- Product name and npm org. Working name "Atriarch Activity", scope `@atriarch/activity-*`, hub image `atriarch/activity-hub`.
+- Commercial license text for `apps/hub/ee` (a placeholder is included; legal wording is Dan's).
+- Whether to publish to npmjs.com or only the internal Nexus.
+- Whether Virali's dashboard switches to the hub or keeps its embedded journal.

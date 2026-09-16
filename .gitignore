@@ -1,0 +1,9 @@
+node_modules/
+dist/
+*.tgz
+.venv/
+__pycache__/
+*.egg-info/
+.playwright-mcp/
+apps/hub/data/
+.env

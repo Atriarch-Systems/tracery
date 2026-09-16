@@ -1,0 +1,21 @@
+{
+  "name": "atriarch-activity",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Atriarch Activity: agent activity graphs. Event contract, reducers, React visualizer, emitter SDKs and a standalone hub server.",
+  "type": "module",
+  "workspaces": [
+    "packages/core",
+    "packages/visualizer",
+    "packages/client",
+    "packages/react",
+    "apps/hub"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present"
+  },
+  "engines": { "node": ">=22.13" },
+  "devDependencies": { "typescript": "^5.6.0" }
+}

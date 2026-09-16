@@ -1,0 +1,31 @@
+name: ci
+on:
+  pull_request:
+  push:
+    branches: [main]
+jobs:
+  node:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - run: node -e "const [m,n]=process.versions.node.split('.').map(Number); if(m<22||(m===22&&n<13)) process.exit(1)"
+      - run: npm ci
+      - run: npm run build
+      - run: npm test
+  python:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - run: python -c "import sys; assert sys.version_info[:2]==(3,11), sys.version"
+      - run: python -m pip install -e clients/python[dev]
+      - run: python -m pytest -q clients/python
+  docker:
+    runs-on: self-hosted
+    needs: [node]
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -f apps/hub/Dockerfile -t atriarch-activity-hub:ci .
