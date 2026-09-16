@@ -1,0 +1,33 @@
+# Build from the repo root: docker compose -f apps/hub/docker-compose.yaml build
+# (the build context is the monorepo root; see apps/hub/Dockerfile).
+services:
+  hub:
+    build:
+      context: ../..
+      dockerfile: apps/hub/Dockerfile
+    image: atriarch/activity-hub:dev
+    restart: unless-stopped
+    ports:
+      - "8971:8971"
+    environment:
+      ACTIVITY_STORE: sqlite
+      ACTIVITY_SQLITE_PATH: /data/activity.db
+      ACTIVITY_RETENTION_HOURS: "72"
+      ACTIVITY_MAX_EVENTS_PER_WORKSPACE: "500000"
+      ACTIVITY_LOG_LEVEL: info
+      # Either set ACTIVITY_API_KEYS inline, or mount a keys file and point
+      # ACTIVITY_API_KEYS_FILE at it (see ./keys.example.json below). With
+      # neither set, the hub prints a dev key to its logs on boot.
+      ACTIVITY_API_KEYS_FILE: /run/secrets/activity-keys.json
+    volumes:
+      - activity-data:/data
+      - ./keys.example.json:/run/secrets/activity-keys.json:ro
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8971/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  activity-data:

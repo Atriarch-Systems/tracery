@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: activity-hub-data
+  namespace: activity
+  labels:
+    app.kubernetes.io/name: activity-hub
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  # storageClassName: truenas-ssd   # set to the cluster's default/preferred class

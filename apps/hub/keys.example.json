@@ -1,0 +1,20 @@
+[
+  {
+    "id": "saga",
+    "key": "REPLACE_ME_ingest_key_for_saga",
+    "workspace": "saga",
+    "roles": ["ingest", "read"]
+  },
+  {
+    "id": "explorer",
+    "key": "REPLACE_ME_read_only_key_for_the_hosted_ui",
+    "workspace": "saga",
+    "roles": ["read"]
+  },
+  {
+    "id": "operator",
+    "key": "REPLACE_ME_operator_key",
+    "workspace": "*",
+    "roles": ["ingest", "read", "admin"]
+  }
+]
