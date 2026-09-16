@@ -1,0 +1,7 @@
+{
+  "session_id": "sess-main-1",
+  "transcript_path": "/home/user/.claude/projects/my-project/sess-main-1/transcript.jsonl",
+  "cwd": "/home/user/my-project",
+  "hook_event_name": "PostCompact",
+  "compact_reason": "auto"
+}

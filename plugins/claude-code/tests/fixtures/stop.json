@@ -1,0 +1,10 @@
+{
+  "session_id": "sess-main-1",
+  "prompt_id": "550e8400-e29b-41d4-a716-446655440000",
+  "transcript_path": "/home/user/.claude/projects/my-project/sess-main-1/transcript.jsonl",
+  "cwd": "/home/user/my-project",
+  "permission_mode": "default",
+  "hook_event_name": "Stop",
+  "last_assistant_message": "Fixed the login bug and the lint errors; tests are green.",
+  "stop_hook_active": false
+}

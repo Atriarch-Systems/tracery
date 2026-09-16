@@ -1,0 +1,14 @@
+{
+  "session_id": "sess-main-1",
+  "prompt_id": "9c7c1a1a-1111-4a2b-9c3d-000000000001",
+  "transcript_path": "/home/user/.claude/projects/my-project/sess-main-1/subagents/agent-77.jsonl",
+  "cwd": "/home/user/my-project",
+  "permission_mode": "default",
+  "hook_event_name": "PostToolUse",
+  "tool_name": "Read",
+  "tool_input": { "file_path": "/home/user/my-project/src/widgets/api.ts" },
+  "tool_use_id": "toolu_03READ",
+  "tool_output": "export function listWidgets(cursor) { /* ... */ }",
+  "agent_id": "agent-77",
+  "agent_type": "general-purpose"
+}

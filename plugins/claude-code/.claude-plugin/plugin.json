@@ -1,0 +1,36 @@
+{
+  "name": "atriarch-activity",
+  "version": "0.1.0",
+  "description": "Streams Claude Code session, tool-call and subagent activity to an Atriarch Activity hub for live graph visualization.",
+  "author": "Atriarch Systems",
+  "license": "MIT",
+  "hooks": "./hooks/hooks.json",
+  "skills": "./skills/",
+  "userConfig": {
+    "hub_url": {
+      "type": "string",
+      "title": "Activity hub URL",
+      "description": "Base URL of the Atriarch Activity hub, e.g. https://activity.example.com (no trailing slash needed).",
+      "required": true
+    },
+    "api_key": {
+      "type": "string",
+      "title": "Ingest API key",
+      "description": "Activity hub API key with the ingest role, sent as an Authorization: Bearer header.",
+      "sensitive": true,
+      "required": true
+    },
+    "workspace": {
+      "type": "string",
+      "title": "Workspace",
+      "description": "Activity hub workspace to ingest events into.",
+      "default": "default"
+    },
+    "include_prompts": {
+      "type": "boolean",
+      "title": "Include prompt text",
+      "description": "When enabled, forwards the full text of user prompts to the hub. Off by default: only the prompt's character count is sent.",
+      "default": false
+    }
+  }
+}

@@ -15,6 +15,7 @@
   "scripts": {
     "build": "npm run build --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
+    "test:plugin": "node --test plugins/claude-code/tests/*.test.mjs",
     "typecheck": "npm run typecheck --workspaces --if-present"
   },
   "engines": { "node": ">=22.13" },
