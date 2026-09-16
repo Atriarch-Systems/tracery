@@ -9,7 +9,8 @@
     "packages/visualizer",
     "packages/client",
     "packages/react",
-    "apps/hub"
+    "apps/hub",
+    "apps/hub/web"
   ],
   "scripts": {
     "build": "npm run build --workspaces --if-present",
