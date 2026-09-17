@@ -10,7 +10,8 @@
     "packages/client",
     "packages/react",
     "apps/hub",
-    "apps/hub/web"
+    "apps/hub/web",
+    "examples/embedded"
   ],
   "scripts": {
     "build": "npm run build --workspaces --if-present",

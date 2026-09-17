@@ -135,6 +135,7 @@ flow reachable that way resolves to one `trace`.
 - [`docs/ENTERPRISE.md`](docs/ENTERPRISE.md) — what the commercial layer (`apps/hub/ee`) does, licensing operationally, and the open-core boundary.
 - [`docs/CLAUDE-CODE-PLUGIN.md`](docs/CLAUDE-CODE-PLUGIN.md) — the Claude Code plugin's hook mapping, privacy details, troubleshooting.
 - [`docs/GETTING-STARTED.md`](docs/GETTING-STARTED.md) — a longer walkthrough: hub via Docker Compose, a keys file, TS and Python emitters, embedding the explorer, the plugin.
+- [`docs/DEMOS.md`](docs/DEMOS.md) — the three demos (Claude Code plugin, npm library, standalone hub): commands, screenshots, and what each distribution can and can't do.
 - [`CLAUDE.md`](CLAUDE.md) — repository layout and conventions for agents working in this codebase.
 
 ## Licensing

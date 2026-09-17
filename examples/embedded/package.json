@@ -1,0 +1,25 @@
+{
+  "name": "tracery-example-embedded",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Tracery library-mode example: Journal + a scripted synthetic agent, no hub, no network.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -p tsconfig.json --noEmit && vite build",
+    "preview": "vite preview --port 4312 --strictPort"
+  },
+  "dependencies": {
+    "@atriarch/tracery-core": "*",
+    "@atriarch/tracery-react": "*",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^4.3.0",
+    "typescript": "^5.6.0",
+    "vite": "^6.0.0"
+  }
+}
