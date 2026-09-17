@@ -2,6 +2,7 @@
   "name": "@atriarch/tracery-hub-web",
   "version": "0.1.0",
   "private": true,
+  "license": "Apache-2.0",
   "type": "module",
   "description": "Hosted explorer for @atriarch/tracery-hub (SPEC.md §6 \"Hosted UI\"): key entry, flow/trace deep links, ActivityExplorer full-screen. Built to dist/ and served by the hub at /ui.",
   "scripts": {

@@ -26,7 +26,7 @@ the wire contract; a change there is a versioned contract change with a golden t
 - Consumer inputs are `readonly` and never mutated. No `any` in exports.
 - Node >= 22.13 (`node:sqlite`). Python 3.11 is the supported interpreter.
 - CI runs on self-hosted runners only. Never `runs-on: ubuntu-latest`.
-- Licensing is open core: MIT everywhere except `apps/hub/ee`.
+- Licensing is open core: Apache-2.0 everywhere except `apps/hub/ee`.
 
 ## Commands
 

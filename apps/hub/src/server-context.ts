@@ -47,4 +47,14 @@ export interface HubExtensions {
    * `onSend` hook.
    */
   onLiveFrame?(ctx: { readonly auth: AuthContext; readonly frame: ActivityFrame }): ActivityFrame | null;
+  /**
+   * Reports whether a currently-valid license is active. Re-checked on
+   * every call (same "no restart needed" pattern as the audit/RBAC feature
+   * checks in `apps/hub/ee/src/index.ts`), not cached at construction time.
+   * Absent (community edition with no `ee` layer at all) or returning
+   * `false` both mean "community" -- `server.ts` uses this to decide
+   * whether to send the `X-Ko-fi` tip-jar header, and `bin/hub.mjs` uses it
+   * for the one-line startup banner.
+   */
+  isLicensed?(): boolean;
 }

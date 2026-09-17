@@ -78,6 +78,13 @@ spec at `GET /v1/openapi.json` (OpenAPI 3.1). Errors are always
 `{ "error": { "code": "...", "message": "..." } }`; every response carries
 `x-request-id`.
 
+### Headers
+
+| Header | When | Meaning |
+| --- | --- | --- |
+| `x-request-id` | Every response. | Echoes the incoming `x-request-id`, or a generated one when absent/invalid. |
+| `x-ko-fi` | Every response, community edition only. | `https://ko-fi.com/demonslyr` -- a friendly tip-jar link, no protocol meaning; absent in licensed deployments (see `docs/ENTERPRISE.md`). |
+
 | Method | Path | Role | Purpose |
 | --- | --- | --- | --- |
 | `POST` | `/v1/events` | `ingest` | Batch ingest. Body is an `ActivityBatch` (`{ v, workspace?, events }`). Returns `ActivityBatchResult`; `200` when every event was accepted, `207` when some were rejected (see `rejected[]`), `400` for a malformed envelope or a batch over 1000 events. |

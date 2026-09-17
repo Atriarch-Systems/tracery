@@ -93,3 +93,7 @@ npm run test:plugin
 payload fixtures; `tests/emit.test.mjs` runs `hooks/emit.mjs` as a child
 process against a fake hub; `tests/e2e.test.mjs` starts the real hub
 (`apps/hub/bin/hub.mjs`) and drives a full session with a subagent through it.
+
+## Support
+
+☕ Tracery is free and open source. If it saves you time, [buy me a coffee](https://ko-fi.com/demonslyr).

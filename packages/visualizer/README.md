@@ -113,17 +113,24 @@ child flow's group.
 
 ## License
 
-This activity visualizer package is licensed under the [MIT License](./LICENSE).
-Copyright (c) 2026 Atriarch Systems. This grant applies to this package's own
-code and documentation; other Agent Kit packages have their own terms.
+This activity visualizer package is licensed under the
+[Apache License, Version 2.0](./LICENSE). Copyright 2026 Atriarch Systems.
+This grant applies to this package's own code and documentation; other Agent
+Kit packages have their own terms.
 
-MIT permits use, modification, redistribution, and commercial use, provided
-the copyright and license notices are retained in copies or substantial portions.
-The software is provided as is, without warranty, subject to the license's terms.
-No visible application badge is required.
+Apache-2.0 permits use, modification, redistribution, and commercial use,
+provided the `LICENSE` and `NOTICE` files are retained in copies or
+substantial portions of the software, and it includes an express patent
+grant from contributors to users. The software is provided as is, without
+warranty, subject to the license's terms. No visible application badge is
+required.
 
 The graph engine is [React Force Graph](https://github.com/vasturiano/react-force-graph)
 by Vasco Asturiano (MIT). This package also uses
 [D3 Force](https://github.com/d3/d3-force) by Mike Bostock (ISC).
 Dependencies remain under their respective licenses; preserve applicable upstream
 notices when distributing them. These acknowledgments do not replace their licenses.
+
+## Support
+
+☕ Tracery is free and open source. If it saves you time, [buy me a coffee](https://ko-fi.com/demonslyr).

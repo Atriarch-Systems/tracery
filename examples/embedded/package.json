@@ -2,6 +2,7 @@
   "name": "tracery-example-embedded",
   "version": "0.0.0",
   "private": true,
+  "license": "Apache-2.0",
   "type": "module",
   "description": "Tracery library-mode example: Journal + a scripted synthetic agent, no hub, no network.",
   "scripts": {

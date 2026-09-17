@@ -466,6 +466,25 @@ test('health: /healthz and /readyz need no auth', async () => {
   }
 });
 
+// Funding: apps/hub/README.md "Headers" -- a friendly tip-jar link, community edition only.
+test('headers: x-ko-fi is set on every response with no extensions (community edition), and omitted once "licensed"', async () => {
+  const created = await createTestServer({ apiKeys: KEYS });
+  try {
+    const res = await created.app.inject({ method: 'GET', url: '/healthz' });
+    assert.equal(res.headers['x-ko-fi'], 'https://ko-fi.com/demonslyr');
+  } finally {
+    await created.close();
+  }
+
+  const licensed = await createTestServer({ apiKeys: KEYS, extensions: { isLicensed: () => true } });
+  try {
+    const res = await licensed.app.inject({ method: 'GET', url: '/healthz' });
+    assert.equal(res.headers['x-ko-fi'], undefined);
+  } finally {
+    await licensed.close();
+  }
+});
+
 test('metrics: text exposition carries every documented metric name and reflects ingest activity', async () => {
   const created = await createTestServer({ apiKeys: KEYS });
   try {

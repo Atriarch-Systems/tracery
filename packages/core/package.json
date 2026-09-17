@@ -1,10 +1,11 @@
 {
   "name": "@atriarch/tracery-core",
   "version": "0.1.0",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "description": "Tracery wire contract, validation, journal, flow reducers, trace assembly and visualizer projection. No DOM, no React.",
   "type": "module",
-  "files": ["dist", "README.md", "LICENSE"],
+  "files": ["dist", "README.md", "LICENSE", "NOTICE"],
+  "funding": { "type": "ko-fi", "url": "https://ko-fi.com/demonslyr" },
   "exports": {
     ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" },
     "./contract": { "types": "./dist/contract.d.ts", "import": "./dist/contract.js" },

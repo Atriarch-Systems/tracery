@@ -18,7 +18,7 @@
       },
       "homepage": "https://github.com/atriarch-systems/tracery",
       "repository": "https://github.com/atriarch-systems/tracery",
-      "license": "MIT",
+      "license": "Apache-2.0",
       "keywords": ["observability", "agent", "activity", "visualization", "hooks"],
       "category": "observability"
     }

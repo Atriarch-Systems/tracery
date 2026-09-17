@@ -132,6 +132,10 @@ export async function createServer(config: Config, extensions?: HubExtensions): 
     const incoming = request.headers['x-request-id'];
     const requestId = safeRequestId(Array.isArray(incoming) ? incoming[0] : incoming);
     reply.header('x-request-id', requestId);
+    // Funding: a friendly tip-jar link, community edition only (apps/hub/README.md "HTTP API").
+    if (!(extensions?.isLicensed?.() ?? false)) {
+      reply.header('x-ko-fi', 'https://ko-fi.com/demonslyr');
+    }
   });
 
   app.setErrorHandler((error: Error, request, reply) => {

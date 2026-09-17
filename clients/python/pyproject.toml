@@ -7,11 +7,11 @@ name = "atriarch-tracery"
 version = "0.1.0"
 description = "Tracery emitter SDK: stdlib-only Python client for the Tracery wire contract."
 readme = "README.md"
-license = { text = "MIT" }
+license = { text = "Apache-2.0" }
 requires-python = ">=3.11"
 authors = [{ name = "Atriarch Systems" }]
 classifiers = [
-  "License :: OSI Approved :: MIT License",
+  "License :: OSI Approved :: Apache Software License",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
@@ -19,6 +19,9 @@ classifiers = [
   "Typing :: Typed",
 ]
 dependencies = []
+
+[project.urls]
+Funding = "https://ko-fi.com/demonslyr"
 
 [project.optional-dependencies]
 dev = ["pytest"]

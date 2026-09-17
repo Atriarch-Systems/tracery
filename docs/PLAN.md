@@ -22,7 +22,7 @@ before writing code. Rules for every workstream:
 ## A — core reducers
 
 Owns: `packages/core`.
-Deliver: `package.json` (`@atriarch/tracery-core` 0.1.0, MIT), `tsconfig.json`
+Deliver: `package.json` (`@atriarch/tracery-core` 0.1.0, Apache-2.0), `tsconfig.json`
 extending `../../tsconfig.base.json`, `src/` implementing SPEC §1–§2:
 `contract.ts` (given), `validate.ts`, `journal.ts`, `flows.ts`, `trace.ts`,
 `project.ts`, `catalog.ts`, `index.ts`. Type-only dependency on

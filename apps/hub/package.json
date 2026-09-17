@@ -1,9 +1,10 @@
 {
   "name": "@atriarch/tracery-hub",
   "version": "0.1.0",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "description": "Tracery standalone hub server: ingest, storage, retention, live feed and hosted UI.",
   "type": "module",
+  "funding": { "type": "ko-fi", "url": "https://ko-fi.com/demonslyr" },
   "bin": {
     "tracery-hub": "./bin/hub.mjs"
   },
@@ -14,7 +15,8 @@
     "ee/LICENSE",
     "ee/scripts",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "NOTICE"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json && npm run build:ee",

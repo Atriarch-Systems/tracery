@@ -39,6 +39,9 @@ created.app.log.info(`store: ${config.store}${config.store === 'sqlite' ? ` (${c
 if (extensions) {
   created.app.log.info(`enterprise layer: ${extensions.license.valid ? `licensed (${extensions.license.features.join(', ') || 'no features'})` : 'community edition'}`);
 }
+if (!(extensions?.isLicensed?.() ?? false)) {
+  created.app.log.info('Tracery is open source (Apache-2.0). Docs: https://github.com/atriarch-systems/tracery · Support: https://ko-fi.com/demonslyr');
+}
 if (created.devKey) {
   created.app.log.warn(
     `No TRACERY_API_KEYS configured. Generated a dev key with all roles on workspace "default":\n` +

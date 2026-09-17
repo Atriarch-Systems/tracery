@@ -4,6 +4,7 @@ import type { Scope } from '@atriarch/tracery-core';
 import { useRoute, type Route } from './router.js';
 import { KeyEntry } from './KeyEntry.js';
 import { ExplorerErrorBoundary } from './ErrorBoundary.js';
+import { Footer } from './Footer.js';
 import { loadSession, saveSession, clearSession, type HubSession } from './session.js';
 import { fetchAuthMe, logout } from './sso.js';
 
@@ -54,28 +55,31 @@ export function App() {
 
   const route = useRoute();
 
-  if (!session) {
-    return (
-      <KeyEntry
-        ssoAvailable={ssoAvailable}
-        onReady={(next) => {
-          saveSession(next);
-          setSession(next);
-        }}
-      />
-    );
-  }
-
   return (
-    <Explorer
-      session={session}
-      route={route}
-      onSignOut={() => {
-        clearSession();
-        setSession(null);
-        void logout(); // best-effort: clears the SSO session cookie server-side too, if there is one
-      }}
-    />
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      <div style={{ flex: '1 1 auto', minHeight: 0 }}>
+        {!session ? (
+          <KeyEntry
+            ssoAvailable={ssoAvailable}
+            onReady={(next) => {
+              saveSession(next);
+              setSession(next);
+            }}
+          />
+        ) : (
+          <Explorer
+            session={session}
+            route={route}
+            onSignOut={() => {
+              clearSession();
+              setSession(null);
+              void logout(); // best-effort: clears the SSO session cookie server-side too, if there is one
+            }}
+          />
+        )}
+      </div>
+      <Footer />
+    </div>
   );
 }
 

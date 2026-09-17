@@ -26,7 +26,7 @@ Three ways to use it:
 
 ```
 packages/core          @atriarch/tracery-core        contract, validation, journal, reducers, trace assembly (no DOM, no React)
-packages/visualizer    @atriarch/tracery-visualizer  the canvas component (moved from agentkit, MIT)
+packages/visualizer    @atriarch/tracery-visualizer  the canvas component (moved from agentkit, Apache-2.0)
 packages/react         @atriarch/tracery-react       ActivityExplorer composite + hooks (live feed, hub client)
 packages/client        @atriarch/tracery-client      TS emitter SDK (batching HTTP transport) + hub read client
 clients/python         atriarch-tracery               Python emitter SDK, stdlib only, namespace package atriarch.tracery
@@ -340,7 +340,7 @@ served by the hub as static files. First load asks for a read key (kept in
 
 ## 7. Enterprise layer (`apps/hub/ee`)
 
-Open core. Everything outside `apps/hub/ee` is MIT. `apps/hub/ee/LICENSE` is the
+Open core. Everything outside `apps/hub/ee` is Apache-2.0. `apps/hub/ee/LICENSE` is the
 Atriarch Commercial License (source-available, use requires a valid license key).
 
 - **License key**: `TRACERY_LICENSE_KEY` is `base64url(payload).base64url(ed25519 signature)`;

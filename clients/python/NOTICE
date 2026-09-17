@@ -1,0 +1,13 @@
+Tracery
+Copyright 2026 Atriarch Systems
+
+This product includes software developed by Atriarch Systems (https://atriarch.systems).
+
+This product includes the following third-party software:
+
+- React Force Graph (https://github.com/vasturiano/react-force-graph)
+  by Vasco Asturiano, licensed under the MIT License.
+- D3 Force (https://github.com/d3/d3-force)
+  by Mike Bostock, licensed under the ISC License.
+- Fastify (https://github.com/fastify/fastify), licensed under the MIT License.
+- node-postgres / pg (https://github.com/brianc/node-postgres), licensed under the MIT License.

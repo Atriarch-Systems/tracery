@@ -96,6 +96,16 @@ test('key entry is skipped once a session is stored, and the flow list shows the
   await expect(page.getByTestId('header-connection-status')).toHaveText('live');
 });
 
+// Funding: the hosted UI's static footer (apps/hub/web/src/Footer.tsx) must
+// always render, with the Ko-fi tip-jar link shown since this preview server
+// has no /v1/license route at all (fetch fails -> treated as community).
+test('the static footer is present with the product name and a Ko-fi link', async ({ page }) => {
+  await primeMockedHub(page);
+  await expect(page.getByTestId('hub-footer')).toBeVisible();
+  await expect(page.getByTestId('hub-footer')).toContainText('Tracery by Atriarch Systems');
+  await expect(page.getByTestId('hub-footer-kofi')).toHaveAttribute('href', 'https://ko-fi.com/demonslyr');
+});
+
 test('choosing trace scope shows three groups in the legend', async ({ page }) => {
   await primeMockedHub(page);
   await page.getByTestId('scope-trace').click();

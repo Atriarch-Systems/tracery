@@ -113,14 +113,14 @@ silent no-op. See
 
 | Package | Path | Version | License |
 | --- | --- | --- | --- |
-| `@atriarch/tracery-core` | `packages/core` | 0.1.0 | MIT |
-| `@atriarch/tracery-visualizer` | `packages/visualizer` | 0.3.0 | MIT |
-| `@atriarch/tracery-client` | `packages/client` | 0.1.0 | MIT |
-| `@atriarch/tracery-react` | `packages/react` | 0.1.0 | MIT |
-| `atriarch-tracery` (Python, `atriarch.tracery`) | `clients/python` | 0.1.0 | MIT |
-| `@atriarch/tracery-hub` | `apps/hub` | 0.1.0 | MIT (`apps/hub/ee` excluded, see below) |
-| `@atriarch/tracery-hub-web` (hosted UI, not published) | `apps/hub/web` | 0.1.0 | MIT |
-| `tracery` (Claude Code plugin) | `plugins/claude-code` | 0.1.0 | MIT |
+| `@atriarch/tracery-core` | `packages/core` | 0.1.0 | Apache-2.0 |
+| `@atriarch/tracery-visualizer` | `packages/visualizer` | 0.3.0 | Apache-2.0 |
+| `@atriarch/tracery-client` | `packages/client` | 0.1.0 | Apache-2.0 |
+| `@atriarch/tracery-react` | `packages/react` | 0.1.0 | Apache-2.0 |
+| `atriarch-tracery` (Python, `atriarch.tracery`) | `clients/python` | 0.1.0 | Apache-2.0 |
+| `@atriarch/tracery-hub` | `apps/hub` | 0.1.0 | Apache-2.0 (`apps/hub/ee` excluded, see below) |
+| `@atriarch/tracery-hub-web` (hosted UI, not published) | `apps/hub/web` | 0.1.0 | Apache-2.0 |
+| `tracery` (Claude Code plugin) | `plugins/claude-code` | 0.1.0 | Apache-2.0 |
 
 ## Event model
 
@@ -152,7 +152,7 @@ flow reachable that way resolves to one `trace`.
 
 ## Licensing
 
-Open core. Everything in this repository is **MIT** except
+Open core. Everything in this repository is **Apache License 2.0** except
 [`apps/hub/ee`](apps/hub/ee), which is source-available under the
 [Atriarch Commercial License](apps/hub/ee/LICENSE) (currently a
 **placeholder** pending Dan's counsel-approved text). The hub is fully
@@ -162,7 +162,7 @@ edition is the default runtime behavior, with or without `apps/hub/ee`
 built into the image. `apps/hub/ee` adds a license-key gate, an audit log,
 and RBAC scopes (including for the live feed); see
 [`docs/ENTERPRISE.md`](docs/ENTERPRISE.md) for how licensing works and what
-each feature requires.
+each feature requires. See [`NOTICE`](NOTICE) for third-party attributions.
 
 ## Status
 
@@ -210,3 +210,11 @@ Docker image not shipping `apps/hub/ee/dist`; `apps/hub/package.json`
 RBAC-filterable (`HubExtensions.onLiveFrame`, implemented in
 `apps/hub/ee/src/rbac.ts`, tested with a real WebSocket client). Nothing
 found during acceptance itself failed and was left unfixed.
+
+## Support
+
+☕ Tracery is free and open source. If it saves you time, [buy me a coffee](https://ko-fi.com/demonslyr).
+
+[![ko-fi](https://img.shields.io/badge/Ko--fi-Buy%20me%20a%20coffee-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/demonslyr)
+
+Licensed under the [Apache License, Version 2.0](LICENSE).
