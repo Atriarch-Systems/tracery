@@ -303,6 +303,8 @@ export class ActivityTracer {
   private droppedCount = 0;
   private seq = 0;
   private closed = false;
+  /** Set while a drain is in flight so overlapping `flush()` callers share it instead of starting another. */
+  private inFlight: Promise<void> | null = null;
 
   constructor(options: ActivityTracerOptions) {
     this.transport = options.transport;
@@ -357,8 +359,7 @@ export class ActivityTracer {
     });
   }
 
-  /** Drain the queue to the transport in `maxBatch`-sized chunks. Never throws. */
-  async flush(): Promise<void> {
+  private async drain(): Promise<void> {
     while (this.queue.length > 0) {
       const batch = this.queue.splice(0, this.maxBatch);
       try {
@@ -373,6 +374,24 @@ export class ActivityTracer {
     } catch {
       // ignore
     }
+  }
+
+  /**
+   * Drain the queue to the transport in `maxBatch`-sized chunks. Never
+   * throws. Re-entrant: if a drain is already running (started by this call,
+   * another concurrent `flush()`, or the periodic timer), this awaits that
+   * same drain instead of starting an overlapping one — so `transport.send`
+   * never runs concurrently with itself and `await flush()` only resolves
+   * once every batch queued up to that point (including ones spliced off by
+   * the in-progress drain) has actually been handed to the transport.
+   */
+  flush(): Promise<void> {
+    if (this.inFlight) return this.inFlight;
+    const run = this.drain().finally(() => {
+      if (this.inFlight === run) this.inFlight = null;
+    });
+    this.inFlight = run;
+    return run;
   }
 
   /** Flush remaining events, stop the flush timer, and close the transport. */

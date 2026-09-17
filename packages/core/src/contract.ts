@@ -142,4 +142,8 @@ export const ACTIVITY_LIMITS = {
   maxEventBytes: 64 * 1024,
   maxIdLength: 256,
   maxTags: 32,
+  /** Maximum nesting depth walked inside event.context. Guards validateEvent's "never throws" guarantee against a deeply nested body. */
+  maxContextDepth: 32,
+  /** Maximum number of JSON nodes (objects, arrays, and scalars) walked inside event.context. */
+  maxContextNodes: 10_000,
 } as const;

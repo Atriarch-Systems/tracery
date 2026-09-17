@@ -42,6 +42,30 @@ export function toFlowSummary(flow: Flow): FlowSummary {
   };
 }
 
+/**
+ * The inverse of `toFlowSummary`: rebuilds a core `Flow` (with `ops`/`nodes`
+ * as `Map`s, as `@atriarch/tracery-core`'s `assembleTrace`/`ancestors`
+ * require) from its JSON wire shape. Used by `SqliteStore` to reload its
+ * in-memory flow index from a persisted `FlowSummary` row instead of
+ * re-deriving every flow from its whole event history on boot.
+ */
+export function flowFromSummary(summary: FlowSummary): Flow {
+  return {
+    id: summary.id,
+    label: summary.label,
+    actor: summary.actor,
+    status: summary.status,
+    partial: summary.partial,
+    startedAt: summary.startedAt,
+    endedAt: summary.endedAt,
+    link: summary.link,
+    trace: summary.trace,
+    ops: new Map(Object.entries(summary.ops)),
+    nodes: new Map(Object.entries(summary.nodes)),
+    edges: summary.edges,
+  };
+}
+
 export interface AppendResult {
   readonly accepted: readonly StoredEvent[];
   readonly duplicates: number;

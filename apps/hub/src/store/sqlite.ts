@@ -1,21 +1,44 @@
 /**
  * SQLite-backed `EventStore` (SPEC.md §6 "Storage"), using Node's built-in
  * `node:sqlite` (`DatabaseSync`, WAL mode). Events are the durable source of
- * truth, persisted one row per event; flow/trace reduction is kept as an
+ * truth, persisted one row per event. Flow/trace reduction is kept as an
  * in-memory index (identical algorithm to `MemoryStore`, built from
- * `@atriarch/tracery-core`'s `buildFlows`/`assembleTrace`) rebuilt from the
- * database on startup and refreshed on every write, so `listFlows` and
- * friends never touch disk on the read path. This trades a bounded amount of
- * memory (workspaces are capped by `TRACERY_MAX_EVENTS_PER_WORKSPACE`) for
- * simplicity and correctness parity with `MemoryStore`.
+ * `@atriarch/tracery-core`'s `buildFlow`/`buildFlows` and `assembleTrace`)
+ * so `listFlows` and friends never touch disk on the read path -- but unlike
+ * `MemoryStore`, that index is ALSO materialised into a `flows` table (hub-22),
+ * one row per flow, kept current incrementally on every write the exact same
+ * way the in-memory index is (via core's single-flow `buildFlow` fast path on
+ * the touched flow(s), plus whichever other flows' `trace` the late-parent
+ * correction actually changed -- see `reduceTouchedFlows`/`reResolveTraceIds`).
+ *
+ * That materialised table is what makes `listFlows`/`flowSummary` genuinely
+ * SQL-backed (indexed `WHERE`/`ORDER BY`, not an in-memory array scan) and,
+ * more importantly, what lets `load()` restore the in-memory flow index on
+ * boot in O(flows) -- one row read + `JSON.parse` per flow -- instead of
+ * O(events): re-deriving every flow from its entire event history via
+ * `buildFlows(state.events)`, as this store used to do (and as `MemoryStore`,
+ * which has no disk to persist a materialised index to, still must). The
+ * events table is still scanned into memory at boot (`flowEvents`/
+ * `traceEvents`/`workspaceFrame`/sweep candidates need the raw events), but
+ * that scan no longer feeds a `buildFlows` reduction -- it is cheap
+ * object-copy work, not graph reduction over the whole retained log.
+ *
+ * If the `flows` table is missing (a database written before hub-22) or its
+ * schema-version row doesn't match `FLOWS_SCHEMA_VERSION` (a future format
+ * change), `load()` falls back to the old O(events) `buildFlows` reduction
+ * once, then repopulates `flows` from the result so every later boot is fast
+ * again.
  */
 import { DatabaseSync } from 'node:sqlite';
 import fs from 'node:fs';
 import path from 'node:path';
-import { buildFlows, assembleTrace, type Flow } from '@atriarch/tracery-core';
+import { buildFlow, buildFlows, assembleTrace, type Flow } from '@atriarch/tracery-core';
 import type { ActivityEvent, ActivityFrame, StoredEvent } from '@atriarch/tracery-core/contract';
 import { buildFrame } from './frame.js';
+import { resolveTraceIds } from './trace-ids.js';
+import { isSweepProtected, isOverRetention, orderSweepCandidates, type SweepCandidate } from './sweep.js';
 import {
+  flowFromSummary,
   toFlowSummary,
   type AppendResult,
   type EventStore,
@@ -30,23 +53,16 @@ import {
   type WorkspaceStats,
 } from './types.js';
 
+/** Bump when the `flows` table's columns or `data_json` shape change; `load()` rebuilds from events on a mismatch. */
+const FLOWS_SCHEMA_VERSION = 1;
+const FLOWS_SCHEMA_VERSION_KEY = 'flows_schema_version';
+
 interface WorkspaceState {
   events: StoredEvent[];
   eventsById: Map<string, StoredEvent>;
   eventsByFlow: Map<string, StoredEvent[]>;
   flows: Map<string, Flow>;
   floorCursor: number | undefined;
-}
-
-function matchesQuery(flow: Flow, query: ListFlowsQuery): boolean {
-  if (query.status && flow.status !== query.status) return false;
-  if (query.actor && flow.actor?.id !== query.actor) return false;
-  if (query.trace && flow.trace !== query.trace) return false;
-  if (query.q) {
-    const needle = query.q.toLowerCase();
-    if (!flow.label.toLowerCase().includes(needle)) return false;
-  }
-  return true;
 }
 
 interface EventRow {
@@ -57,11 +73,39 @@ interface EventRow {
   json: string;
 }
 
+interface FlowRow {
+  workspace: string;
+  data_json: string;
+}
+
+/** Union of every op's tags in a flow, deduped and sorted for a deterministic `tags_json` column. */
+function collectTags(flow: Flow): string[] {
+  const tags = new Set<string>();
+  for (const op of flow.ops.values()) for (const tag of op.tags) tags.add(tag);
+  return [...tags].sort();
+}
+
+/** The node of the op whose `start` declared `root: true` -- ops are keyed in event-processing order, so the first one found is the flow's actual root (SPEC.md §1 "Flow"). `undefined` for a partial flow with no root start yet. */
+function rootNodeOf(flow: Flow): string | undefined {
+  for (const op of flow.ops.values()) if (op.root) return op.node;
+  return undefined;
+}
+
+/** Escapes `%`, `_` and `\` so a user-supplied `q` substring is matched literally by SQL `LIKE ... ESCAPE '\'`. */
+function escapeLikePattern(input: string): string {
+  return input.replace(/[\\%_]/g, (ch) => `\\${ch}`);
+}
+
 export class SqliteStore implements EventStore {
   private readonly workspaces = new Map<string, WorkspaceState>();
   private readonly subscribers = new Set<StoreSubscriber>();
   private cursor = 0;
   private readonly db: DatabaseSync;
+
+  private readonly insertEventStmt;
+  private readonly upsertFlowStmt;
+  private readonly deleteFlowRowStmt;
+  private readonly flowSummaryStmt;
 
   constructor(filePath: string) {
     const dir = path.dirname(filePath);
@@ -70,6 +114,16 @@ export class SqliteStore implements EventStore {
     this.db = new DatabaseSync(filePath);
     this.db.exec('PRAGMA journal_mode = WAL;');
     this.db.exec('PRAGMA synchronous = NORMAL;');
+
+    const flowsTableExisted = this.tableExists('flows');
+    const storedSchemaVersion = this.tableExists('schema_meta') ? this.readSchemaMeta(FLOWS_SCHEMA_VERSION_KEY) : undefined;
+    const needsFlowsRebuild = !flowsTableExisted || storedSchemaVersion !== String(FLOWS_SCHEMA_VERSION);
+    // A stale-schema table (version mismatch) is dropped so CREATE TABLE IF NOT
+    // EXISTS below lays down the current column set instead of leaving the old
+    // one in place; a missing table (upgrade from a pre-hub-22 database, or a
+    // brand-new one) has nothing to drop.
+    if (needsFlowsRebuild && flowsTableExisted) this.db.exec('DROP TABLE IF EXISTS flows;');
+
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS events (
         cursor INTEGER PRIMARY KEY,
@@ -81,11 +135,95 @@ export class SqliteStore implements EventStore {
       );
     `);
     this.db.exec('CREATE INDEX IF NOT EXISTS idx_events_workspace_flow ON events(workspace, flow);');
+    // hub-6: persists the eviction floor per workspace so a restart doesn't forget
+    // what the sweeper (or an admin delete) already dropped -- without this a
+    // client reconnecting post-restart with a pre-eviction cursor gets a plain
+    // `events` delta instead of `truncated: true` and silently misses data.
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS workspace_meta (
+        workspace TEXT PRIMARY KEY,
+        floor_cursor INTEGER
+      );
+    `);
 
-    this.load();
+    // hub-22: materialised flow index -- see the class doc. `data_json` is the
+    // full `FlowSummary` (ops/nodes/edges included); the other columns exist so
+    // `listFlows`/`flowSummary` can filter, sort and page in SQL without
+    // deserialising every candidate row first.
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS flows (
+        workspace TEXT NOT NULL,
+        id TEXT NOT NULL,
+        trace TEXT NOT NULL,
+        label TEXT NOT NULL,
+        actor_id TEXT,
+        actor_kind TEXT,
+        status TEXT NOT NULL,
+        partial INTEGER NOT NULL,
+        started_at INTEGER,
+        ended_at INTEGER,
+        first_cursor INTEGER NOT NULL,
+        last_cursor INTEGER NOT NULL,
+        tags_json TEXT NOT NULL,
+        root_node TEXT,
+        data_json TEXT NOT NULL,
+        PRIMARY KEY (workspace, id)
+      );
+    `);
+    this.db.exec('CREATE INDEX IF NOT EXISTS idx_flows_workspace_last_cursor ON flows(workspace, last_cursor);');
+    this.db.exec('CREATE INDEX IF NOT EXISTS idx_flows_workspace_status ON flows(workspace, status);');
+    this.db.exec('CREATE INDEX IF NOT EXISTS idx_flows_workspace_actor ON flows(workspace, actor_id);');
+    this.db.exec('CREATE INDEX IF NOT EXISTS idx_flows_workspace_trace ON flows(workspace, trace);');
+
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS schema_meta (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+      );
+    `);
+
+    this.insertEventStmt = this.db.prepare('INSERT INTO events (cursor, workspace, id, flow, json) VALUES (?, ?, ?, ?, ?)');
+    this.upsertFlowStmt = this.db.prepare(`
+      INSERT INTO flows (workspace, id, trace, label, actor_id, actor_kind, status, partial, started_at, ended_at, first_cursor, last_cursor, tags_json, root_node, data_json)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(workspace, id) DO UPDATE SET
+        trace = excluded.trace, label = excluded.label, actor_id = excluded.actor_id, actor_kind = excluded.actor_kind,
+        status = excluded.status, partial = excluded.partial, started_at = excluded.started_at, ended_at = excluded.ended_at,
+        first_cursor = excluded.first_cursor, last_cursor = excluded.last_cursor, tags_json = excluded.tags_json,
+        root_node = excluded.root_node, data_json = excluded.data_json
+    `);
+    this.deleteFlowRowStmt = this.db.prepare('DELETE FROM flows WHERE workspace = ? AND id = ?');
+    this.flowSummaryStmt = this.db.prepare('SELECT data_json FROM flows WHERE workspace = ? AND id = ?');
+
+    this.load(needsFlowsRebuild);
   }
 
-  private load(): void {
+  private tableExists(name: string): boolean {
+    const row = this.db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?").get(name);
+    return row !== undefined;
+  }
+
+  private readSchemaMeta(key: string): string | undefined {
+    const row = this.db.prepare('SELECT value FROM schema_meta WHERE key = ?').get(key) as unknown as { value: string } | undefined;
+    return row?.value;
+  }
+
+  private writeSchemaMeta(key: string, value: string): void {
+    this.db
+      .prepare('INSERT INTO schema_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value')
+      .run(key, value);
+  }
+
+  /**
+   * `needsFlowsRebuild`: when false (the common case -- every prior boot has
+   * already gone through this code), every workspace's flow index is loaded
+   * straight from the `flows` table (O(flows): one row + one `JSON.parse`
+   * each) via `flowFromSummary`, never touching `buildFlows`. When true (the
+   * table was missing or its schema version didn't match), it falls back to
+   * the old O(events) `buildFlows(state.events)` reduction once, then writes
+   * the result into `flows` so this branch isn't taken again next boot.
+   */
+  private load(needsFlowsRebuild: boolean): void {
     const rows = this.db.prepare('SELECT cursor, workspace, id, flow, json FROM events ORDER BY cursor ASC').all() as unknown as EventRow[];
     for (const row of rows) {
       const stored = JSON.parse(row.json) as StoredEvent;
@@ -97,7 +235,71 @@ export class SqliteStore implements EventStore {
       else state.eventsByFlow.set(row.flow, [stored]);
       if (row.cursor > this.cursor) this.cursor = row.cursor;
     }
-    for (const state of this.workspaces.values()) this.rebuildFlows(state);
+
+    const metaRows = this.db.prepare('SELECT workspace, floor_cursor FROM workspace_meta').all() as unknown as {
+      workspace: string;
+      floor_cursor: number | null;
+    }[];
+    for (const row of metaRows) {
+      if (row.floor_cursor === null) continue;
+      this.state(row.workspace).floorCursor = row.floor_cursor;
+    }
+
+    if (needsFlowsRebuild) {
+      for (const [workspace, state] of this.workspaces) {
+        state.flows = new Map(buildFlows(state.events));
+        for (const flowId of state.flows.keys()) this.persistFlowRow(workspace, state, flowId);
+      }
+      this.writeSchemaMeta(FLOWS_SCHEMA_VERSION_KEY, String(FLOWS_SCHEMA_VERSION));
+    } else {
+      const flowRows = this.db.prepare('SELECT workspace, data_json FROM flows').all() as unknown as FlowRow[];
+      for (const row of flowRows) {
+        const summary = JSON.parse(row.data_json) as FlowSummary;
+        const flow = flowFromSummary(summary);
+        this.state(row.workspace).flows.set(flow.id, flow);
+      }
+    }
+  }
+
+  private persistFloorCursor(workspace: string, floorCursor: number | undefined): void {
+    this.db
+      .prepare(
+        'INSERT INTO workspace_meta (workspace, floor_cursor) VALUES (?, ?) ON CONFLICT(workspace) DO UPDATE SET floor_cursor = excluded.floor_cursor',
+      )
+      .run(workspace, floorCursor ?? null);
+  }
+
+  /** Upserts one flow's `flows` row from the current in-memory `state.flows`/`state.eventsByFlow`. No-op (well, a delete) if the flow no longer exists in memory. */
+  private persistFlowRow(workspace: string, state: WorkspaceState, flowId: string): void {
+    const flow = state.flows.get(flowId);
+    if (!flow) {
+      this.deleteFlowRowStmt.run(workspace, flowId);
+      return;
+    }
+    const events = state.eventsByFlow.get(flowId);
+    const firstCursor = events && events.length > 0 ? events[0]!.cursor : 0;
+    const lastCursor = events && events.length > 0 ? events[events.length - 1]!.cursor : 0;
+    this.upsertFlowStmt.run(
+      workspace,
+      flow.id,
+      flow.trace,
+      flow.label,
+      flow.actor?.id ?? null,
+      flow.actor?.kind ?? null,
+      flow.status,
+      flow.partial ? 1 : 0,
+      flow.startedAt ?? null,
+      flow.endedAt ?? null,
+      firstCursor,
+      lastCursor,
+      JSON.stringify(collectTags(flow)),
+      rootNodeOf(flow) ?? null,
+      JSON.stringify(toFlowSummary(flow)),
+    );
+  }
+
+  private persistFlowRows(workspace: string, state: WorkspaceState, flowIds: ReadonlySet<string>): void {
+    for (const flowId of flowIds) this.persistFlowRow(workspace, state, flowId);
   }
 
   private state(workspace: string): WorkspaceState {
@@ -109,16 +311,73 @@ export class SqliteStore implements EventStore {
     return state;
   }
 
-  private rebuildFlows(state: WorkspaceState): void {
-    state.flows = new Map(buildFlows(state.events));
+  /**
+   * hub-2 (see `MemoryStore.reduceTouchedFlows`): re-reduces only
+   * `touchedFlowIds` via core's single-flow `buildFlow`, then re-resolves
+   * trace ids for the whole workspace -- O(#flows), not O(#events). Returns
+   * every flow id whose in-memory record actually changed (touched, or a
+   * late-parent trace correction), so the caller persists exactly those rows
+   * instead of the whole table.
+   */
+  private reduceTouchedFlows(state: WorkspaceState, touchedFlowIds: ReadonlySet<string>): Set<string> {
+    const dirty = new Set<string>();
+    for (const flowId of touchedFlowIds) {
+      const flowEvents = state.eventsByFlow.get(flowId);
+      if (flowEvents && flowEvents.length > 0) {
+        state.flows.set(flowId, buildFlow(flowEvents));
+        dirty.add(flowId);
+      }
+    }
+    for (const id of this.reResolveTraceIds(state)) dirty.add(id);
+    return dirty;
+  }
+
+  /** Returns the ids of every flow whose resolved `trace` changed. */
+  private reResolveTraceIds(state: WorkspaceState): Set<string> {
+    const traceIds = resolveTraceIds(state.flows);
+    const changed = new Set<string>();
+    for (const [id, flow] of state.flows) {
+      const trace = traceIds.get(id)!;
+      if (flow.trace !== trace) {
+        state.flows.set(id, { ...flow, trace });
+        changed.add(id);
+      }
+    }
+    return changed;
+  }
+
+  private lastSeenAt(state: WorkspaceState, flowId: string): number {
+    const events = state.eventsByFlow.get(flowId);
+    if (!events || events.length === 0) return Number.NEGATIVE_INFINITY;
+    let max = Number.NEGATIVE_INFINITY;
+    for (const event of events) if (event.receivedAt > max) max = event.receivedAt;
+    return max;
+  }
+
+  /** Removes a flow's events and `flows` row (DB + index entries) without re-resolving trace ids -- callers batch that (see `deleteFlow`, `sweep`). */
+  private removeFlowEvents(workspace: string, state: WorkspaceState, flowId: string): boolean {
+    const flowEvents = state.eventsByFlow.get(flowId);
+    if (!flowEvents) return false;
+
+    this.db.prepare('DELETE FROM events WHERE workspace = ? AND flow = ?').run(workspace, flowId);
+    this.deleteFlowRowStmt.run(workspace, flowId);
+
+    for (const event of flowEvents) state.eventsById.delete(event.id);
+    state.eventsByFlow.delete(flowId);
+    const removedIds = new Set(flowEvents.map((event) => event.id));
+    state.events = state.events.filter((event) => !removedIds.has(event.id));
+    state.flows.delete(flowId);
+
+    state.floorCursor = state.events.length > 0 ? state.events[0]!.cursor : this.cursor;
+    this.persistFloorCursor(workspace, state.floorCursor);
+    return true;
   }
 
   async append(workspace: string, events: readonly ActivityEvent[]): Promise<AppendResult> {
     const state = this.state(workspace);
     const accepted: StoredEvent[] = [];
     let duplicates = 0;
-
-    const insert = this.db.prepare('INSERT INTO events (cursor, workspace, id, flow, json) VALUES (?, ?, ?, ?, ?)');
+    const touchedFlows = new Set<string>();
 
     for (const event of events) {
       if (state.eventsById.has(event.id)) {
@@ -127,17 +386,19 @@ export class SqliteStore implements EventStore {
       }
       this.cursor += 1;
       const stored: StoredEvent = { ...event, workspace, cursor: this.cursor, receivedAt: Date.now() };
-      insert.run(stored.cursor, workspace, stored.id, stored.flow, JSON.stringify(stored));
+      this.insertEventStmt.run(stored.cursor, workspace, stored.id, stored.flow, JSON.stringify(stored));
       state.eventsById.set(event.id, stored);
       state.events.push(stored);
       const forFlow = state.eventsByFlow.get(event.flow);
       if (forFlow) forFlow.push(stored);
       else state.eventsByFlow.set(event.flow, [stored]);
       accepted.push(stored);
+      touchedFlows.add(event.flow);
     }
 
     if (accepted.length > 0) {
-      this.rebuildFlows(state);
+      const dirty = this.reduceTouchedFlows(state, touchedFlows);
+      this.persistFlowRows(workspace, state, dirty);
       for (const event of accepted) for (const subscriber of this.subscribers) subscriber(event);
     }
 
@@ -174,33 +435,46 @@ export class SqliteStore implements EventStore {
     return buildFrame(state.events, this.cursor, this.floorInfo(state), after);
   }
 
+  /** SQL-backed (hub-22): filters, sorts and pages entirely in the `flows` table -- no in-memory flow scan. */
   async listFlows(workspace: string, query: ListFlowsQuery): Promise<ListFlowsResult> {
-    const state = this.state(workspace);
     const limit = query.limit && query.limit > 0 ? Math.min(query.limit, 1000) : 50;
 
-    const lastCursorOf = (flow: Flow): number => {
-      const events = state.eventsByFlow.get(flow.id);
-      if (!events || events.length === 0) return 0;
-      return events[events.length - 1]!.cursor;
-    };
-
-    let candidates = [...state.flows.values()].filter((flow) => matchesQuery(flow, query));
-    candidates.sort((a, b) => lastCursorOf(b) - lastCursorOf(a));
-
+    const conditions = ['workspace = ?'];
+    const params: (string | number)[] = [workspace];
+    if (query.status) {
+      conditions.push('status = ?');
+      params.push(query.status);
+    }
+    if (query.actor) {
+      conditions.push('actor_id = ?');
+      params.push(query.actor);
+    }
+    if (query.trace) {
+      conditions.push('trace = ?');
+      params.push(query.trace);
+    }
+    if (query.q) {
+      conditions.push("label LIKE ? ESCAPE '\\'");
+      params.push(`%${escapeLikePattern(query.q)}%`);
+    }
     if (query.before !== undefined) {
-      const before = Number(query.before);
-      candidates = candidates.filter((flow) => lastCursorOf(flow) < before);
+      conditions.push('last_cursor < ?');
+      params.push(Number(query.before));
     }
 
-    const page = candidates.slice(0, limit);
-    const nextBefore = page.length === limit && page.length > 0 ? String(lastCursorOf(page[page.length - 1]!)) : undefined;
+    const sql = `SELECT data_json, last_cursor FROM flows WHERE ${conditions.join(' AND ')} ORDER BY last_cursor DESC LIMIT ?`;
+    const rows = this.db.prepare(sql).all(...params, limit) as unknown as { data_json: string; last_cursor: number }[];
 
-    return { flows: page.map(toFlowSummary), nextBefore };
+    const flows = rows.map((row) => JSON.parse(row.data_json) as FlowSummary);
+    const nextBefore = rows.length === limit && rows.length > 0 ? String(rows[rows.length - 1]!.last_cursor) : undefined;
+
+    return { flows, nextBefore };
   }
 
+  /** SQL-backed (hub-22): a single indexed row lookup, not a `state.flows.get` + conversion. */
   async flowSummary(workspace: string, flowId: string): Promise<FlowSummary | undefined> {
-    const flow = this.state(workspace).flows.get(flowId);
-    return flow ? toFlowSummary(flow) : undefined;
+    const row = this.flowSummaryStmt.get(workspace, flowId) as unknown as { data_json: string } | undefined;
+    return row ? (JSON.parse(row.data_json) as FlowSummary) : undefined;
   }
 
   async getTrace(workspace: string, traceId: string): Promise<TraceSummary | undefined> {
@@ -212,19 +486,13 @@ export class SqliteStore implements EventStore {
 
   async deleteFlow(workspace: string, flowId: string): Promise<boolean> {
     const state = this.state(workspace);
-    const flowEvents = state.eventsByFlow.get(flowId);
-    if (!flowEvents) return false;
-
-    this.db.prepare('DELETE FROM events WHERE workspace = ? AND flow = ?').run(workspace, flowId);
-
-    for (const event of flowEvents) state.eventsById.delete(event.id);
-    state.eventsByFlow.delete(flowId);
-    const removedIds = new Set(flowEvents.map((event) => event.id));
-    state.events = state.events.filter((event) => !removedIds.has(event.id));
-
-    state.floorCursor = state.events.length > 0 ? state.events[0]!.cursor : this.cursor;
-    this.rebuildFlows(state);
-    return true;
+    const removed = this.removeFlowEvents(workspace, state, flowId);
+    if (removed) {
+      // a deleted parent's children may need a new placeholder trace id
+      const dirty = this.reResolveTraceIds(state);
+      this.persistFlowRows(workspace, state, dirty);
+    }
+    return removed;
   }
 
   subscribe(subscriber: StoreSubscriber): Unsubscribe {
@@ -238,25 +506,31 @@ export class SqliteStore implements EventStore {
     let sweptEvents = 0;
 
     for (const [workspace, state] of this.workspaces) {
-      const isProtected = (flow: Flow): boolean =>
-        flow.status === 'running' && flow.startedAt !== undefined && flow.startedAt >= cutoff;
-
-      const candidates = [...state.flows.values()]
-        .filter((flow) => !isProtected(flow))
-        .sort((a, b) => (a.startedAt ?? -Infinity) - (b.startedAt ?? -Infinity));
+      const withLastSeen: SweepCandidate[] = [...state.flows.values()].map((flow) => ({
+        flow,
+        lastSeenAt: this.lastSeenAt(state, flow.id),
+      }));
+      const candidates = orderSweepCandidates(withLastSeen.filter((c) => !isSweepProtected(c, cutoff)));
 
       let totalEvents = state.events.length;
-      for (const flow of candidates) {
-        const overRetention = flow.startedAt !== undefined ? flow.startedAt < cutoff : true;
+      let sweptThisWorkspace = 0;
+      for (const candidate of candidates) {
         const overCount = totalEvents > options.maxEventsPerWorkspace;
-        if (!overRetention && !overCount) break;
+        // Candidates are ordered oldest-first within (complete, then running/unknown)
+        // groups, not globally by age, so a candidate that doesn't qualify yet must
+        // not stop the loop -- a later, older candidate in the other group might.
+        if (!isOverRetention(candidate, cutoff) && !overCount) continue;
 
-        const count = state.eventsByFlow.get(flow.id)?.length ?? 0;
-        // eslint-disable-next-line no-await-in-loop
-        await this.deleteFlow(workspace, flow.id);
+        const count = state.eventsByFlow.get(candidate.flow.id)?.length ?? 0;
+        this.removeFlowEvents(workspace, state, candidate.flow.id);
         totalEvents -= count;
         sweptFlows += 1;
         sweptEvents += count;
+        sweptThisWorkspace += 1;
+      }
+      if (sweptThisWorkspace > 0) {
+        const dirty = this.reResolveTraceIds(state);
+        this.persistFlowRows(workspace, state, dirty);
       }
     }
 

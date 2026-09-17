@@ -98,6 +98,42 @@ test('httpTransport retries a network error (not just HTTP 5xx) before reaching 
   await closeHub(hub);
 });
 
+test('httpTransport aborts a stalled attempt after timeoutMs instead of hanging, then retries', async () => {
+  const hub = await startFakeHub((req, res, n) => {
+    if (n === 1) {
+      // Simulate a hub that accepts the connection and then stalls: respond
+      // well after the client's timeout (and after it has already moved on
+      // to a retry), just so the socket eventually closes cleanly.
+      res.on('error', () => {});
+      setTimeout(() => {
+        try {
+          sendJson(res, 200, { accepted: 1, duplicates: 0, rejected: [], cursor: 1 });
+        } catch {
+          // client already gone; nothing to do
+        }
+      }, 300);
+      return;
+    }
+    sendJson(res, 200, { accepted: 1, duplicates: 0, rejected: [], cursor: 1 });
+  });
+  const transport = httpTransport({ baseUrl: hub.baseUrl, apiKey: 'k', retries: 3, backoffMs: 5, timeoutMs: 50 });
+
+  const start = Date.now();
+  await transport.send(sampleEvents);
+  const elapsed = Date.now() - start;
+
+  // Without a per-attempt timeout this would hang for undici's default
+  // headers timeout (minutes); bounded by timeoutMs it must resolve quickly.
+  assert.ok(elapsed < 1000, `expected the stalled attempt to be aborted quickly, took ${elapsed}ms`);
+  assert.equal(hub.requests.length, 2); // 1st attempt stalls/times out, 2nd succeeds
+
+  // The aborted attempt's keep-alive connection otherwise lingers (the
+  // delayed response above still has to land somewhere) and makes a plain
+  // `server.close()` wait out Node's keep-alive idle timeout.
+  hub.server.closeAllConnections();
+  await closeHub(hub);
+});
+
 test('memoryTransport records every batch verbatim, in order', () => {
   const transport = memoryTransport();
   transport.send(sampleEvents);

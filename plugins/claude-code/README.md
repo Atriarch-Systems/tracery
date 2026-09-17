@@ -15,7 +15,17 @@ For development, point Claude Code straight at this directory:
 claude --plugin-dir ./plugins/claude-code
 ```
 
-From a marketplace: `/plugin install tracery@<marketplace>`.
+From a marketplace: this repo's own [`.claude-plugin/marketplace.json`](../../.claude-plugin/marketplace.json)
+lists this plugin as `tracery`, so once its marketplace is added (assuming
+the repo's intended future location):
+
+```
+/plugin marketplace add atriarch-systems/tracery
+/plugin install tracery@atriarch-systems
+```
+
+See [`../../docs/CLAUDE-CODE-PLUGIN.md`](../../docs/CLAUDE-CODE-PLUGIN.md#install-and-configure)
+for the local-path variant of `/plugin marketplace add`.
 
 ## Configure
 

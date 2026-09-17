@@ -118,6 +118,22 @@ test('polling: poll-error keeps the feed polling for the next tick to retry', ()
   assert.equal(state.cursor, before.cursor);
 });
 
+// Regression (ui-9): the module's own header comment says "A frame applied
+// while `polling` keeps the status `polling`", but the implementation used
+// to unconditionally return `status: 'live'`. A message queued on a socket
+// that has since been superseded by polling can still arrive after the
+// switch (disposing a socket is asynchronous), which used to paint the
+// connection indicator `live` while the only real transport was a poll timer.
+test('a frame delivered while polling keeps the feed polling, per this module\'s documented contract', () => {
+  let state = feedReducer(initialFeedState(), { type: 'disconnect' });
+  state = feedReducer(state, { type: 'disconnect' }); // now polling
+  assert.equal(state.status, 'polling');
+  state = feedReducer(state, { type: 'frame', frame: events(30) });
+  assert.equal(state.status, 'polling');
+  assert.equal(state.cursor, 30);
+  assert.equal(state.wsFailures, 0);
+});
+
 test('reset returns to the initial state, optionally reseeding a resume cursor', () => {
   let state = feedReducer(initialFeedState(), { type: 'frame', frame: snapshot(99) });
   state = feedReducer(state, { type: 'reset', after: 5 });

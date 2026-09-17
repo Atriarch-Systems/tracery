@@ -46,8 +46,8 @@ test.afterAll(async () => {
   });
 });
 
-/** Seeds the session (skips the key-entry screen) and installs a mock WebSocket delivering `snapshotFrame` once, immediately. */
-async function primeMockedHub(page: Page): Promise<void> {
+/** Seeds the session (skips the key-entry screen) and installs a mock WebSocket delivering `frame` once, immediately. */
+async function primeMockedHubWithFrame(page: Page, frame: unknown, path = '/ui/'): Promise<void> {
   await page.addInitScript(
     ({ session, frame }) => {
       window.sessionStorage.setItem('atriarch-tracery-hub-session', JSON.stringify(session));
@@ -79,9 +79,14 @@ async function primeMockedHub(page: Page): Promise<void> {
 
       (window as unknown as { WebSocket: unknown }).WebSocket = MockWebSocket;
     },
-    { session: MOCK_SESSION, frame: snapshotFrame },
+    { session: MOCK_SESSION, frame },
   );
-  await page.goto(`${BASE_URL}/ui/`);
+  await page.goto(`${BASE_URL}${path}`);
+}
+
+/** Seeds the session and installs a mock WebSocket delivering the fixture trace's `snapshotFrame`. */
+async function primeMockedHub(page: Page): Promise<void> {
+  await primeMockedHubWithFrame(page, snapshotFrame);
 }
 
 test('key entry is skipped once a session is stored, and the flow list shows the fixture\'s three flows', async ({ page }) => {
@@ -120,4 +125,178 @@ test('double-clicking a child group\'s node switches scope to that flow', async 
     'data-active',
     'true',
   );
+});
+
+// Regression (ui-1): `Inspector.formatTs` used to call `new Date(ts).toISOString()`
+// with no guard. `validateEvent` only requires `ts` to be a finite number, so
+// an out-of-range value (still valid per the wire contract) passes ingest and
+// reaches the inspector, where `toISOString()` threw `RangeError` during
+// render -- and with no error boundary, unmounted the whole hosted UI.
+test('an op with an out-of-range ts does not blank the page when inspected', async ({ page }) => {
+  const insaneFlowId = 'flow:insane-ts';
+  const insaneEvent = {
+    v: 1,
+    id: 'evt-insane-01',
+    ts: 1e18,
+    flow: insaneFlowId,
+    op: 'op:insane',
+    node: 'llm:insane',
+    type: 'start',
+    name: 'llm.plan',
+    kind: 'llm',
+    label: 'Out-of-range timestamp',
+    root: true,
+    actor: { id: 'agent:insane', kind: 'agent' },
+  };
+  const events = [...storedEvents, { ...insaneEvent, workspace: 'default', cursor: storedEvents.length + 1, receivedAt: Date.now() }];
+  await primeMockedHubWithFrame(page, { type: 'snapshot', cursor: events.length, events, truncated: false });
+
+  await expect(page.getByTestId('header-connection-status')).toHaveText('live');
+  await page.locator(`[data-testid="flow-picker-item"][data-flow-id="${insaneFlowId}"]`).click();
+  await page.locator('[data-testid="node-item"][data-node-id="llm:insane"]').first().click();
+
+  // The page must still be up (header + flow picker intact), not blanked by a thrown RangeError.
+  await expect(page.getByText('Tracery', { exact: true })).toBeVisible();
+  await expect(page.getByTestId('explorer-crashed')).toHaveCount(0);
+  await expect(page.getByTestId('inspector-op').first()).toBeVisible();
+  // formatTs falls back to the raw number for a ts outside Date's range.
+  await expect(page.getByTestId('inspector-op').first()).toContainText('1000000000000000000');
+});
+
+// Regression (ui-2): a namespaced (trace/ancestors) scope resolves node ids
+// as `${actor.id}::${node}`. Two flows sharing an actor and a node id (an
+// orchestrator's linked child flow reusing the parent's node names, per the
+// finding's repro) collapse onto one id; the visualizer's `reconcile` used to
+// throw on that duplicate from inside `ActivityGraph`'s effect, unmounting
+// the whole hosted UI the moment "Whole trace" scope was chosen.
+test('two flows that collapse onto the same namespaced node id in trace scope do not blank the page', async ({ page }) => {
+  const sharedActor = { id: 'agent:dup', kind: 'agent' };
+  const parentId = 'flow:dup-parent';
+  const childId = 'flow:dup-child';
+  const dupEvents = [
+    { v: 1, id: 'evt-dup-p1', ts: 1_700_000_100_000, flow: parentId, op: 'op:dup-p', node: 'llm:main', type: 'start', name: 'llm.plan', kind: 'llm', label: 'Dup parent', root: true, actor: sharedActor },
+    { v: 1, id: 'evt-dup-c1', ts: 1_700_000_100_500, flow: childId, op: 'op:dup-c', node: 'llm:main', type: 'start', name: 'llm.plan', kind: 'llm', label: 'Dup child', root: true, actor: sharedActor, link: { parentFlow: parentId } },
+  ];
+  const events = [
+    ...storedEvents,
+    ...dupEvents.map((event, index) => ({ ...event, workspace: 'default', cursor: storedEvents.length + index + 1, receivedAt: Date.now() })),
+  ];
+  await primeMockedHubWithFrame(page, { type: 'snapshot', cursor: events.length, events, truncated: false });
+
+  await expect(page.getByTestId('header-connection-status')).toHaveText('live');
+  await page.locator(`[data-testid="flow-picker-item"][data-flow-id="${parentId}"]`).click();
+  await page.getByTestId('scope-trace').click();
+
+  // The page must still be up: the crash used to happen synchronously on switching to trace scope.
+  await expect(page.getByText('Tracery', { exact: true })).toBeVisible();
+  await expect(page.getByTestId('explorer-crashed')).toHaveCount(0);
+  await expect(page.getByTestId('group-legend-item')).toHaveCount(2);
+});
+
+// Regression (ui-11): `parseRoute` called `decodeURIComponent` on the flow/
+// trace id segment with no guard. A stray `%` in the path (browsers preserve
+// it verbatim in `location.pathname`) throws `URIError`, which -- run from
+// `useRoute`'s `popstate` handler (also its `useState` initializer, exercised
+// via client-side navigation here rather than an initial HTTP request, since
+// `vite preview`'s own static-file middleware -- unrelated to this app --
+// independently 500s on a raw "%" in the request path) -- used to blank the
+// page instead of degrading gracefully.
+test('a malformed deep link (stray "%") reached via client-side navigation does not blank the page', async ({ page }) => {
+  await primeMockedHub(page);
+  await expect(page.getByTestId('flow-picker-item')).toHaveCount(3);
+
+  await page.evaluate(() => {
+    window.history.pushState(null, '', '/ui/flows/%');
+    window.dispatchEvent(new PopStateEvent('popstate'));
+  });
+
+  // The id segment fails to decode, so the route falls back to the raw,
+  // still-encoded segment as a (non-existent) flow id: no flow matches it,
+  // so the explorer shows its normal "nothing selected" state -- not a blank page.
+  await expect(page.getByText('Tracery', { exact: true })).toBeVisible();
+  await expect(page.getByTestId('explorer-crashed')).toHaveCount(0);
+  await expect(page.getByTestId('flow-picker-item')).toHaveCount(3);
+});
+
+// SPEC.md §7 "SSO (OIDC) for the hosted UI": "the key-entry screen shows a
+// 'Sign in with SSO' button when GET /v1/auth/me reports sso is configured".
+// No sessionStorage session is primed for either test below -- KeyEntry must
+// render on its own, exactly like a first-ever visit.
+
+test('key entry shows a "Sign in with SSO" button when GET /v1/auth/me reports sso configured and licensed', async ({ page }) => {
+  await page.route('**/v1/auth/me', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ sso: { configured: true, licensed: true }, authenticated: false }),
+    }),
+  );
+  await page.goto(`${BASE_URL}/ui/`);
+
+  await expect(page.getByTestId('key-entry-form')).toBeVisible();
+  const ssoButton = page.getByTestId('sso-login-button');
+  await expect(ssoButton).toBeVisible();
+  await expect(ssoButton).toHaveAttribute('href', /^\/v1\/auth\/oidc\/login\?returnTo=/);
+});
+
+test('key entry has no SSO button when GET /v1/auth/me reports sso not configured', async ({ page }) => {
+  await page.route('**/v1/auth/me', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ sso: { configured: false, licensed: false }, authenticated: false }),
+    }),
+  );
+  await page.goto(`${BASE_URL}/ui/`);
+
+  await expect(page.getByTestId('key-entry-form')).toBeVisible();
+  await expect(page.getByTestId('sso-login-button')).toHaveCount(0);
+});
+
+// A valid session cookie already existing on first load (the common case
+// right after the OIDC callback redirects the browser back to `/ui/`) must
+// skip KeyEntry entirely, with no API key ever touching sessionStorage.
+test('key entry is skipped when GET /v1/auth/me reports an already-authenticated SSO session', async ({ page }) => {
+  await page.route('**/v1/auth/me', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        sso: { configured: true, licensed: true },
+        authenticated: true,
+        user: { sub: 'user-1', email: 'user1@example.com', workspace: 'default', role: 'read' },
+      }),
+    }),
+  );
+  await page.addInitScript(({ frame }) => {
+    class MockWebSocket extends EventTarget {
+      static readonly CONNECTING = 0;
+      static readonly OPEN = 1;
+      static readonly CLOSING = 2;
+      static readonly CLOSED = 3;
+      readyState = 0;
+      constructor(_url: string) {
+        super();
+        setTimeout(() => {
+          this.readyState = 1;
+          this.dispatchEvent(new Event('open'));
+          this.dispatchEvent(new MessageEvent('message', { data: JSON.stringify(frame) }));
+        }, 0);
+      }
+      send(): void {}
+      close(): void {
+        this.readyState = 3;
+        this.dispatchEvent(new Event('close'));
+      }
+    }
+    (window as unknown as { WebSocket: unknown }).WebSocket = MockWebSocket;
+  }, { frame: snapshotFrame });
+  await page.goto(`${BASE_URL}/ui/`);
+
+  await expect(page.getByTestId('key-entry-form')).toHaveCount(0);
+  await expect(page.getByTestId('flow-picker-item')).toHaveCount(3);
+
+  const storedSession = await page.evaluate(() => window.sessionStorage.getItem('atriarch-tracery-hub-session'));
+  expect(storedSession).not.toBeNull();
+  expect(JSON.parse(storedSession!).apiKey).toBe(''); // no API key -- the cookie alone authenticates every request
 });

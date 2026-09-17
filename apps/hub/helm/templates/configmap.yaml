@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "tracery-hub.fullname" . }}-config
+  labels:
+    {{- include "tracery-hub.labels" . | nindent 4 }}
+data:
+  TRACERY_PORT: {{ .Values.config.port | quote }}
+  TRACERY_HOST: {{ .Values.config.host | quote }}
+  TRACERY_STORE: {{ .Values.config.store | quote }}
+  {{- if eq .Values.config.store "sqlite" }}
+  TRACERY_SQLITE_PATH: {{ .Values.config.sqlitePath | quote }}
+  {{- end }}
+  TRACERY_RETENTION_HOURS: {{ .Values.config.retentionHours | quote }}
+  TRACERY_MAX_EVENTS_PER_WORKSPACE: {{ .Values.config.maxEventsPerWorkspace | quote }}
+  TRACERY_LOG_LEVEL: {{ .Values.config.logLevel | quote }}
+  {{- if .Values.config.uiDir }}
+  TRACERY_UI_DIR: {{ .Values.config.uiDir | quote }}
+  {{- end }}
+  {{- if include "tracery-hub.apiKeysSecretName" . }}
+  TRACERY_API_KEYS_FILE: /etc/tracery/keys.json
+  {{- end }}

@@ -1,0 +1,36 @@
+Tracery Hub ({{ include "tracery-hub.fullname" . }}) is deploying to namespace {{ .Release.Namespace }}.
+
+Store: {{ .Values.config.store }}
+Replicas: {{ .Values.replicaCount }}
+{{- if and (eq .Values.config.store "postgres") (not (include "tracery-hub.postgresSecretName" .)) }}
+
+WARNING: config.store is "postgres" but no TRACERY_POSTGRES_URL secret is
+configured (set postgres.url or postgres.existingSecret). The hub will fail
+at boot without it (apps/hub/README.md "Environment variables").
+{{- end }}
+{{- if not (include "tracery-hub.apiKeysSecretName" .) }}
+
+NOTE: no apiKeys.keys or apiKeys.existingSecret set. The hub will generate
+one dev API key at boot and log it once -- fine for a quick look, not for
+anything real. Set apiKeys.keys (or apiKeys.existingSecret, preferably
+provisioned via OpenBao/ExternalSecret) with real keys before relying on
+this deployment.
+{{- end }}
+
+1. Check the rollout:
+
+   kubectl -n {{ .Release.Namespace }} rollout status deployment/{{ include "tracery-hub.fullname" . }}
+
+2. Port-forward and hit it locally:
+
+   kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "tracery-hub.fullname" . }} 8971:{{ .Values.service.port }}
+   curl http://127.0.0.1:8971/healthz
+
+{{- if .Values.ingress.enabled }}
+
+3. Or reach it through the Ingress:
+
+   http{{ if .Values.ingress.tls.enabled }}s{{ end }}://{{ .Values.ingress.host }}{{ .Values.ingress.path }}
+{{- end }}
+
+Full API and environment variable reference: apps/hub/README.md.

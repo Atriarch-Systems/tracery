@@ -1,0 +1,123 @@
+{{- $store := .Values.config.store }}
+{{- $replicas := int .Values.replicaCount }}
+{{- if and (ne $replicas 1) (ne $store "postgres") }}
+{{- fail (printf "tracery-hub: replicaCount=%d requires config.store=postgres -- memory and sqlite are single-writer stores (SPEC.md §6 \"Storage\"), so replicaCount must stay 1 unless you switch config.store to postgres and provide TRACERY_POSTGRES_URL (postgres.url or postgres.existingSecret)." $replicas) }}
+{{- end }}
+{{- $apiKeysSecret := include "tracery-hub.apiKeysSecretName" . }}
+{{- $licenseSecret := include "tracery-hub.licenseSecretName" . }}
+{{- $postgresSecret := include "tracery-hub.postgresSecretName" . }}
+{{- $metricsSecret := include "tracery-hub.metricsSecretName" . }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "tracery-hub.fullname" . }}
+  labels:
+    {{- include "tracery-hub.labels" . | nindent 4 }}
+spec:
+  # SqliteStore/MemoryStore are single-writer; the chart refuses to render
+  # this with replicas > 1 unless config.store is postgres (see the guard
+  # above and apps/hub/README.md "Storage").
+  replicas: {{ $replicas }}
+  strategy:
+    type: {{ if eq $store "postgres" }}RollingUpdate{{ else }}Recreate{{ end }}
+  selector:
+    matchLabels:
+      {{- include "tracery-hub.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "tracery-hub.labels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: hub
+          image: {{ include "tracery-hub.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.config.port }}
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: {{ include "tracery-hub.fullname" . }}-config
+          {{- if or (and (eq $store "postgres") $postgresSecret) $licenseSecret $metricsSecret }}
+          env:
+            {{- if and (eq $store "postgres") $postgresSecret }}
+            - name: TRACERY_POSTGRES_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $postgresSecret }}
+                  key: {{ .Values.postgres.existingSecretKey }}
+            {{- end }}
+            {{- if $licenseSecret }}
+            - name: TRACERY_LICENSE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $licenseSecret }}
+                  key: {{ .Values.license.existingSecretKey }}
+            {{- end }}
+            {{- if $metricsSecret }}
+            - name: TRACERY_METRICS_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $metricsSecret }}
+                  key: {{ .Values.metrics.existingSecretKey }}
+            {{- end }}
+          {{- end }}
+          {{- if or (eq $store "sqlite") $apiKeysSecret }}
+          volumeMounts:
+            {{- if eq $store "sqlite" }}
+            - name: data
+              mountPath: /data
+            {{- end }}
+            {{- if $apiKeysSecret }}
+            - name: keys
+              mountPath: /etc/tracery
+              readOnly: true
+            {{- end }}
+          {{- end }}
+          livenessProbe:
+            {{- toYaml .Values.livenessProbe | nindent 12 }}
+          readinessProbe:
+            {{- toYaml .Values.readinessProbe | nindent 12 }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      {{- if or (eq $store "sqlite") $apiKeysSecret }}
+      volumes:
+        {{- if eq $store "sqlite" }}
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ include "tracery-hub.pvcName" . }}
+        {{- end }}
+        {{- if $apiKeysSecret }}
+        - name: keys
+          secret:
+            secretName: {{ $apiKeysSecret }}
+        {{- end }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

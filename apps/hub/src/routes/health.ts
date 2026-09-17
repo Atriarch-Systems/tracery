@@ -1,6 +1,7 @@
 /** `GET /healthz`, `GET /readyz`, `GET /metrics` (SPEC.md §6 HTTP API table). */
 import type { FastifyInstance } from 'fastify';
 import type { HubContext } from '../server-context.js';
+import { constantTimeEquals } from '../auth.js';
 import { errorBody } from './errors.js';
 
 function extractToken(request: { headers: Record<string, string | string[] | undefined>; query: unknown }): string | undefined {
@@ -31,7 +32,9 @@ export function registerHealthRoutes(app: FastifyInstance, ctx: HubContext): voi
   app.get('/metrics', { schema: { summary: 'Prometheus text exposition', tags: ['health'] } }, async (request, reply) => {
     if (ctx.config.metricsToken) {
       const token = extractToken(request as never);
-      if (token !== ctx.config.metricsToken) {
+      // hub-14: constant-time, matching how API keys are compared -- /metrics is
+      // this token's whole access control when it's configured.
+      if (token === undefined || !constantTimeEquals(token, ctx.config.metricsToken)) {
         return reply.code(401).send(errorBody('unauthorized', 'invalid or missing metrics token'));
       }
     }

@@ -11,6 +11,18 @@ export interface FloorInfo {
 }
 
 /**
+ * hub-13: `floorCursor` is the smallest cursor the store still holds, not the
+ * largest one it dropped, so a client sitting exactly at the eviction
+ * boundary (`after === floorCursor - 1`) has lost nothing -- the very next
+ * event it needs, `floorCursor`, is still retained. Comparing `after` against
+ * `floorCursor - 1` (the highest cursor definitely evicted) instead of
+ * `floorCursor` itself keeps `truncated` true only when data is actually gone.
+ */
+function isTruncated(after: number, floorCursor: number | undefined): boolean {
+  return floorCursor !== undefined && after < floorCursor - 1;
+}
+
+/**
  * `scoped` must already be filtered to the requested flow/trace/workspace
  * and sorted by `cursor` ascending. `currentCursor` is the hub-wide cursor
  * at the moment of the read.
@@ -25,7 +37,7 @@ export function buildFrame(
     return { type: 'snapshot', cursor: currentCursor, events: scoped, truncated: false };
   }
 
-  const truncated = floor.floorCursor !== undefined && after < floor.floorCursor;
+  const truncated = isTruncated(after, floor.floorCursor);
   if (truncated) {
     return { type: 'snapshot', cursor: currentCursor, events: scoped, truncated: true };
   }

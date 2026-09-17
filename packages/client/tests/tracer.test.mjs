@@ -190,6 +190,64 @@ test('flow.end() ends the root op once, defaulting status to success', async () 
   assert.equal(typeof ends[0].durationMs, 'number');
 });
 
+test('flush() is re-entrant: overlapping timer ticks never run transport.send concurrently', async () => {
+  let inFlight = 0;
+  let maxInFlight = 0;
+  const delivered = [];
+  const transport = {
+    async send(events) {
+      inFlight++;
+      maxInFlight = Math.max(maxInFlight, inFlight);
+      await sleep(40); // much slower than flushIntervalMs below
+      delivered.push(...events);
+      inFlight--;
+    },
+  };
+  // maxBatch: 1 + a slow send means, without a re-entrancy guard, each 10ms
+  // timer tick starts another overlapping drain against the still-queued events.
+  const tracer = new ActivityTracer({ transport, flushIntervalMs: 10, maxBatch: 1 });
+  const flow = tracer.startFlow({}); // 1 event
+  for (let i = 0; i < 5; i++) {
+    const op = flow.start({ node: `tool:${i}`, name: 'tool.call' });
+    op.end();
+  } // 10 more events; 11 total
+
+  // Let many timer ticks land (10ms apart) while sends are still slowly
+  // draining (40ms apiece) — this is what gives an unguarded flush() the
+  // chance to start overlapping drains against the still-queued events.
+  await sleep(500);
+
+  assert.equal(maxInFlight, 1, 'transport.send must never run concurrently with itself');
+  assert.equal(delivered.length, 11, 'every queued event must have been delivered');
+
+  await tracer.close();
+});
+
+test('close() waits for a flush already in progress rather than returning while sends are still in flight', async () => {
+  let resolveSend;
+  const sendStarted = new Promise((resolve) => {
+    resolveSend = resolve;
+  });
+  let delivered = 0;
+  const transport = {
+    async send(events) {
+      resolveSend();
+      await sleep(50);
+      delivered += events.length;
+    },
+  };
+  const tracer = new ActivityTracer({ transport, flushIntervalMs: 1_000_000, maxBatch: 100 });
+  const flow = tracer.startFlow({});
+  flow.start({ node: 'n', name: 'x' }).end();
+
+  const firstFlush = tracer.flush(); // starts the (slow) drain
+  await sendStarted; // let the send actually begin before racing close()
+  await tracer.close(); // must await the same in-flight drain, not race past it
+
+  assert.equal(delivered, 3, 'close() resolved only after the in-flight send finished');
+  await firstFlush;
+});
+
 test('event ids are unique across a busy tracer (duplicate-safe)', async () => {
   const transport = memoryTransport();
   const tracer = new ActivityTracer({ transport, flushIntervalMs: 1_000_000, maxQueue: 10_000 });

@@ -11,6 +11,7 @@ test('loadConfig: every documented default applies when the environment is empty
   assert.equal(config.host, '0.0.0.0');
   assert.equal(config.store, 'memory');
   assert.equal(config.sqlitePath, '/data/tracery.db');
+  assert.equal(config.postgresUrl, undefined);
   assert.equal(config.apiKeys, undefined);
   assert.equal(config.retentionHours, 72);
   assert.equal(config.maxEventsPerWorkspace, 500_000);
@@ -46,6 +47,56 @@ test('loadConfig: every documented env var overrides its default', () => {
 
 test('loadConfig: an unparseable numeric env var throws with the variable name', () => {
   assert.throws(() => loadConfig({ TRACERY_PORT: 'not-a-number' }), /TRACERY_PORT/);
+});
+
+// hub-16: a TRACERY_STORE typo must not silently fall back to the in-memory
+// store, and out-of-range numeric env vars must not silently wipe data on the
+// first sweep/boot.
+test('loadConfig: an unrecognised TRACERY_STORE throws instead of silently falling back to "memory"', () => {
+  assert.throws(() => loadConfig({ TRACERY_STORE: 'sqllite' }), /TRACERY_STORE/);
+  assert.equal(loadConfig({}).store, 'memory');
+  assert.equal(loadConfig({ TRACERY_STORE: 'sqlite' }).store, 'sqlite');
+  assert.equal(loadConfig({ TRACERY_STORE: 'memory' }).store, 'memory');
+  assert.equal(loadConfig({ TRACERY_STORE: 'postgres', TRACERY_POSTGRES_URL: 'postgres://x/y' }).store, 'postgres');
+});
+
+// hub-postgres: TRACERY_STORE=postgres has no sensible default connection string
+// (unlike sqlite's file path), so a missing TRACERY_POSTGRES_URL must fail loudly
+// at boot instead of the store failing to connect on the first request.
+test('loadConfig: TRACERY_STORE=postgres requires TRACERY_POSTGRES_URL', () => {
+  assert.throws(() => loadConfig({ TRACERY_STORE: 'postgres' }), /TRACERY_POSTGRES_URL/);
+  assert.throws(() => loadConfig({ TRACERY_STORE: 'postgres', TRACERY_POSTGRES_URL: '' }), /TRACERY_POSTGRES_URL/);
+  const config = loadConfig({ TRACERY_STORE: 'postgres', TRACERY_POSTGRES_URL: 'postgres://user:pw@host:5432/db' });
+  assert.equal(config.postgresUrl, 'postgres://user:pw@host:5432/db');
+  // TRACERY_POSTGRES_URL is harmless (and ignored) when the store isn't postgres.
+  assert.equal(loadConfig({ TRACERY_POSTGRES_URL: 'postgres://unused' }).store, 'memory');
+});
+
+test('loadConfig: a non-positive TRACERY_RETENTION_HOURS or TRACERY_MAX_EVENTS_PER_WORKSPACE throws', () => {
+  assert.throws(() => loadConfig({ TRACERY_RETENTION_HOURS: '0' }), /TRACERY_RETENTION_HOURS/);
+  assert.throws(() => loadConfig({ TRACERY_RETENTION_HOURS: '-1' }), /TRACERY_RETENTION_HOURS/);
+  assert.throws(() => loadConfig({ TRACERY_MAX_EVENTS_PER_WORKSPACE: '0' }), /TRACERY_MAX_EVENTS_PER_WORKSPACE/);
+  assert.throws(() => loadConfig({ TRACERY_MAX_EVENTS_PER_WORKSPACE: '-5' }), /TRACERY_MAX_EVENTS_PER_WORKSPACE/);
+  assert.throws(() => loadConfig({ TRACERY_MAX_EVENTS_PER_WORKSPACE: '1.5' }), /TRACERY_MAX_EVENTS_PER_WORKSPACE/);
+});
+
+test('loadConfig: TRACERY_PORT must be an integer in [1, 65535]', () => {
+  assert.throws(() => loadConfig({ TRACERY_PORT: '0' }), /TRACERY_PORT/);
+  assert.throws(() => loadConfig({ TRACERY_PORT: '-1' }), /TRACERY_PORT/);
+  assert.throws(() => loadConfig({ TRACERY_PORT: '0.5' }), /TRACERY_PORT/);
+  assert.throws(() => loadConfig({ TRACERY_PORT: '70000' }), /TRACERY_PORT/);
+  assert.equal(loadConfig({ TRACERY_PORT: '65535' }).port, 65535);
+});
+
+// hub-15: SPEC.md §6 defines the operator key as workspace "*" AND role "admin".
+test('parseApiKeys: a workspace "*" key without role "admin" is rejected at parse time', () => {
+  assert.throws(
+    () => parseApiKeys('[{"key":"k","workspace":"*","roles":["read"]}]', 'SRC'),
+    /workspace "\*".*must include role "admin"/,
+  );
+  // Still accepted once "admin" is present.
+  const ok = parseApiKeys('[{"key":"k","workspace":"*","roles":["read","admin"]}]', 'SRC');
+  assert.equal(ok[0].workspace, '*');
 });
 
 test('parseApiKeys: rejects malformed entries with a precise reason', () => {

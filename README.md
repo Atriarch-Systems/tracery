@@ -93,10 +93,21 @@ function MyPage() {
 claude --plugin-dir ./plugins/claude-code
 ```
 
-or, from a marketplace: `/plugin install tracery@<marketplace>`. Set
-`TRACERY_HUB_URL` and `TRACERY_API_KEY` (env vars or the plugin's own
-config prompts); with neither set, every hook is a silent no-op. See
-[`plugins/claude-code/README.md`](plugins/claude-code/README.md).
+or, from this repo as a marketplace (see
+[`.claude-plugin/marketplace.json`](.claude-plugin/marketplace.json)):
+
+```
+/plugin marketplace add atriarch-systems/tracery
+/plugin install tracery@atriarch-systems
+```
+
+(`atriarch-systems/tracery` is this repo's intended future GitHub location;
+point `/plugin marketplace add` at wherever it actually lives, local path
+included, until then.) Set `TRACERY_HUB_URL` and `TRACERY_API_KEY` (env vars
+or the plugin's own config prompts); with neither set, every hook is a
+silent no-op. See
+[`plugins/claude-code/README.md`](plugins/claude-code/README.md) and
+[`docs/CLAUDE-CODE-PLUGIN.md`](docs/CLAUDE-CODE-PLUGIN.md).
 
 ## Packages
 
@@ -136,6 +147,7 @@ flow reachable that way resolves to one `trace`.
 - [`docs/CLAUDE-CODE-PLUGIN.md`](docs/CLAUDE-CODE-PLUGIN.md) — the Claude Code plugin's hook mapping, privacy details, troubleshooting.
 - [`docs/GETTING-STARTED.md`](docs/GETTING-STARTED.md) — a longer walkthrough: hub via Docker Compose, a keys file, TS and Python emitters, embedding the explorer, the plugin.
 - [`docs/DEMOS.md`](docs/DEMOS.md) — the three demos (Claude Code plugin, npm library, standalone hub): commands, screenshots, and what each distribution can and can't do.
+- [`docs/HARDENING.md`](docs/HARDENING.md) — findings from a review/verify/fix pass (confirmed vs. refuted, with reasoning) and the roadmap items delivered alongside it.
 - [`CLAUDE.md`](CLAUDE.md) — repository layout and conventions for agents working in this codebase.
 
 ## Licensing

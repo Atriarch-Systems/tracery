@@ -192,6 +192,51 @@ def test_flow_end_ends_root_op_once():
     assert isinstance(ends[0]["durationMs"], (int, float))
 
 
+class SlowFlushTransport:
+    """A transport whose `send` is instant but whose `flush` is slow --
+    models a `HttpTransport` waiting out a stalled hub's retry cycle.
+    """
+
+    def __init__(self):
+        self.send_calls = 0
+        self.flush_calls = 0
+
+    def send(self, events):
+        self.send_calls += 1
+
+    def flush(self):
+        self.flush_calls += 1
+        time.sleep(0.3)
+
+    def close(self):
+        return None
+
+
+def test_periodic_timer_never_blocks_on_the_transports_own_flush():
+    """`_on_timer` must only hand batches to `transport.send` (non-blocking);
+    it must never wait on `transport.flush()`, which can block for a long
+    time against a stalled hub. Only the explicit `flush()`/`close()` calls
+    should pay that cost.
+    """
+    transport = SlowFlushTransport()
+    tracer = ActivityTracer(transport=transport, flush_interval_ms=10)
+
+    tick_count = {"n": 0}
+    original_on_timer = tracer._on_timer
+
+    def counting_on_timer():
+        tick_count["n"] += 1
+        original_on_timer()
+
+    tracer._on_timer = counting_on_timer
+
+    time.sleep(0.15)  # ~15 timer ticks' worth, if the timer isn't stuck
+    tracer.close()
+
+    assert tick_count["n"] >= 5, "the periodic timer must keep firing even though transport.flush() is slow"
+    assert transport.flush_calls == 1  # only close()'s explicit flush called it; the timer path never does
+
+
 def test_event_ids_are_unique_across_a_busy_tracer():
     transport = MemoryTransport()
     tracer = ActivityTracer(transport=transport, flush_interval_ms=1_000_000, max_queue=10_000)

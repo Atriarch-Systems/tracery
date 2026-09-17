@@ -14,6 +14,22 @@ export type Route =
   | { readonly type: 'trace'; readonly id: string }
   | { readonly type: 'not-found'; readonly path: string };
 
+/**
+ * `decodeURIComponent` throws `URIError` on a malformed escape (a stray or
+ * truncated `%`); browsers preserve such bytes verbatim in
+ * `location.pathname`, so any deep link with one would otherwise propagate
+ * out of `useRoute`'s render with no error boundary above it and blank the
+ * page instead of hitting the `not-found` branch below. Fall back to the
+ * raw (still-encoded) segment rather than fail the whole route parse over it.
+ */
+function safeDecode(segment: string): string {
+  try {
+    return decodeURIComponent(segment);
+  } catch {
+    return segment;
+  }
+}
+
 /** Parses a pathname served under the hub's `/ui` mount point into a Route. */
 export function parseRoute(pathname: string): Route {
   const trimmed = pathname.length > 1 ? pathname.replace(/\/+$/, '') : pathname;
@@ -22,10 +38,10 @@ export function parseRoute(pathname: string): Route {
   if (rel === '' || rel === '/') return { type: 'root' };
 
   const flowMatch = /^\/flows\/([^/]+)$/.exec(rel);
-  if (flowMatch) return { type: 'flow', id: decodeURIComponent(flowMatch[1]!) };
+  if (flowMatch) return { type: 'flow', id: safeDecode(flowMatch[1]!) };
 
   const traceMatch = /^\/traces\/([^/]+)$/.exec(rel);
-  if (traceMatch) return { type: 'trace', id: decodeURIComponent(traceMatch[1]!) };
+  if (traceMatch) return { type: 'trace', id: safeDecode(traceMatch[1]!) };
 
   return { type: 'not-found', path: pathname };
 }

@@ -103,6 +103,10 @@ test('auth: workspace isolation -- a key bound to one workspace cannot read anot
   }
 });
 
+test('auth: an explicitly empty TRACERY_API_KEYS (apiKeys: []) refuses to boot into an accidental all-roles dev key (hub-15)', async () => {
+  await assert.rejects(() => createTestServer({ apiKeys: [] }), /TRACERY_API_KEYS is explicitly empty/);
+});
+
 test('auth: the operator key must be given an explicit workspace, then may act on it', async () => {
   const created = await createTestServer({ apiKeys: KEYS });
   try {
@@ -201,6 +205,77 @@ test('ingest: an oversized event is rejected per-event (207) with a maxEventByte
   }
 });
 
+test('ingest: a malformed workspace field is rejected outright, not silently replaced by the key\'s workspace (hub-21)', async () => {
+  const created = await createTestServer({ apiKeys: KEYS });
+  try {
+    const empty = await created.app.inject({
+      method: 'POST',
+      url: '/v1/events',
+      headers: bearer('key-full'),
+      payload: { v: ACTIVITY_CONTRACT_VERSION, workspace: '', events: [oneEvent()] },
+    });
+    assert.equal(empty.statusCode, 400);
+    assert.equal(JSON.parse(empty.body).error.code, 'invalid_batch');
+
+    const wrongType = await created.app.inject({
+      method: 'POST',
+      url: '/v1/events',
+      headers: bearer('key-full'),
+      payload: { v: ACTIVITY_CONTRACT_VERSION, workspace: 42, events: [oneEvent()] },
+    });
+    assert.equal(wrongType.statusCode, 400);
+    assert.equal(JSON.parse(wrongType.body).error.code, 'invalid_batch');
+  } finally {
+    await created.close();
+  }
+});
+
+test('ingest: malformed JSON is rejected with 400 invalid_json, not 500 (hub-4)', async () => {
+  const created = await createTestServer({ apiKeys: KEYS });
+  try {
+    const res = await created.app.inject({
+      method: 'POST',
+      url: '/v1/events',
+      headers: { ...bearer('key-full'), 'content-type': 'application/json' },
+      payload: '{not valid json',
+    });
+    assert.equal(res.statusCode, 400);
+    assert.equal(JSON.parse(res.body).error.code, 'invalid_json');
+  } finally {
+    await created.close();
+  }
+});
+
+test('ingest: a body over the configured limit is rejected 413 body_too_large, not 500 (hub-4)', async () => {
+  const created = await createTestServer({ apiKeys: KEYS, bodyLimitBytes: 200 });
+  try {
+    const res = await created.app.inject({
+      method: 'POST',
+      url: '/v1/events',
+      headers: { ...bearer('key-full'), 'content-type': 'application/json' },
+      payload: batchOf([oneEvent({ context: { note: 'x'.repeat(1000) } })]),
+    });
+    assert.equal(res.statusCode, 413);
+    assert.equal(JSON.parse(res.body).error.code, 'body_too_large');
+  } finally {
+    await created.close();
+  }
+});
+
+test('ingest: a spec-legal near-max batch is never rejected by the body size limit (hub-4)', async () => {
+  const created = await createTestServer({ apiKeys: KEYS });
+  try {
+    // 500 events x ~1KB context each: well within maxEventsPerBatch (1000) and
+    // maxEventBytes (64KB) per event, but comfortably over Fastify's old 1 MiB default.
+    const events = Array.from({ length: 500 }, (_, i) => oneEvent({ id: `big-${i}`, context: { note: 'x'.repeat(1000) } }));
+    const res = await created.app.inject({ method: 'POST', url: '/v1/events', headers: bearer('key-full'), payload: batchOf(events) });
+    assert.equal(res.statusCode, 200, `expected the batch to be accepted, got ${res.statusCode}: ${res.body}`);
+    assert.equal(JSON.parse(res.body).accepted, 500);
+  } finally {
+    await created.close();
+  }
+});
+
 test('ingest: a batch over 1000 events is rejected outright with 400', async () => {
   const created = await createTestServer({ apiKeys: KEYS });
   try {
@@ -253,6 +328,34 @@ test('flows: list/paging and GET /v1/flows/:id against the fixture trace', async
 
     const missing = await created.app.inject({ method: 'GET', url: '/v1/flows/no-such-flow', headers: bearer('key-full') });
     assert.equal(missing.statusCode, 404);
+  } finally {
+    await created.close();
+  }
+});
+
+test('flows: a garbage after/before/limit query param 400s instead of silently returning an empty page (hub-5)', async () => {
+  const created = await createTestServer({ apiKeys: KEYS });
+  try {
+    await seedFixtureTrace(created.app);
+
+    const badAfter = await created.app.inject({
+      method: 'GET',
+      url: `/v1/flows/${encodeURIComponent(sampleFlowIds.parent)}/events?after=abc`,
+      headers: bearer('key-full'),
+    });
+    assert.equal(badAfter.statusCode, 400);
+    assert.equal(JSON.parse(badAfter.body).error.code, 'invalid_query');
+
+    const badBefore = await created.app.inject({ method: 'GET', url: '/v1/flows?before=abc', headers: bearer('key-full') });
+    assert.equal(badBefore.statusCode, 400);
+    assert.equal(JSON.parse(badBefore.body).error.code, 'invalid_query');
+
+    const badLimit = await created.app.inject({ method: 'GET', url: '/v1/flows?limit=-3', headers: bearer('key-full') });
+    assert.equal(badLimit.statusCode, 400);
+    assert.equal(JSON.parse(badLimit.body).error.code, 'invalid_query');
+
+    const overMaxLimit = await created.app.inject({ method: 'GET', url: '/v1/flows?limit=1001', headers: bearer('key-full') });
+    assert.equal(overMaxLimit.statusCode, 400);
   } finally {
     await created.close();
   }
@@ -397,6 +500,22 @@ test('metrics: a configured TRACERY_METRICS_TOKEN is required', async () => {
 
     const allowed = await created.app.inject({ method: 'GET', url: '/metrics?token=secret-token' });
     assert.equal(allowed.statusCode, 200);
+  } finally {
+    await created.close();
+  }
+});
+
+test('metrics: a token of a different length than the configured one is rejected cleanly, not thrown on (hub-14)', async () => {
+  // Regression for the constant-time comparison: it hashes both sides to a fixed
+  // length first specifically so a length mismatch between the presented and
+  // configured token can never throw out of `crypto.timingSafeEqual`.
+  const created = await createTestServer({ apiKeys: KEYS, metricsToken: 'secret-token' });
+  try {
+    const shorter = await created.app.inject({ method: 'GET', url: '/metrics?token=short' });
+    assert.equal(shorter.statusCode, 401);
+
+    const longer = await created.app.inject({ method: 'GET', url: `/metrics?token=${'x'.repeat(500)}` });
+    assert.equal(longer.statusCode, 401);
   } finally {
     await created.close();
   }

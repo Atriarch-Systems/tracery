@@ -55,13 +55,46 @@ function isStatus(value: unknown): value is ActivityStatus {
   return typeof value === 'string' && (STATUSES as readonly string[]).includes(value);
 }
 
-function isActivityJson(value: unknown): value is ActivityJson {
-  if (value === null) return true;
-  const t = typeof value;
-  if (t === 'string' || t === 'number' || t === 'boolean') return true;
-  if (Array.isArray(value)) return value.every(isActivityJson);
-  if (t === 'object') return Object.values(value as Record<string, unknown>).every(isActivityJson);
-  return false;
+const CONTEXT_NOT_JSON_REASON = 'event.context must be a JSON-serialisable object';
+
+/**
+ * Walks `root` (event.context) with an explicit work stack instead of recursion,
+ * enforcing a depth cap and a total-node cap, so a hostile shape (deeply nested
+ * arrays/objects, or a circular reference reachable only via direct object
+ * construction rather than JSON.parse) can never overflow the stack or loop
+ * forever -- it fails fast with a stable reason instead (validateEvent's
+ * documented "never throws" guarantee).
+ */
+function checkActivityJson(root: unknown): { ok: true } | { ok: false; reason: string } {
+  const stack: { value: unknown; depth: number }[] = [{ value: root, depth: 0 }];
+  let nodeCount = 0;
+
+  while (stack.length > 0) {
+    const { value, depth } = stack.pop()!;
+
+    nodeCount++;
+    if (nodeCount > ACTIVITY_LIMITS.maxContextNodes) {
+      return fail(`event.context exceeds maxContextNodes (${ACTIVITY_LIMITS.maxContextNodes})`);
+    }
+    if (depth > ACTIVITY_LIMITS.maxContextDepth) {
+      return fail(`event.context exceeds maxContextDepth (${ACTIVITY_LIMITS.maxContextDepth})`);
+    }
+
+    if (value === null) continue;
+    const t = typeof value;
+    if (t === 'string' || t === 'number' || t === 'boolean') continue;
+    if (Array.isArray(value)) {
+      for (const item of value) stack.push({ value: item, depth: depth + 1 });
+      continue;
+    }
+    if (t === 'object') {
+      for (const item of Object.values(value as Record<string, unknown>)) stack.push({ value: item, depth: depth + 1 });
+      continue;
+    }
+    return fail(CONTEXT_NOT_JSON_REASON);
+  }
+
+  return { ok: true };
 }
 
 function byteLength(value: string): number {
@@ -191,7 +224,9 @@ export function validateEvent(raw: unknown): ValidateEventResult {
 
   let context: ActivityContext | undefined;
   if (raw.context !== undefined) {
-    if (!isPlainObject(raw.context) || !isActivityJson(raw.context)) return fail('event.context must be a JSON-serialisable object');
+    if (!isPlainObject(raw.context)) return fail(CONTEXT_NOT_JSON_REASON);
+    const check = checkActivityJson(raw.context);
+    if (!check.ok) return fail(check.reason);
     context = raw.context as ActivityContext;
   }
 
@@ -227,7 +262,16 @@ export function validateEvent(raw: unknown): ValidateEventResult {
     ...(tags !== undefined ? { tags } : {}),
   };
 
-  const bytes = byteLength(JSON.stringify(event));
+  // event.context has already been walked and bounded above, so this should never
+  // throw -- but a circular or otherwise exotic value reachable only via direct
+  // object construction (not JSON.parse) must still never escape as a throw.
+  let serialised: string;
+  try {
+    serialised = JSON.stringify(event);
+  } catch {
+    return fail(CONTEXT_NOT_JSON_REASON);
+  }
+  const bytes = byteLength(serialised);
   if (bytes > ACTIVITY_LIMITS.maxEventBytes) return fail(`event exceeds maxEventBytes (${ACTIVITY_LIMITS.maxEventBytes})`);
 
   return { ok: true, event };

@@ -164,6 +164,59 @@ test('live: heartbeat frame shape', { timeout: 25_000 }, async (t) => {
   assert.equal(Object.keys(frame).sort().join(','), 'cursor,type');
 });
 
+test('live: an unparseable after= closes the connection with 4400 instead of silently returning an empty stream forever (hub-5)', async (t) => {
+  const created = await createTestServer({ apiKeys: KEYS });
+  const address = await created.app.listen({ port: 0, host: '127.0.0.1' });
+  t.after(async () => {
+    await created.close();
+  });
+
+  const ws = new WebSocket(`${address.replace('http', 'ws')}/v1/live?flow=f1&after=not-a-cursor&token=key-full`);
+  const closeCode = await new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('did not close')), 5000);
+    ws.once('close', (code) => {
+      clearTimeout(timer);
+      resolve(code);
+    });
+  });
+  assert.equal(closeCode, 4400);
+});
+
+test('live: a store failure while building a frame closes just that connection, not the process (hub-9)', async (t) => {
+  const created = await createTestServer({ apiKeys: KEYS });
+  const address = await created.app.listen({ port: 0, host: '127.0.0.1' });
+  t.after(async () => {
+    await created.close();
+  });
+
+  const originalWorkspaceFrame = created.store.workspaceFrame.bind(created.store);
+  let calls = 0;
+  created.store.workspaceFrame = async (...args) => {
+    calls += 1;
+    if (calls === 1) throw new Error('boom: store unavailable');
+    return originalWorkspaceFrame(...args);
+  };
+
+  let unhandled;
+  const onUnhandledRejection = (err) => {
+    unhandled = err;
+  };
+  process.on('unhandledRejection', onUnhandledRejection);
+
+  const ws = new WebSocket(`${address.replace('http', 'ws')}/v1/live?token=key-full`);
+  const closeCode = await new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('did not close')), 5000);
+    ws.once('close', (code) => {
+      clearTimeout(timer);
+      resolve(code);
+    });
+  });
+  process.removeListener('unhandledRejection', onUnhandledRejection);
+
+  assert.equal(closeCode, 1011);
+  assert.equal(unhandled, undefined, 'a rejecting store call must not surface as an unhandled promise rejection');
+});
+
 test('live: an unauthenticated connection is closed', async (t) => {
   const created = await createTestServer({ apiKeys: KEYS });
   const address = await created.app.listen({ port: 0, host: '127.0.0.1' });

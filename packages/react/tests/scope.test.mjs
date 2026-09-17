@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { computeScope, scopeKey, scopeModeForKey, activatedFlow, SCOPE_MODE_KEYS } from '../dist/scope.js';
+import { computeScope, scopeKey, scopeModeForKey, activatedFlow, isScopeShortcutTarget, SCOPE_MODE_KEYS } from '../dist/scope.js';
 import { buildSampleFlows, sampleFlowIds } from '@atriarch/tracery-core/fixtures';
 
 const flows = buildSampleFlows();
@@ -55,4 +55,31 @@ test('activatedFlow: returns the child flow id when the node belongs to a differ
 test('activatedFlow: null when the node carries no data (defensive)', () => {
   const node = { id: 'n1', label: 'n1' };
   assert.equal(activatedFlow(node, sampleFlowIds.parent), null);
+});
+
+// Regression (ui-13): the 1/2/3 scope shortcuts must not fire while the key
+// lands in a text field (a consumer's renderInspector override may render
+// one) or alongside a modifier that gives the digit a different, browser-
+// owned meaning.
+test('isScopeShortcutTarget: allows the shortcut with no target and no modifier', () => {
+  assert.equal(isScopeShortcutTarget(null), true);
+  assert.equal(isScopeShortcutTarget(undefined), true);
+});
+
+test('isScopeShortcutTarget: allows the shortcut from a plain element (e.g. a button or the graph region)', () => {
+  assert.equal(isScopeShortcutTarget({ tagName: 'DIV' }), true);
+  assert.equal(isScopeShortcutTarget({ tagName: 'BUTTON' }), true);
+});
+
+test('isScopeShortcutTarget: rejects input, textarea, select and contenteditable targets', () => {
+  assert.equal(isScopeShortcutTarget({ tagName: 'INPUT' }), false);
+  assert.equal(isScopeShortcutTarget({ tagName: 'input' }), false); // case-insensitive
+  assert.equal(isScopeShortcutTarget({ tagName: 'TEXTAREA' }), false);
+  assert.equal(isScopeShortcutTarget({ tagName: 'SELECT' }), false);
+  assert.equal(isScopeShortcutTarget({ tagName: 'DIV', isContentEditable: true }), false);
+});
+
+test('isScopeShortcutTarget: rejects any target when a modifier key is held (Ctrl/Cmd/Alt+digit is browser-owned)', () => {
+  assert.equal(isScopeShortcutTarget({ tagName: 'DIV' }, true), false);
+  assert.equal(isScopeShortcutTarget(null, true), false);
 });

@@ -214,17 +214,20 @@ function reduceFlow(flowId: string, rawEvents: readonly ActivityEvent[]): FlowWi
 
   for (const event of events) {
     const { type, op: opId, node: nodeId, ts } = event;
-    touchNode(nodeId, ts, event.kind, event.label, event.name);
 
     const parentOp = event.parentOp === null ? undefined : event.parentOp;
     const parentNode = event.parentNode === null ? undefined : event.parentNode;
     let op = ops.get(opId);
 
+    // First-wins checks happen before any node/op state is touched -- an event
+    // the reducer discards must not still mutate the node's label/kind/lastSeenAt,
+    // and must not create a ghost node with no ops if it names a different node id.
+    if (type === 'start' && op && op.hasStart) continue; // later starts for the same op are ignored: first wins.
+    if (type === 'end' && op && op.endedAt !== undefined) continue; // later ends for the same op are ignored: first wins.
+
+    touchNode(nodeId, ts, event.kind, event.label, event.name);
+
     if (type === 'start') {
-      if (op && op.hasStart) {
-        // Later starts for the same op are ignored: first wins.
-        continue;
-      }
       if (!op) {
         op = {
           id: opId, node: nodeId, name: event.name, kind: event.kind, status: 'running',
@@ -235,7 +238,11 @@ function reduceFlow(flowId: string, rawEvents: readonly ActivityEvent[]): FlowWi
       }
       registerOpOnNode(nodeId, opId);
       op.startedAt = ts;
-      op.status = 'running';
+      // A start processed after its op already ended (a late/retried start, or an
+      // end that sorted first at equal ts) must not revert a terminal status or
+      // discard the recorded end -- it only fills in start-side fields.
+      if (op.endedAt === undefined) op.status = 'running';
+      else op.durationMs ??= op.endedAt - op.startedAt;
       op.hasStart = true;
       op.name = event.name;
       if (event.kind !== undefined) op.kind = event.kind;
@@ -276,10 +283,6 @@ function reduceFlow(flowId: string, rawEvents: readonly ActivityEvent[]): FlowWi
       if (event.status !== undefined) op.status = event.status;
       op.timeline.push({ ts, type: 'update', status: event.status, context: event.context, eventId: event.id });
     } else if (type === 'end') {
-      if (op.endedAt !== undefined) {
-        // Later ends for the same op are ignored: first wins.
-        continue;
-      }
       op.endedAt = ts;
       op.status = event.status ?? 'success';
       op.durationMs = event.durationMs ?? (op.startedAt !== undefined ? ts - op.startedAt : undefined);
@@ -365,40 +368,49 @@ function reduceFlow(flowId: string, rawEvents: readonly ActivityEvent[]): FlowWi
 function resolveTraceIds(flows: ReadonlyMap<string, Pick<FlowWithoutTrace, 'id' | 'link'>>): Map<string, string> {
   const resolved = new Map<string, string>();
 
-  const resolveOne = (id: string, stack: string[]): string => {
-    const cached = resolved.get(id);
-    if (cached !== undefined) return cached;
-    const flow = flows.get(id);
-    if (!flow || !flow.link) {
-      resolved.set(id, id);
-      return id;
+  /**
+   * Walks the parentFlow chain from `startId` iteratively (an explicit `path`
+   * array standing in for the call stack) instead of recursing once per hop, so
+   * a long chain of linked flows cannot overflow the stack. `pathSet` mirrors
+   * `path` for O(1) cycle checks so a long chain still resolves in linear time.
+   */
+  const resolveOne = (startId: string): string => {
+    const path: string[] = [];
+    const pathSet = new Set<string>();
+    let id = startId;
+
+    const finish = (result: string): string => {
+      resolved.set(id, result);
+      for (const p of path) resolved.set(p, result);
+      return result;
+    };
+
+    for (;;) {
+      const cached = resolved.get(id);
+      if (cached !== undefined) return finish(cached);
+
+      const flow = flows.get(id);
+      if (!flow || !flow.link) return finish(id);
+      if (flow.link.trace) return finish(flow.link.trace);
+
+      const parentId = flow.link.parentFlow;
+      const parent = flows.get(parentId);
+      if (!parent) {
+        // Parent may arrive later; use its id as the trace id placeholder.
+        return finish(parentId);
+      }
+      if (pathSet.has(parentId)) {
+        // Cycle: the first flow seen in this walk is treated as the root.
+        return finish(path[0]!);
+      }
+
+      path.push(id);
+      pathSet.add(id);
+      id = parentId;
     }
-    if (flow.link.trace) {
-      resolved.set(id, flow.link.trace);
-      return flow.link.trace;
-    }
-    const parentId = flow.link.parentFlow;
-    const parent = flows.get(parentId);
-    if (!parent) {
-      // Parent may arrive later; use its id as the trace id placeholder.
-      resolved.set(id, parentId);
-      return parentId;
-    }
-    const cycleIndex = stack.indexOf(parentId);
-    if (cycleIndex !== -1) {
-      // Cycle: the first flow seen in this walk is treated as the root.
-      const root = stack[0]!;
-      resolved.set(id, root);
-      return root;
-    }
-    stack.push(id);
-    const result = resolveOne(parentId, stack);
-    stack.pop();
-    resolved.set(id, result);
-    return result;
   };
 
-  for (const id of flows.keys()) resolveOne(id, []);
+  for (const id of flows.keys()) resolveOne(id);
   return resolved;
 }
 

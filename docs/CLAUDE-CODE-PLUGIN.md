@@ -15,13 +15,33 @@ its limits, and troubleshooting.
 
 ## Install and configure
 
+For development, point Claude Code straight at the plugin directory:
+
 ```
 claude --plugin-dir ./plugins/claude-code
 ```
 
-Set `hub_url` and `api_key` (`userConfig` prompt, or `TRACERY_HUB_URL` /
-`TRACERY_API_KEY`). Both unset is a silent no-op; only one set logs a single
-stderr line and stays a no-op. See the README for the full env var table.
+Or add this repository as a plugin marketplace and install from it. The
+repo root's [`.claude-plugin/marketplace.json`](../.claude-plugin/marketplace.json)
+lists this plugin with `source: "./plugins/claude-code"`, so a marketplace
+install resolves to the same directory as the `--plugin-dir` path above --
+there's no separate build or publish step. Assuming this repo lives at
+`atriarch-systems/tracery` on GitHub (the intended future location -- swap
+in wherever this checkout actually lives if that's not yet true):
+
+```
+/plugin marketplace add atriarch-systems/tracery
+/plugin install tracery@atriarch-systems
+```
+
+A local clone can be added as a marketplace the same way, with a path
+instead of a `owner/repo` shorthand: `/plugin marketplace add
+/path/to/this/repo`.
+
+Either install path needs the same configuration: set `hub_url` and
+`api_key` (`userConfig` prompt, or `TRACERY_HUB_URL` / `TRACERY_API_KEY`).
+Both unset is a silent no-op; only one set logs a single stderr line and
+stays a no-op. See the README for the full env var table.
 
 ## Architecture
 

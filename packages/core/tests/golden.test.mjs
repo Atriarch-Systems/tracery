@@ -13,11 +13,17 @@ test('golden: ACTIVITY_CONTRACT_VERSION is pinned to 1', () => {
 });
 
 test('golden: ACTIVITY_LIMITS are pinned', () => {
+  // Deliberately updated: maxContextDepth/maxContextNodes added to bound
+  // validateEvent's context walk (core-1 fix). This is a library-side
+  // robustness limit, not a wire-shape change, so ACTIVITY_CONTRACT_VERSION
+  // stays at 1.
   assert.deepEqual(ACTIVITY_LIMITS, {
     maxEventsPerBatch: 1000,
     maxEventBytes: 65536,
     maxIdLength: 256,
     maxTags: 32,
+    maxContextDepth: 32,
+    maxContextNodes: 10000,
   });
 });
 

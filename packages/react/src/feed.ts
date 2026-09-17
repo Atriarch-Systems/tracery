@@ -9,10 +9,16 @@
  * ... when WS fails twice"). A frame applied while `polling` keeps the status
  * `polling` -- this reducer never moves the feed back to `live` on its own;
  * the hook may start a fresh socket and feed a `frame` action to recover.
+ *
+ * `offline` is not produced by this reducer at all: it is set directly by
+ * the hook (`useHubSource` / `hub-feed-engine.ts`) when the socket is gone
+ * and there is nothing to poll -- an unscoped source (no single `flow` or
+ * `trace`) has no SPEC.md §6 endpoint to refetch from, so claiming `polling`
+ * there would describe a timer that will never fetch anything again.
  */
 import type { ActivityFrame } from '@atriarch/tracery-client';
 
-export type FeedStatus = 'connecting' | 'live' | 'reconnecting' | 'polling';
+export type FeedStatus = 'connecting' | 'live' | 'reconnecting' | 'polling' | 'offline';
 
 export interface FeedState {
   readonly status: FeedStatus;
@@ -48,7 +54,12 @@ export function feedReducer(state: FeedState, action: FeedAction): FeedState {
     case 'frame': {
       const { frame } = action;
       const truncated = frame.type === 'snapshot' ? frame.truncated : state.truncated;
-      return { status: 'live', cursor: frame.cursor, wsFailures: 0, truncated };
+      // A message queued on a socket that has since been superseded by
+      // polling can still arrive after the switch (disposing a socket is
+      // asynchronous); per this module's own contract above, that must not
+      // silently flip the status back to `live` out from under the poll timer.
+      const status: FeedStatus = state.status === 'polling' ? 'polling' : 'live';
+      return { status, cursor: frame.cursor, wsFailures: 0, truncated };
     }
     case 'disconnect': {
       const wsFailures = state.wsFailures + 1;

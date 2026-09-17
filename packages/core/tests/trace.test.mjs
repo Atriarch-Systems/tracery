@@ -46,6 +46,28 @@ test('trace resolution: cycles are broken by treating the first-seen flow as the
   assert.equal(flows.get('b').trace, 'a');
 });
 
+test('core-7: buildFlows resolves a 50k-deep parentFlow chain without overflowing the stack', () => {
+  const depth = 50_000;
+  const events = [];
+  for (let i = 0; i < depth; i++) {
+    events.push(
+      i === 0
+        ? root(`f${i}`, `e${i}`, 1000)
+        : root(`f${i}`, `e${i}`, 1000 + i, { link: { parentFlow: `f${i - 1}` } }),
+    );
+  }
+
+  let flows;
+  assert.doesNotThrow(() => {
+    flows = buildFlows(events);
+  });
+  assert.equal(flows.size, depth);
+  // Every flow in the chain resolves to the same root trace id (the first flow).
+  assert.equal(flows.get('f0').trace, 'f0');
+  assert.equal(flows.get(`f${depth - 1}`).trace, 'f0');
+  assert.equal(flows.get(`f${Math.floor(depth / 2)}`).trace, 'f0');
+});
+
 test('assembleTrace groups every flow sharing a resolved trace id, root-first-ish ordering by startedAt', () => {
   const flows = buildFlows([
     root('parent', 'p', 1000),

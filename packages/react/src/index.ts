@@ -31,6 +31,7 @@ export {
   scopeKey,
   scopeModeForKey,
   activatedFlow,
+  isScopeShortcutTarget,
   SCOPE_LABELS,
   SCOPE_MODE_KEYS,
 } from './scope.js';

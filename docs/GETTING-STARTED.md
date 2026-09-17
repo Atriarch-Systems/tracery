@@ -59,6 +59,8 @@ one dev key at boot with every role on workspace `default`, and logs it
 once — read it from the container's stdout. This mode keeps everything in
 memory (`TRACERY_STORE=memory`, the default); nothing survives a restart.
 Full environment variable reference: [`apps/hub/README.md`](../apps/hub/README.md).
+Running on a cluster instead: plain manifests in `apps/hub/k8s/`, or the
+Helm chart at [`apps/hub/helm/`](../apps/hub/helm/README.md).
 
 Either way, confirm it's up:
 

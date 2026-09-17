@@ -93,6 +93,58 @@ test('reject: event exceeds maxEventBytes', () => {
 });
 
 // ---------------------------------------------------------------------------
+// core-1: validateEvent never throws, even on a hostile/deeply nested context
+// ---------------------------------------------------------------------------
+
+test('validateEvent rejects (does not throw on) a deeply nested context beyond maxContextDepth', () => {
+  // Builds { a: [[[ ... [] ... ]]] } nested 5000 arrays deep -- well below
+  // maxEventBytes, but deep enough to overflow a naive recursive walk.
+  const depth = 5000;
+  const deep = JSON.parse('{"a":' + '['.repeat(depth) + ']'.repeat(depth) + '}');
+  let result;
+  assert.doesNotThrow(() => {
+    result = validateEvent({ ...minimal(), context: deep });
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.reason, `event.context exceeds maxContextDepth (${ACTIVITY_LIMITS.maxContextDepth})`);
+});
+
+test('validateEvent rejects a context within depth but over maxContextNodes', () => {
+  const wide = { items: Array.from({ length: ACTIVITY_LIMITS.maxContextNodes + 10 }, (_, i) => i) };
+  const result = validateEvent({ ...minimal(), context: wide });
+  assert.equal(result.ok, false);
+  assert.equal(result.reason, `event.context exceeds maxContextNodes (${ACTIVITY_LIMITS.maxContextNodes})`);
+});
+
+test('validateEvent accepts a context right at maxContextDepth', () => {
+  // depth: nest one array per level up to exactly maxContextDepth.
+  let inner = [];
+  for (let i = 0; i < ACTIVITY_LIMITS.maxContextDepth - 1; i++) inner = [inner];
+  const result = validateEvent({ ...minimal(), context: { a: inner } });
+  assert.equal(result.ok, true);
+});
+
+test('validateEvent still rejects a context with a non-JSON value (e.g. a function) without throwing', () => {
+  let result;
+  assert.doesNotThrow(() => {
+    result = validateEvent({ ...minimal(), context: { deep: { nested: { fn: () => 1 } } } });
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.reason, 'event.context must be a JSON-serialisable object');
+});
+
+test('validateBatch also never throws on a batch containing a hostile deeply nested event', () => {
+  const depth = 5000;
+  const deep = JSON.parse('{"a":' + '['.repeat(depth) + ']'.repeat(depth) + '}');
+  const batch = { v: 1, events: [minimal(), { ...minimal(), id: 'bad', context: deep }] };
+  let result;
+  assert.doesNotThrow(() => {
+    result = validateBatch(batch);
+  });
+  assert.equal(result.ok, false);
+});
+
+// ---------------------------------------------------------------------------
 // validateBatch
 // ---------------------------------------------------------------------------
 

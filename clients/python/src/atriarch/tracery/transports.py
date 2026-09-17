@@ -40,6 +40,34 @@ class MemoryTransport:
 
 _SHUTDOWN = object()
 
+# Distinguishes "no `timeout` argument given" (use the computed bounded
+# default) from an explicit `timeout=None` (block forever) on `flush`/`close`.
+_UNSET_TIMEOUT = object()
+
+
+class _RefuseRedirectHandler(urllib.request.HTTPRedirectHandler):
+    """Refuses every redirect instead of following it.
+
+    The default ``HTTPRedirectHandler`` rebuilds the redirected request from
+    the original headers (minus only the content headers), so it would
+    replay ``Authorization: Bearer <api_key>`` verbatim to whatever host a
+    301/302/303/307/308 names -- a MITM on plaintext HTTP, hijacked DNS, or a
+    compromised/misconfigured hub could harvest the key this way. The hub's
+    ingest endpoint never legitimately redirects, so refusing outright is
+    safe: ``redirect_request`` returning ``None`` makes urllib raise the
+    redirect status as an ``HTTPError`` instead of following it, which
+    ``_send_with_retry`` already treats as a non-retryable drop (redirect
+    codes are all < 500).
+    """
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):  # noqa: D102
+        return None
+
+
+# Built once: stateless (no cookie jar), so every HttpTransport instance can
+# share it unless a test injects its own `opener`.
+_DEFAULT_OPENER = urllib.request.build_opener(_RefuseRedirectHandler)
+
 
 class HttpTransport:
     """Posts ``ActivityBatch``es to ``{base_url}/v1/events``.
@@ -71,7 +99,19 @@ class HttpTransport:
         self._timeout_s = timeout_s
         # Primarily a testing seam: lets tests inject a fake opener to
         # simulate a transient network error without racing real sockets.
-        self._urlopen = opener or urllib.request.urlopen
+        # The default goes through `_DEFAULT_OPENER`, not bare
+        # `urllib.request.urlopen`, so redirects are refused rather than
+        # followed with the API key attached (see `_RefuseRedirectHandler`).
+        self._urlopen = opener or _DEFAULT_OPENER.open
+
+        # Bound for flush()/close()'s default wait: long enough for one
+        # batch to exhaust its own retry budget (worst case (retries + 1)
+        # attempts at timeout_s each, plus the backoff between them) with
+        # slack for whatever else is queued behind it. Callers who need to
+        # wait longer (or forever) can pass an explicit `timeout`.
+        self._default_flush_timeout_s = (
+            (retries + 1) * timeout_s + sum(self._backoff_s * (2**i) for i in range(retries)) + 1.0
+        )
 
         self._queue: "queue.Queue[list[dict[str, Any]] | object]" = queue.Queue(maxsize=max_queue)
         self._dropped_lock = threading.Lock()
@@ -96,15 +136,33 @@ class HttpTransport:
             with self._dropped_lock:
                 self._dropped += len(events)
 
-    def flush(self) -> None:
-        """Block until every batch enqueued so far has been attempted."""
-        self._queue.join()
+    def flush(self, timeout: float | None = _UNSET_TIMEOUT) -> bool:  # type: ignore[assignment]
+        """Block until every batch enqueued so far has been attempted.
 
-    def close(self) -> None:
+        ``timeout`` (seconds) bounds the wait; omitted, it defaults to one
+        full retry cycle's worth of time (see ``_default_flush_timeout_s``)
+        so a stalled hub cannot block the caller -- including the tracer's
+        own flush timer -- indefinitely. Pass ``None`` explicitly to block
+        forever. Returns ``True`` if the queue drained before the deadline,
+        ``False`` on timeout.
+        """
+        effective = self._default_flush_timeout_s if timeout is _UNSET_TIMEOUT else timeout
+        if effective is None:
+            self._queue.join()
+            return True
+        deadline = time.monotonic() + effective
+        while self._queue.unfinished_tasks > 0:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return False
+            time.sleep(min(0.02, remaining))
+        return True
+
+    def close(self, timeout: float | None = _UNSET_TIMEOUT) -> None:  # type: ignore[assignment]
         if self._closed:
             return
         self._closed = True
-        self.flush()
+        self.flush(timeout)
         self._queue.put(_SHUTDOWN)
         self._thread.join(timeout=5)
 
@@ -144,10 +202,10 @@ class HttpTransport:
                     },
                 )
                 with self._urlopen(request, timeout=self._timeout_s):
-                    return  # 2xx (or a redirect urllib already followed)
+                    return  # 2xx
             except urllib.error.HTTPError as exc:
                 if exc.code < 500:
-                    return  # 4xx: not retryable, drop
+                    return  # 4xx, or a redirect the opener refused to follow: not retryable, drop
                 # 5xx: fall through to retry
             except Exception:
                 pass  # network error: fall through to retry

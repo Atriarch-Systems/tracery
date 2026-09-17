@@ -6,7 +6,12 @@ metadata:
   labels:
     app.kubernetes.io/name: tracery-hub
 spec:
-  replicas: 1 # SqliteStore/MemoryStore are single-writer; do not scale this beyond 1 until a shared store (Postgres, SPEC.md §6 follow-up) lands.
+  # SqliteStore/MemoryStore are single-writer; do not scale this beyond 1
+  # unless TRACERY_STORE is switched to postgres below (SPEC.md §6
+  # "Storage"), which is the only backing store this Deployment can safely
+  # run with replicas > 1 (also drop `strategy: Recreate` for a normal
+  # `RollingUpdate` once you do).
+  replicas: 1
   strategy:
     type: Recreate
   selector:
@@ -43,6 +48,17 @@ spec:
               value: "500000"
             - name: TRACERY_LOG_LEVEL
               value: info
+            # --- Alternative: Postgres-backed store (SPEC.md §6 "Storage"), the
+            # only backing store this Deployment can run with replicas > 1. To
+            # switch: comment out TRACERY_STORE/TRACERY_SQLITE_PATH above and the
+            # `data` volume/volumeMount/PVC below, then uncomment these two:
+            # - name: TRACERY_STORE
+            #   value: postgres
+            # - name: TRACERY_POSTGRES_URL
+            #   valueFrom:
+            #     secretKeyRef:
+            #       name: tracery-hub-postgres # provision via OpenBao/ExternalSecret; a postgres:// URL, e.g. postgres://tracery:PASSWORD@tracery-postgres:5432/tracery
+            #       key: url
           volumeMounts:
             - name: data
               mountPath: /data

@@ -11,7 +11,14 @@ export type InspectorSelection = ActivityNode<NodeData>;
 
 function formatTs(ts: number | undefined): string {
   if (ts === undefined) return '—';
-  return new Date(ts).toISOString().replace('T', ' ').replace('Z', '');
+  const date = new Date(ts);
+  // `validateEvent` (packages/core/src/validate.ts) only requires `ts` to be
+  // a finite number, so a value outside JS's ±8.64e15 date range can reach
+  // here from any producer holding an ingest key. `toISOString()` throws
+  // `RangeError` for such a value; render the raw number instead of letting
+  // one malformed event blank the whole inspector panel.
+  if (Number.isNaN(date.getTime())) return String(ts);
+  return date.toISOString().replace('T', ' ').replace('Z', '');
 }
 
 function opsNewestFirst(ops: readonly OpRecord[]): OpRecord[] {

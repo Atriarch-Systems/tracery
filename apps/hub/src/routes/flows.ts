@@ -6,6 +6,7 @@ import type { FastifyInstance } from 'fastify';
 import type { FlowStatus } from '@atriarch/tracery-core';
 import type { HubContext } from '../server-context.js';
 import { errorBody } from './errors.js';
+import { InvalidQueryError, parseCursor, parseLimit } from './query.js';
 
 interface ListFlowsQueryString {
   readonly workspace?: string;
@@ -32,9 +33,19 @@ export function registerFlowsRoutes(app: FastifyInstance, ctx: HubContext): void
       return reply.code(400).send(errorBody('invalid_query', `status must be one of ${FLOW_STATUSES.join(', ')}`));
     }
 
+    let limit: number | undefined;
+    let before: number | undefined;
+    try {
+      limit = query.limit !== undefined ? parseLimit(query.limit, 50, 1000) : undefined;
+      before = parseCursor(query.before, 'before');
+    } catch (err) {
+      if (err instanceof InvalidQueryError) return reply.code(400).send(errorBody('invalid_query', err.message));
+      throw err;
+    }
+
     const result = await ctx.store.listFlows(auth.workspace, {
-      limit: query.limit !== undefined ? Number(query.limit) : undefined,
-      before: query.before,
+      limit,
+      before: before !== undefined ? String(before) : undefined,
       status: isFlowStatus(query.status) ? query.status : undefined,
       actor: query.actor,
       trace: query.trace,
@@ -61,7 +72,13 @@ export function registerFlowsRoutes(app: FastifyInstance, ctx: HubContext): void
     async (request, reply) => {
       const query = request.query as { workspace?: string; after?: string };
       const auth = await ctx.requireAuth(request, 'read', query.workspace);
-      const after = query.after !== undefined && query.after !== '' ? Number(query.after) : undefined;
+      let after: number | undefined;
+      try {
+        after = parseCursor(query.after, 'after');
+      } catch (err) {
+        if (err instanceof InvalidQueryError) return reply.code(400).send(errorBody('invalid_query', err.message));
+        throw err;
+      }
       const frame = await ctx.store.flowEvents(auth.workspace, request.params.id, after);
       reply.send(frame);
     },

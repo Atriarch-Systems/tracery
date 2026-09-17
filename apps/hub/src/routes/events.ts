@@ -37,6 +37,13 @@ export function registerEventsRoutes(app: FastifyInstance, ctx: HubContext): voi
       if (!isPlainObject(raw) || raw.v !== ACTIVITY_CONTRACT_VERSION || !Array.isArray(raw.events)) {
         return reply.code(400).send(errorBody('invalid_batch', 'body must be an ActivityBatch: { v, workspace?, events[] }'));
       }
+      // hub-21: an envelope-level defect (a malformed `workspace`) must be rejected
+      // outright, not silently swallowed by the per-event fallback below -- that
+      // fallback only ever looks at `raw.events[i]`, so it has no way to notice
+      // anything wrong with `raw.workspace` and would 200 as if nothing were wrong.
+      if (raw.workspace !== undefined && (typeof raw.workspace !== 'string' || raw.workspace.length === 0)) {
+        return reply.code(400).send(errorBody('invalid_batch', 'batch.workspace must be a non-empty string when present'));
+      }
       if (raw.events.length > ACTIVITY_LIMITS.maxEventsPerBatch) {
         return reply
           .code(400)

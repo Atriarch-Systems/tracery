@@ -1,153 +1,210 @@
-// Store contract suite: every assertion here runs against BOTH `MemoryStore`
-// and `SqliteStore` so the two implementations stay behaviourally identical
-// (SPEC.md §6 "Storage").
+// Store contract suite: the shared assertions in `./store-contract-suite.mjs`
+// run against BOTH `MemoryStore` and `SqliteStore` here so the two
+// implementations stay behaviourally identical (SPEC.md §6 "Storage");
+// `PostgresStore` gets the same suite from `postgres.test.mjs` (it needs a
+// docker-availability guard the other two don't). SqliteStore-only
+// persistence/rebuild tests unrelated to the shared contract live below.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { evt, storeEngines, withStore } from './helpers.mjs';
-
-function startEvt(overrides) {
-  return evt({ type: 'start', root: true, ...overrides });
-}
-function endEvt(overrides) {
-  return evt({ type: 'end', status: 'success', ...overrides });
-}
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
+import { storeEngines } from './helpers.mjs';
+import { registerStoreContractSuite, startEvt, endEvt } from './store-contract-suite.mjs';
+import { SqliteStore } from '../dist/store/sqlite.js';
 
 for (const { name, create } of storeEngines) {
-  test(`${name}: append dedupes by (workspace, id) and assigns a monotonic cursor`, () =>
-    withStore(create, async (store) => {
-      const r1 = await store.append('ws1', [startEvt({ id: 'e1', flow: 'f1', op: 'o1' })]);
-      assert.equal(r1.accepted.length, 1);
-      assert.equal(r1.duplicates, 0);
-      assert.equal(r1.cursor, 1);
-      assert.equal(r1.accepted[0].cursor, 1);
-      assert.equal(r1.accepted[0].workspace, 'ws1');
+  registerStoreContractSuite(name, create);
+}
 
-      const r2 = await store.append('ws1', [startEvt({ id: 'e1', flow: 'f1', op: 'o1' })]);
-      assert.equal(r2.accepted.length, 0);
-      assert.equal(r2.duplicates, 1);
-      assert.equal(r2.cursor, 1);
+// hub-6: SqliteStore-only -- the eviction floor must survive a restart (a
+// fresh `SqliteStore` opened on the same file), since that's exactly when
+// clients reconnect with a cursor the store may no longer hold that far back.
+test('SqliteStore: the eviction floor (floorCursor) survives a restart, so a pre-sweep cursor still gets a truncated snapshot after reopening', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tracery-hub-sqlite-restart-'));
+  const file = path.join(dir, 'test.db');
+  try {
+    const now = 10_000_000;
+    const dayMs = 24 * 60 * 60 * 1000;
 
-      const r3 = await store.append('ws1', [endEvt({ id: 'e2', flow: 'f1', op: 'o1' })]);
-      assert.equal(r3.cursor, 2);
+    let store = new SqliteStore(file);
+    const r1 = await store.append('ws', [startEvt({ id: 'old-1', flow: 'old', op: 'o', ts: now - 10 * dayMs })]);
+    await store.append('ws', [endEvt({ id: 'old-2', flow: 'old', op: 'o', ts: now - 10 * dayMs + 5 })]);
+    await store.append('ws', [startEvt({ id: 'new-1', flow: 'new', op: 'o', ts: now - 10 })]);
+    await store.sweep(now, { retentionMs: dayMs, maxEventsPerWorkspace: 1_000_000 });
 
-      // Same id in a different workspace is not a duplicate: dedupe is workspace-scoped.
-      const r4 = await store.append('ws2', [startEvt({ id: 'e1', flow: 'f1', op: 'o1' })]);
-      assert.equal(r4.accepted.length, 1);
-      assert.equal(r4.duplicates, 0);
-    }));
+    const before = await store.workspaceFrame('ws', r1.cursor);
+    assert.equal(before.truncated, true);
+    await store.close();
 
-  test(`${name}: flowEvents gives a full snapshot, then the delta after a cursor`, () =>
-    withStore(create, async (store) => {
-      await store.append('ws', [startEvt({ id: 'e1', flow: 'f1', op: 'o1', ts: 1000 })]);
-      await store.append('ws', [endEvt({ id: 'e2', flow: 'f1', op: 'o1', ts: 1100 })]);
+    // Reopen: a fresh instance on the same file, simulating a hub restart.
+    store = new SqliteStore(file);
+    try {
+      const after = await store.workspaceFrame('ws', r1.cursor);
+      assert.equal(after.truncated, true, 'floorCursor must survive a restart, or a reconnecting client silently misses evicted events');
+      assert.deepEqual(after.events.map((e) => e.id), ['new-1']);
+    } finally {
+      await store.close();
+    }
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
 
-      const snapshot = await store.flowEvents('ws', 'f1');
-      assert.equal(snapshot.type, 'snapshot');
-      assert.equal(snapshot.truncated, false);
-      assert.equal(snapshot.events.length, 2);
+// hub-22: boot rebuilds the in-memory flow/trace index in O(flows) (one
+// materialised `flows` row per flow) instead of O(events) (re-deriving every
+// flow from its whole event history via `buildFlows`). These tests are
+// SqliteStore-only: `MemoryStore` has nothing to persist a materialised index
+// to, so it must always rebuild from its (in-memory) event log.
 
-      const afterFirst = await store.flowEvents('ws', 'f1', snapshot.events[0].cursor);
-      assert.equal(afterFirst.type, 'events');
-      assert.deepEqual(afterFirst.events.map((e) => e.id), ['e2']);
+function withTempDb(fn) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tracery-hub-sqlite-hub22-'));
+  const file = path.join(dir, 'test.db');
+  return (async () => {
+    try {
+      return await fn(file);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  })();
+}
 
-      const afterLast = await store.flowEvents('ws', 'f1', snapshot.events[1].cursor);
-      assert.equal(afterLast.events.length, 0);
+test('SqliteStore: reopening from disk lists flows without scanning events -- listFlows/flowSummary still work after the events table is wiped out from under it', () =>
+  withTempDb(async (file) => {
+    let store = new SqliteStore(file);
+    await store.append('ws', [startEvt({ id: 'a1', flow: 'flow-a', op: 'oa', ts: 1000, label: 'Alpha run' })]);
+    await store.append('ws', [endEvt({ id: 'a2', flow: 'flow-a', op: 'oa', ts: 1010 })]);
+    await store.append('ws', [startEvt({ id: 'b1', flow: 'flow-b', op: 'ob', ts: 1020, label: 'Beta run' })]);
+    await store.append('ws', [endEvt({ id: 'b2', flow: 'flow-b', op: 'ob', ts: 1030, status: 'error' })]);
+    await store.close();
 
-      const unknownFlow = await store.flowEvents('ws', 'no-such-flow');
-      assert.equal(unknownFlow.type, 'snapshot');
-      assert.equal(unknownFlow.events.length, 0);
-    }));
+    // Simulate a store whose flow index is materialised but whose event log is
+    // gone (evicted, corrupted, whatever) -- if `load()` still needed to scan
+    // `events` to reconstruct `flows`, this reopen would come back with nothing.
+    const raw = new DatabaseSync(file);
+    raw.exec('DELETE FROM events;');
+    raw.close();
 
-  test(`${name}: traceEvents gathers every event across every flow sharing the trace, cursor-ordered`, () =>
-    withStore(create, async (store) => {
-      await store.append('ws', [startEvt({ id: 'p1', flow: 'parent', op: 'po', ts: 1000 })]);
-      await store.append('ws', [
-        startEvt({ id: 'c1', flow: 'child', op: 'co', ts: 1050, link: { parentFlow: 'parent', parentOp: 'po' } }),
-      ]);
-      await store.append('ws', [endEvt({ id: 'p2', flow: 'parent', op: 'po', ts: 1100 })]);
+    store = new SqliteStore(file);
+    try {
+      const listed = await store.listFlows('ws', {});
+      assert.deepEqual(
+        listed.flows.map((f) => f.id).sort(),
+        ['flow-a', 'flow-b'],
+        'listFlows must be able to answer from the materialised flows table alone',
+      );
 
-      const events = await store.traceEvents('ws', 'parent');
-      assert.deepEqual(events.map((e) => e.id), ['p1', 'c1', 'p2']);
-      // Ascending by cursor.
-      for (let i = 1; i < events.length; i++) assert.ok(events[i].cursor > events[i - 1].cursor);
-    }));
+      const a = await store.flowSummary('ws', 'flow-a');
+      assert.equal(a.label, 'Alpha run');
+      assert.equal(a.status, 'complete');
+      const b = await store.flowSummary('ws', 'flow-b');
+      assert.equal(b.status, 'error');
 
-  test(`${name}: listFlows pages newest-first and filters by status/actor/trace/q`, () =>
-    withStore(create, async (store) => {
-      await store.append('ws', [startEvt({ id: 'a1', flow: 'flow-a', op: 'oa', ts: 1000, label: 'Alpha run', actor: { id: 'agent:x' } })]);
-      await store.append('ws', [endEvt({ id: 'a2', flow: 'flow-a', op: 'oa', ts: 1010 })]);
-      await store.append('ws', [startEvt({ id: 'b1', flow: 'flow-b', op: 'ob', ts: 1020, label: 'Beta run', actor: { id: 'agent:y' } })]);
-      await store.append('ws', [endEvt({ id: 'b2', flow: 'flow-b', op: 'ob', ts: 1030, status: 'error' })]);
-      await store.append('ws', [startEvt({ id: 'c1', flow: 'flow-c', op: 'oc', ts: 1040, label: 'Gamma run', actor: { id: 'agent:x' } })]);
-
-      const page1 = await store.listFlows('ws', { limit: 2 });
-      assert.equal(page1.flows.length, 2);
-      assert.deepEqual(page1.flows.map((f) => f.id), ['flow-c', 'flow-b']); // newest (most recent activity) first
-      assert.ok(page1.nextBefore);
-
-      const page2 = await store.listFlows('ws', { limit: 2, before: page1.nextBefore });
-      assert.deepEqual(page2.flows.map((f) => f.id), ['flow-a']);
-      assert.equal(page2.nextBefore, undefined);
-
-      const byStatus = await store.listFlows('ws', { status: 'error' });
-      assert.deepEqual(byStatus.flows.map((f) => f.id), ['flow-b']);
-
-      const byActor = await store.listFlows('ws', { actor: 'agent:x' });
-      assert.deepEqual(byActor.flows.map((f) => f.id).sort(), ['flow-a', 'flow-c']);
-
-      const byTrace = await store.listFlows('ws', { trace: 'flow-a' });
-      assert.deepEqual(byTrace.flows.map((f) => f.id), ['flow-a']);
-
-      const byQ = await store.listFlows('ws', { q: 'beta' });
-      assert.deepEqual(byQ.flows.map((f) => f.id), ['flow-b']);
-    }));
-
-  test(`${name}: flowSummary matches core's Flow shape with Maps converted to Records`, () =>
-    withStore(create, async (store) => {
-      await store.append('ws', [startEvt({ id: 'e1', flow: 'f1', op: 'o1', node: 'n1', ts: 1000, label: 'Hello' })]);
-      await store.append('ws', [endEvt({ id: 'e2', flow: 'f1', op: 'o1', node: 'n1', ts: 1100 })]);
-
-      const summary = await store.flowSummary('ws', 'f1');
-      assert.equal(summary.id, 'f1');
-      assert.equal(summary.label, 'Hello');
-      assert.equal(summary.status, 'complete');
-      assert.equal(summary.trace, 'f1');
-      assert.equal(typeof summary.ops, 'object');
-      assert.ok(!(summary.ops instanceof Map));
-      assert.ok('o1' in summary.ops);
-      assert.ok('n1' in summary.nodes);
-      assert.equal(JSON.stringify(summary), JSON.stringify(JSON.parse(JSON.stringify(summary))));
-
-      assert.equal(await store.flowSummary('ws', 'no-such-flow'), undefined);
-    }));
-
-  test(`${name}: deleteFlow removes the flow and its events`, () =>
-    withStore(create, async (store) => {
-      await store.append('ws', [startEvt({ id: 'e1', flow: 'f1', op: 'o1' })]);
-      assert.equal(await store.deleteFlow('ws', 'no-such-flow'), false);
-      assert.equal(await store.deleteFlow('ws', 'f1'), true);
-      assert.equal(await store.flowSummary('ws', 'f1'), undefined);
-      const events = await store.flowEvents('ws', 'f1');
+      // The event log really is gone -- confirms this wasn't secretly served from events.
+      const events = await store.flowEvents('ws', 'flow-a');
       assert.equal(events.events.length, 0);
-    }));
+    } finally {
+      await store.close();
+    }
+  }));
 
-  test(`${name}: a parent flow arriving after its child corrects the child's (and grandchild's) resolved trace`, () =>
-    withStore(create, async (store) => {
-      // Grandchild links to "parent1", not yet observed.
-      await store.append('ws', [
-        startEvt({ id: 'c1', flow: 'child', op: 'co', ts: 1000, link: { parentFlow: 'parent1' } }),
-      ]);
-      let child = await store.flowSummary('ws', 'child');
-      assert.equal(child.trace, 'parent1'); // placeholder: parent not yet known
+test('SqliteStore: a missing flows table (a database from before hub-22) is rebuilt from events on open', () =>
+  withTempDb(async (file) => {
+    // Hand-build a pre-hub-22 database: only `events` + `workspace_meta`, no
+    // `flows`/`schema_meta` tables at all -- exactly what an older SqliteStore left behind.
+    const raw = new DatabaseSync(file);
+    raw.exec(`
+      CREATE TABLE events (
+        cursor INTEGER PRIMARY KEY, workspace TEXT NOT NULL, id TEXT NOT NULL, flow TEXT NOT NULL, json TEXT NOT NULL,
+        UNIQUE(workspace, id)
+      );
+    `);
+    raw.exec('CREATE INDEX idx_events_workspace_flow ON events(workspace, flow);');
+    raw.exec('CREATE TABLE workspace_meta (workspace TEXT PRIMARY KEY, floor_cursor INTEGER);');
+    const insert = raw.prepare('INSERT INTO events (cursor, workspace, id, flow, json) VALUES (?, ?, ?, ?, ?)');
+    const rows = [startEvt({ id: 'p1', flow: 'old-flow', op: 'op', ts: 1000, label: 'Old run' }), endEvt({ id: 'p2', flow: 'old-flow', op: 'op', ts: 1010 })];
+    rows.forEach((event, i) => {
+      const stored = { ...event, workspace: 'ws', cursor: i + 1, receivedAt: Date.now() };
+      insert.run(stored.cursor, 'ws', stored.id, stored.flow, JSON.stringify(stored));
+    });
+    raw.close();
 
-      // parent1 arrives, itself linking to "grandparent1" (also not yet observed).
-      await store.append('ws', [
-        startEvt({ id: 'p1', flow: 'parent1', op: 'po', ts: 990, link: { parentFlow: 'grandparent1' } }),
-      ]);
+    const store = new SqliteStore(file);
+    try {
+      const listed = await store.listFlows('ws', {});
+      assert.deepEqual(listed.flows.map((f) => f.id), ['old-flow']);
+      const summary = await store.flowSummary('ws', 'old-flow');
+      assert.equal(summary.label, 'Old run');
+      assert.equal(summary.status, 'complete');
+    } finally {
+      await store.close();
+    }
+
+    // And the rebuild is durable: a schema_meta row now marks the table current.
+    const check = new DatabaseSync(file);
+    try {
+      const row = check.prepare("SELECT value FROM schema_meta WHERE key = 'flows_schema_version'").get();
+      assert.notEqual(row, undefined, 'load() must write a schema-version row once the flows table is rebuilt');
+    } finally {
+      check.close();
+    }
+  }));
+
+test('SqliteStore: a flows-table schema-version mismatch is rebuilt from events on open', () =>
+  withTempDb(async (file) => {
+    let store = new SqliteStore(file);
+    await store.append('ws', [startEvt({ id: 'a1', flow: 'flow-a', op: 'oa', ts: 1000, label: 'Alpha run' })]);
+    await store.append('ws', [endEvt({ id: 'a2', flow: 'flow-a', op: 'oa', ts: 1010 })]);
+    await store.close();
+
+    // Downgrade the recorded schema version and blow away the materialised
+    // rows -- if the version check didn't trigger a rebuild, the reopened
+    // store would list nothing at all.
+    const raw = new DatabaseSync(file);
+    raw.exec("UPDATE schema_meta SET value = '0' WHERE key = 'flows_schema_version';");
+    raw.exec('DELETE FROM flows;');
+    raw.close();
+
+    store = new SqliteStore(file);
+    try {
+      const listed = await store.listFlows('ws', {});
+      assert.deepEqual(listed.flows.map((f) => f.id), ['flow-a']);
+      const summary = await store.flowSummary('ws', 'flow-a');
+      assert.equal(summary.label, 'Alpha run');
+    } finally {
+      await store.close();
+    }
+
+    const check = new DatabaseSync(file);
+    try {
+      const row = check.prepare("SELECT value FROM schema_meta WHERE key = 'flows_schema_version'").get();
+      assert.notEqual(row.value, '0', 'the stale schema version must have been overwritten by the rebuild');
+    } finally {
+      check.close();
+    }
+  }));
+
+test('SqliteStore: a late-arriving parent\'s trace correction survives a restart, not just the in-process append that made it', () =>
+  withTempDb(async (file) => {
+    let store = new SqliteStore(file);
+    // Grandchild links to "parent1", not yet observed.
+    await store.append('ws', [startEvt({ id: 'c1', flow: 'child', op: 'co', ts: 1000, link: { parentFlow: 'parent1' } })]);
+    // parent1 arrives, itself linking to "grandparent1" (also not yet observed) --
+    // this corrects child's trace to "grandparent1" before the store ever restarts.
+    await store.append('ws', [startEvt({ id: 'p1', flow: 'parent1', op: 'po', ts: 990, link: { parentFlow: 'grandparent1' } })]);
+
+    let child = await store.flowSummary('ws', 'child');
+    assert.equal(child.trace, 'grandparent1');
+    await store.close();
+
+    // Reopen: the corrected trace must have been persisted, not just held in memory.
+    store = new SqliteStore(file);
+    try {
       child = await store.flowSummary('ws', 'child');
-      assert.equal(child.trace, 'grandparent1'); // corrected once parent1 is known, even before grandparent1 is
+      assert.equal(child.trace, 'grandparent1', 'the late-parent trace correction must survive a restart');
 
-      // grandparent1 finally arrives; it has no link, so it is its own trace root.
+      // grandparent1 finally arrives; everything should still resolve together.
       await store.append('ws', [startEvt({ id: 'g1', flow: 'grandparent1', op: 'go', ts: 980 })]);
       const grandparent = await store.flowSummary('ws', 'grandparent1');
       const parent1 = await store.flowSummary('ws', 'parent1');
@@ -158,88 +215,7 @@ for (const { name, create } of storeEngines) {
 
       const trace = await store.getTrace('ws', 'grandparent1');
       assert.deepEqual(trace.flows.map((f) => f.id).sort(), ['child', 'grandparent1', 'parent1']);
-    }));
-
-  test(`${name}: sweep deletes the oldest complete flows first, protecting a running flow younger than the retention window`, () =>
-    withStore(create, async (store) => {
-      const now = 10_000_000;
-      const dayMs = 24 * 60 * 60 * 1000;
-
-      await store.append('ws', [startEvt({ id: 'a1', flow: 'old-complete', op: 'oa', ts: now - 10 * dayMs })]);
-      await store.append('ws', [endEvt({ id: 'a2', flow: 'old-complete', op: 'oa', ts: now - 10 * dayMs + 10 })]);
-
-      await store.append('ws', [startEvt({ id: 'b1', flow: 'old-running', op: 'ob', ts: now - 10 * dayMs })]);
-      // no end: still running
-
-      await store.append('ws', [startEvt({ id: 'c1', flow: 'young-running', op: 'oc', ts: now - 1000 })]);
-      // no end: still running, but well within the retention window -- protected
-
-      await store.append('ws', [startEvt({ id: 'd1', flow: 'young-complete', op: 'od', ts: now - 1000 })]);
-      await store.append('ws', [endEvt({ id: 'd2', flow: 'young-complete', op: 'od', ts: now - 900 })]);
-
-      const result = await store.sweep(now, { retentionMs: dayMs, maxEventsPerWorkspace: 1_000_000 });
-      assert.equal(result.sweptFlows, 2); // old-complete, old-running
-      assert.equal(result.sweptEvents, 3); // a1, a2, b1
-
-      assert.equal(await store.flowSummary('ws', 'old-complete'), undefined);
-      assert.equal(await store.flowSummary('ws', 'old-running'), undefined);
-      assert.notEqual(await store.flowSummary('ws', 'young-running'), undefined);
-      assert.notEqual(await store.flowSummary('ws', 'young-complete'), undefined);
-    }));
-
-  test(`${name}: sweep evicts oldest-first once a workspace exceeds maxEventsPerWorkspace, even within the retention window`, () =>
-    withStore(create, async (store) => {
-      const now = 10_000_000;
-      for (const [id, ts] of [
-        ['flow-1', now - 300],
-        ['flow-2', now - 200],
-        ['flow-3', now - 100],
-      ]) {
-        await store.append('ws', [startEvt({ id: `${id}-s`, flow: id, op: 'o', ts })]);
-        await store.append('ws', [endEvt({ id: `${id}-e`, flow: id, op: 'o', ts: ts + 1 })]);
-      }
-
-      const result = await store.sweep(now, { retentionMs: 24 * 60 * 60 * 1000, maxEventsPerWorkspace: 4 });
-      assert.equal(result.sweptFlows, 1);
-      assert.equal(await store.flowSummary('ws', 'flow-1'), undefined);
-      assert.notEqual(await store.flowSummary('ws', 'flow-2'), undefined);
-      assert.notEqual(await store.flowSummary('ws', 'flow-3'), undefined);
-    }));
-
-  test(`${name}: stats reports per-workspace event/flow counts and time bounds`, () =>
-    withStore(create, async (store) => {
-      await store.append('ws1', [startEvt({ id: 'e1', flow: 'f1', op: 'o1', ts: 1000 })]);
-      await store.append('ws1', [endEvt({ id: 'e2', flow: 'f1', op: 'o1', ts: 1500 })]);
-      await store.append('ws2', [startEvt({ id: 'e3', flow: 'f2', op: 'o2', ts: 2000 })]);
-
-      const stats = await store.stats();
-      const ws1 = stats.find((s) => s.workspace === 'ws1');
-      const ws2 = stats.find((s) => s.workspace === 'ws2');
-      assert.equal(ws1.events, 2);
-      assert.equal(ws1.flows, 1);
-      assert.equal(ws1.oldestEventAt, 1000);
-      assert.equal(ws1.newestEventAt, 1500);
-      assert.equal(ws2.events, 1);
-      assert.equal(ws2.flows, 1);
-    }));
-
-  test(`${name}: after a sweep evicts a flow, a reconnect from an older cursor gets a truncated snapshot`, () =>
-    withStore(create, async (store) => {
-      const now = 10_000_000;
-      const dayMs = 24 * 60 * 60 * 1000;
-      const r1 = await store.append('ws', [startEvt({ id: 'old-1', flow: 'old', op: 'o', ts: now - 10 * dayMs })]);
-      await store.append('ws', [endEvt({ id: 'old-2', flow: 'old', op: 'o', ts: now - 10 * dayMs + 5 })]);
-      await store.append('ws', [startEvt({ id: 'new-1', flow: 'new', op: 'o', ts: now - 10 })]);
-
-      await store.sweep(now, { retentionMs: dayMs, maxEventsPerWorkspace: 1_000_000 });
-
-      const frame = await store.workspaceFrame('ws', r1.cursor);
-      assert.equal(frame.type, 'snapshot');
-      assert.equal(frame.truncated, true);
-      assert.deepEqual(frame.events.map((e) => e.id), ['new-1']);
-
-      // A fresh (no `after`) request is never truncated: it is authoritative for "now".
-      const fresh = await store.workspaceFrame('ws');
-      assert.equal(fresh.truncated, false);
-    }));
-}
+    } finally {
+      await store.close();
+    }
+  }));

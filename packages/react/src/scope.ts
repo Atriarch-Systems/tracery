@@ -55,3 +55,22 @@ export function activatedFlow(node: ActivityNode<NodeData>, activeFlow: string):
   if (!flow || flow === activeFlow) return null;
   return flow;
 }
+
+/**
+ * SPEC.md §4's `1`/`2`/`3` scope shortcuts must not fire while the key
+ * lands in a text field -- including one a consumer's `renderInspector`
+ * override renders (an explicitly supported extension point) -- or while a
+ * modifier key gives the digit a different, browser-owned meaning (e.g.
+ * Ctrl/Cmd+1 switches tabs in most browsers). `target`/`modifier` are typed
+ * loosely so this stays testable without a DOM: a plain object with the
+ * fields actually inspected is enough.
+ */
+export function isScopeShortcutTarget(
+  target: { readonly tagName?: string; readonly isContentEditable?: boolean } | null | undefined,
+  modifier = false,
+): boolean {
+  if (modifier) return false;
+  if (!target) return true;
+  const tag = target.tagName?.toUpperCase();
+  return tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT' && target.isContentEditable !== true;
+}

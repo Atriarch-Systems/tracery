@@ -294,6 +294,62 @@ test('self edges (parentNode === node) are still recorded by flows.ts (suppressi
   assert.equal(edges[0].target, 'n0');
 });
 
+test('core-3: a start processed after its op already ended (equal ts, end sorts first) preserves the terminal status and durationMs', () => {
+  const flows = buildFlows([
+    evt({ id: '2', ts: 1000, flow: 'f', op: 'r', node: 'n', type: 'end', name: 'root', status: 'error' }),
+    evt({ id: '1', ts: 1000, flow: 'f', op: 'r', node: 'n', type: 'start', name: 'root', root: true }),
+  ]);
+  const flow = flows.get('f');
+  const op = flow.ops.get('r');
+  assert.equal(op.status, 'error'); // not reverted to 'running'
+  assert.equal(op.startedAt, 1000);
+  assert.equal(op.endedAt, 1000);
+  assert.equal(op.durationMs, 0); // backfilled from endedAt - startedAt
+  assert.equal(flow.status, 'error'); // not reported as 'complete'
+  assert.equal(flow.partial, false);
+});
+
+test('core-3: a late start after a normal end backfills durationMs without disturbing a successful status', () => {
+  const flows = buildFlows([
+    evt({ id: '2', ts: 1200, flow: 'f', op: 'r', node: 'n', type: 'end', name: 'root', status: 'success' }),
+    evt({ id: '1', ts: 1000, flow: 'f', op: 'r', node: 'n', type: 'start', name: 'root', root: true }),
+  ]);
+  const op = flows.get('f').ops.get('r');
+  assert.equal(op.status, 'success');
+  assert.equal(op.startedAt, 1000);
+  assert.equal(op.durationMs, 200);
+});
+
+test('core-8: a duplicate start that is ignored does not mutate the node it names, even a different node than the accepted start', () => {
+  const flows = buildFlows([
+    evt({ id: '1', ts: 1000, flow: 'f1', op: 'o1', node: 'n1', type: 'start', name: 'first', root: true }),
+    // Same op, later start: ignored (first wins). It names a different node,
+    // which must not spring into existence as a 0-ops ghost node.
+    evt({ id: '2', ts: 1100, flow: 'f1', op: 'o1', node: 'n2', type: 'start', name: 'second', kind: 'tool', label: 'Ghost' }),
+  ]);
+  const flow = flows.get('f1');
+  assert.equal(flow.nodes.has('n2'), false);
+  const n1 = flow.nodes.get('n1');
+  assert.equal(n1.lastOpName, 'first');
+  assert.equal(n1.label, 'n1'); // untouched by the ignored event's label
+});
+
+test('core-8: a duplicate end does not mutate its node\'s lastSeenAt/lastOpName/label', () => {
+  const flows = buildFlows([
+    evt({ id: '1', ts: 1000, flow: 'f1', op: 'o1', node: 'n1', type: 'start', name: 'root', root: true }),
+    evt({ id: '2', ts: 1100, flow: 'f1', op: 'o1', node: 'n1', type: 'end', name: 'root', status: 'success' }),
+    // Later end for the same op: ignored (first wins), even though it carries
+    // a later ts and a different label -- neither should reach the node.
+    evt({ id: '3', ts: 1900, flow: 'f1', op: 'o1', node: 'n1', type: 'end', name: 'ignored', status: 'error', label: 'Should not stick' }),
+  ]);
+  const flow = flows.get('f1');
+  const node = flow.nodes.get('n1');
+  assert.equal(node.lastSeenAt, 1100);
+  assert.equal(node.lastOpName, 'root');
+  assert.equal(node.label, 'n1');
+  assert.equal(flow.ops.get('o1').status, 'success');
+});
+
 test('an end/update/annotate without a start never creates an edge, even with parentNode/dataFrom set', () => {
   const flows = buildFlows([
     evt({ id: '1', ts: 1000, flow: 'f1', op: 'root', node: 'n0', type: 'start', name: 'root', root: true }),

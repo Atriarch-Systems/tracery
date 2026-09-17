@@ -18,8 +18,9 @@ setting below has a default, so this works out of the box.
 | --- | --- | --- |
 | `TRACERY_PORT` | `8971` | HTTP/WS listen port. |
 | `TRACERY_HOST` | `0.0.0.0` | HTTP/WS listen host. |
-| `TRACERY_STORE` | `memory` | `memory` or `sqlite`. |
+| `TRACERY_STORE` | `memory` | `memory`, `sqlite`, or `postgres`. |
 | `TRACERY_SQLITE_PATH` | `/data/tracery.db` | Database file path, used only when `TRACERY_STORE=sqlite`. |
+| `TRACERY_POSTGRES_URL` | unset | `postgres://user:pass@host:5432/db` connection string. **Required** when `TRACERY_STORE=postgres` (the hub fails at boot without it); ignored otherwise. |
 | `TRACERY_API_KEYS` | unset | Inline JSON array of API keys (see below). |
 | `TRACERY_API_KEYS_FILE` | unset | Path to a JSON file with the same shape as `TRACERY_API_KEYS`. Ignored when `TRACERY_API_KEYS` is set. |
 | `TRACERY_RETENTION_HOURS` | `72` | Retention window; the sweeper deletes complete flows older than this. |
@@ -57,6 +58,19 @@ Use this for local development only.
   SHA-256 hash of each candidate), so a wrong key never leaks how much of it
   matched.
 
+### Enterprise SSO (OIDC)
+
+With the `apps/hub/ee` enterprise layer built in and a license carrying the
+`sso` feature (see [`../../docs/ENTERPRISE.md`](../../docs/ENTERPRISE.md)),
+the hosted UI can authenticate a browser session via an OIDC identity
+provider instead of an API key: `TRACERY_OIDC_*` + `TRACERY_SESSION_SECRET`
+configure it, `GET /v1/auth/oidc/login` starts the redirect, and a signed,
+httpOnly session cookie the browser then holds is accepted anywhere a `read`
+role API key would be -- including `GET /v1/flows` and `WS /v1/live` above,
+with no `Authorization` header or `?token=` at all. See
+`docs/ENTERPRISE.md`'s "SSO (OIDC) for the hosted UI" section for the full
+flow, every route, and every environment variable.
+
 ## HTTP API
 
 All JSON, all under `/v1` except health/metrics/UI. Full machine-readable
@@ -93,23 +107,88 @@ which must be given one explicitly (`?workspace=` on every read/WS route,
 
 ## Storage
 
-Two `EventStore` implementations, selected by `TRACERY_STORE`:
+Three `EventStore` implementations, selected by `TRACERY_STORE`:
 
 - **`memory`** (default): everything in process memory. Simplest option;
   lost on restart.
 - **`sqlite`**: `node:sqlite` (`DatabaseSync`, WAL mode), file at
   `TRACERY_SQLITE_PATH`. Events are the durable source of truth on disk;
-  flow/trace reduction is rebuilt from them into an in-memory index on
-  startup and kept current on every write, so reads never touch disk. This
-  keeps `SqliteStore` behaviourally identical to `MemoryStore` (both run the
-  exact same `@atriarch/tracery-core` reduction) while adding durability
-  across restarts. It bounds memory use to what `TRACERY_MAX_EVENTS_PER_WORKSPACE`
-  allows; a Postgres-backed store (for horizontal scale / very large
-  histories) is a documented follow-up, not built here.
+  flow/trace reduction is kept as an in-memory index, updated incrementally
+  on every write (core's single-flow `buildFlow`, exactly like `MemoryStore` --
+  see below), so reads never touch disk. This keeps `SqliteStore` behaviourally
+  identical to `MemoryStore` (both run the exact same `@atriarch/tracery-core`
+  reduction) while adding durability across restarts. It bounds memory use to
+  what `TRACERY_MAX_EVENTS_PER_WORKSPACE` allows.
+- **`postgres`**: the `pg` package against `TRACERY_POSTGRES_URL`. Same
+  design as `SqliteStore` (events on disk, an incrementally-updated in-memory
+  flow index, the same materialised `flows` table -- see below), except
+  every write (`append`, `deleteFlow`, `sweep`) runs inside one SQL
+  transaction and every query is parameterised. **This is the only store
+  that supports more than one hub replica** -- `MemoryStore` and
+  `SqliteStore` are both single-writer (in-process memory, or a single
+  WAL-mode file); pointing several hub instances at the same Postgres
+  database is the supported way to scale the hub horizontally or run it
+  highly available. `k8s/deployment.yaml` has a commented-out env block for
+  switching to it, and `docker-compose.yaml`'s `postgres` profile brings up
+  a throwaway Postgres alongside the hub for local testing.
 
-Both stores resolve a flow's `trace` id via core's `assembleTrace`/`buildFlows`
-on every append, so a parent flow arriving after its child corrects the
-child's (and any further descendants') `trace` automatically.
+All three stores resolve a flow's `trace` id via core's `resolveTraceIds`/
+`assembleTrace` on every append (an O(flows) walk over already-reduced
+`{id, link}` pairs, not a re-run of `buildFlows` over the whole event log), so
+a parent flow arriving after its child corrects the child's (and any further
+descendants') `trace` automatically.
+
+### The `flows` table (SqliteStore, PostgresStore)
+
+`SqliteStore` and `PostgresStore` each keep a `flows` table alongside
+`events` -- one row per flow, kept current incrementally the same way the
+in-memory index is (on `append`, `deleteFlow` and `sweep`, only the flow(s)
+actually touched plus whichever other flows a late-parent trace correction
+changed are re-written). It exists for two reasons:
+
+1. **Boot cost.** On open, the store loads the `flows` table straight into
+   its in-memory index -- one row read + a `JSON.parse` (`SqliteStore`) or
+   an already-parsed `jsonb` value (`PostgresStore`) per flow, O(flows) --
+   instead of re-deriving every flow from its entire event history via
+   `buildFlows(allEvents)`, which is O(events) and was `SqliteStore`'s old
+   startup path. The `events` table is still read into memory at boot (other
+   reads need the raw events), but that read no longer feeds a flow-graph
+   reduction.
+2. **`listFlows`/`flowSummary` are genuinely SQL-backed**: filtering
+   (`status`, `actor`, `trace`, `q`), ordering (newest activity first) and
+   `before`-cursor paging are all indexed `WHERE`/`ORDER BY` clauses against
+   this table, not an in-memory array scan.
+
+`PostgresStore` keeps all of its tables inside one Postgres *schema*
+(`public` by default) and creates them on boot if they don't exist yet, with
+a `schema_version` row recording the materialised row shape -- a missing
+`flows` table or a version mismatch triggers the same one-time O(events)
+rebuild described above for `SqliteStore`.
+
+Columns (both stores use the same shape; `SqliteStore`'s TEXT/INTEGER map to
+`PostgresStore`'s TEXT/BIGINT/JSONB):
+
+| Column | Meaning |
+| --- | --- |
+| `workspace`, `id` | Primary key. |
+| `trace` | The flow's resolved trace id (SPEC.md §1 "Trace resolution"). |
+| `label` | `Flow.label`; matched case-insensitively by `listFlows`' `q` filter. |
+| `actor_id`, `actor_kind` | `Flow.actor.id`/`.kind`, `NULL` if the flow has no actor. |
+| `status`, `partial` | `Flow.status`; `partial` as `0`/`1`. |
+| `started_at`, `ended_at` | `Flow.startedAt`/`.endedAt`, `NULL` when open/unset. |
+| `first_cursor`, `last_cursor` | The lowest/highest hub cursor among the flow's retained events; `last_cursor` is `listFlows`' sort/page key (matches "most recent activity first"). |
+| `tags_json` | Sorted, deduped JSON array of every op's tags in the flow. |
+| `root_node` | The node id of the op whose `start` declared `root: true`, or `NULL` for a partial flow with no root start yet. |
+| `data_json` | The full `FlowSummary` (ops/nodes/edges included) as JSON -- what `listFlows`/`flowSummary` actually return. |
+
+A schema-metadata table carries a `flows_schema_version` row -- `schema_meta`
+in `SqliteStore`, `schema_version` in `PostgresStore` (the same idea, named
+per the task that introduced each store). On open, the store rebuilds the
+`flows` table from `events` (the old O(events) `buildFlows` path, run once)
+whenever the table is missing (a database/schema from before it existed) or
+that row doesn't match the store's current schema version (a future
+column/format change) -- then writes the current version so the next boot
+takes the fast path again.
 
 ### Retention
 
@@ -148,9 +227,19 @@ context, the image still builds and serves the plain placeholder page at
 `TRACERY_API_KEYS_FILE` mounts well as a Docker secret or a read-only bind
 mount; see `docker-compose.yaml` and `keys.example.json` for the shape.
 
+`docker-compose.yaml`'s default `hub` service uses `sqlite`. Its `postgres`
+profile brings up a throwaway Postgres plus a second hub instance
+(`hub-postgres`, host port `8972`) configured with `TRACERY_STORE=postgres`:
+
+```
+docker compose -f apps/hub/docker-compose.yaml --profile postgres up --build postgres hub-postgres
+```
+
 ## Kubernetes
 
-Plain manifests in `k8s/` (Kustomize-friendly, no Helm):
+Plain manifests in `k8s/` (Kustomize-friendly, no Helm); a Helm chart
+covering the same deployment (plus Ingress, ServiceMonitor and templated
+secrets) is at [`helm/`](helm/README.md).
 
 ```
 kubectl create namespace tracery
@@ -162,9 +251,13 @@ kubectl apply -f k8s/service.yaml
 
 `deployment.yaml` runs `TRACERY_STORE=sqlite` against the `pvc.yaml` volume,
 reads `k8s/secret.example.yaml`'s `keys.json` via `TRACERY_API_KEYS_FILE`,
-and sets `replicas: 1` with `strategy: Recreate` -- both stores are
-single-writer, so do not scale this beyond one replica until a shared store
-lands.
+and sets `replicas: 1` with `strategy: Recreate` -- `memory`/`sqlite` are both
+single-writer, so do not scale this beyond one replica unless you switch to
+`TRACERY_STORE=postgres` first (see the "Storage" section above). A commented
+env block in `deployment.yaml` shows that swap: point `TRACERY_POSTGRES_URL`
+at an existing Postgres (via a Secret; OpenBao/ExternalSecret is the
+preferred way to provision it) and drop the `data` PVC/volume/mount, then
+raise `replicas` and switch `strategy` back to `RollingUpdate`.
 
 ## Extending (enterprise layer)
 

@@ -47,9 +47,39 @@ test('edge-first updates render once endpoints arrive; self edges are accepted',
   assert.equal(first.links.length,0);
   assert.equal(reconcile(first,[{id:'a',label:'A'}],edges).links.length,1);
 });
-test('duplicate IDs fail explicitly', () => {
-  assert.throws(()=>reconcile(emptyGraph(),[{id:'a',label:'A'},{id:'a',label:'B'}],[]),/Duplicate activity node/);
-  assert.throws(()=>reconcile(emptyGraph(),[],[{id:'e',source:'a',target:'a'},{id:'e',source:'a',target:'a'}]),/Duplicate activity edge/);
+// Regression (ui-2): a namespaced (trace/ancestors) scope can project two
+// flows onto the same node id (e.g. two flows sharing an actor and a node);
+// `reconcile` used to throw here, and since it runs inside `ActivityGraph`'s
+// effect with no error boundary above it in the hosted UI, that unmounted the
+// whole page over one bad projection. It must degrade instead: keep the
+// first occurrence, drop the rest, never throw.
+test('duplicate node/edge IDs are deduped (first occurrence wins), never thrown', () => {
+  const warnCalls = [];
+  const originalWarn = console.warn;
+  console.warn = (...args) => warnCalls.push(args);
+  try {
+    const graph = reconcile(emptyGraph(), [{ id: 'a', label: 'A' }, { id: 'a', label: 'B' }], []);
+    assert.equal(graph.nodes.length, 1);
+    assert.equal(graph.nodes[0].spec.label, 'A');
+
+    const withEdges = reconcile(emptyGraph(), [{ id: 'a', label: 'A' }],
+      [{ id: 'e', source: 'a', target: 'a' }, { id: 'e', source: 'a', target: 'a' }]);
+    assert.equal(withEdges.links.length, 1);
+    assert.ok(warnCalls.length >= 2, 'expected a warning for each dropped duplicate');
+  } finally {
+    console.warn = originalWarn;
+  }
+});
+test('two namespaced flows that collapse onto the same actor::node id render as one node, not a crash', () => {
+  // Mirrors the trace-scope repro: two flows sharing an actor resolve both
+  // nodes to `agent:saga::llm:main`; project() is expected to merge these
+  // (packages/core), but reconcile must survive even if it has not.
+  const id = 'agent:saga::llm:main';
+  const graph = reconcile(emptyGraph(), [
+    { id, label: 'llm:main', data: { flow: 'flow:f1' } },
+    { id, label: 'llm:main', data: { flow: 'flow:f2' } },
+  ], []);
+  assert.equal(graph.nodes.length, 1);
 });
 test('presentation lifecycle needs no turns or agent event protocol', () => {
   assert.equal(intensity({highlighted:true},1000),1);

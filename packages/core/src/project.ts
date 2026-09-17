@@ -90,6 +90,44 @@ function resolveScope(flows: ReadonlyMap<string, Flow>, scope: Scope): { scopeFl
   return { scopeFlows: [...trace.flows], namespaced: true, highlighted: new Set(trace.flows.map((f) => f.id)) };
 }
 
+/**
+ * Accumulator for one namespaced node id while merging across the flows that
+ * contribute to it (SPEC.md §2: "one agent's repeated flows in a trace merge
+ * onto shared nodes"). Non-namespaced scopes never have more than one
+ * contributor per id, so this degenerates to a plain per-node record there.
+ */
+interface NodeAgg {
+  readonly id: string;
+  ops: OpRecord[];
+  running: number;
+  errorCount: number;
+  label: string;
+  detail: string | undefined;
+  firstFlowId: string;
+  canonicalNode: NodeRecord;
+  canonicalFlow: Flow;
+  lastSeenAt: number;
+  completedAt: number | undefined;
+  highlighted: boolean;
+  layoutParentId: string | undefined;
+}
+
+/**
+ * Accumulator for one namespaced (source, target, relation, kind) edge tuple,
+ * merged the same way as nodes so two flows of the same actor never emit two
+ * edges (or a self-loop) between what is now one node.
+ */
+interface EdgeAgg {
+  readonly id: string;
+  readonly source: string;
+  readonly target: string;
+  readonly relation: string;
+  readonly kind: 'call' | 'data';
+  readonly flowId: string;
+  record: EdgeRecord;
+  highlighted: boolean;
+}
+
 /** Projects `flows` in `scope` onto nodes/edges/groups the visualizer can draw. */
 export function project(flows: ReadonlyMap<string, Flow>, scope: Scope, options?: ProjectOptions): Projection {
   const now = options?.now ?? Date.now();
@@ -121,59 +159,142 @@ export function project(flows: ReadonlyMap<string, Flow>, scope: Scope, options?
     }
   }
 
-  const nodes: ActivityNode<NodeData>[] = [];
-  const edges: ActivityEdge<EdgeData>[] = [];
-  const groups: FlowGroup[] = [];
+  // Pass 2: nodes, keyed by namespaced id so two flows of the same actor collapse
+  // onto one node instead of colliding ids with divergent (and last-write-wins,
+  // effectively random) data.
+  const nodeAggs = new Map<string, NodeAgg>();
+  const groupNodeIds = new Map<string, string[]>();
+  for (const flow of scopeFlows) groupNodeIds.set(flow.id, []);
 
   for (const flow of scopeFlows) {
     const isHighlighted = highlighted.has(flow.id);
-    const groupNodeIds: string[] = [];
     const spawn = spawns.get(flow.id);
 
     for (const node of flow.nodes.values()) {
       if (keepCompletedMs !== undefined && node.status !== 'running' && now - node.lastSeenAt > keepCompletedMs) continue;
 
       const id = namespacedId(flow, node.id, namespaced);
-      groupNodeIds.push(id);
       const ops = node.ops.map((opId) => flow.ops.get(opId)).filter((op): op is OpRecord => op !== undefined);
       const isSpawnTarget = spawn !== undefined && node.id === spawn.childRootNodeId;
 
-      nodes.push({
-        id,
-        label: node.label,
-        detail: node.lastOpName,
-        footer: node.errorCount > 0 ? `${node.errorCount} errors` : `${node.ops.length} ops`,
-        status: node.status,
-        active: node.running > 0,
-        ...(isSpawnTarget ? { layout: { parentId: spawn!.sourceId } } : {}),
-        presentation: catalogFor(node, flow),
-        activity: { highlighted: isHighlighted, completedAt: flow.endedAt, updatedAt: node.lastSeenAt },
-        ...(namespaced ? { group: flow.id } : {}),
-        data: { flow: flow.id, node, ops },
-      });
+      const groupList = groupNodeIds.get(flow.id)!;
+      if (!groupList.includes(id)) groupList.push(id);
+
+      const existing = nodeAggs.get(id);
+      if (!existing) {
+        nodeAggs.set(id, {
+          id,
+          ops: [...ops],
+          running: node.running,
+          errorCount: node.errorCount,
+          label: node.label,
+          detail: node.lastOpName,
+          firstFlowId: flow.id,
+          canonicalNode: node,
+          canonicalFlow: flow,
+          lastSeenAt: node.lastSeenAt,
+          completedAt: flow.endedAt,
+          highlighted: isHighlighted,
+          layoutParentId: isSpawnTarget ? spawn!.sourceId : undefined,
+        });
+        continue;
+      }
+
+      existing.ops.push(...ops);
+      existing.running += node.running;
+      existing.errorCount += node.errorCount;
+      existing.highlighted = existing.highlighted || isHighlighted;
+      if (existing.layoutParentId === undefined && isSpawnTarget) existing.layoutParentId = spawn!.sourceId;
+      if (node.lastSeenAt >= existing.lastSeenAt) {
+        // The most recently active contributing flow wins for presentation
+        // fields, mirroring the within-flow "last observed value wins" rule.
+        existing.label = node.label;
+        existing.detail = node.lastOpName;
+        existing.canonicalNode = node;
+        existing.canonicalFlow = flow;
+        existing.lastSeenAt = node.lastSeenAt;
+        existing.completedAt = flow.endedAt;
+      }
     }
+  }
 
-    groups.push({ id: flow.id, label: flow.label, flow: flow.id, nodeIds: groupNodeIds, actor: flow.actor, status: flow.status });
+  const nodes: ActivityNode<NodeData>[] = [];
+  for (const agg of nodeAggs.values()) {
+    const status: NodeRecord['status'] = agg.errorCount > 0 ? 'error' : agg.running > 0 ? 'running' : 'idle';
+    nodes.push({
+      id: agg.id,
+      label: agg.label,
+      detail: agg.detail,
+      footer: agg.errorCount > 0 ? `${agg.errorCount} errors` : `${agg.ops.length} ops`,
+      status,
+      active: agg.running > 0,
+      ...(agg.layoutParentId !== undefined ? { layout: { parentId: agg.layoutParentId } } : {}),
+      presentation: catalogFor(agg.canonicalNode, agg.canonicalFlow),
+      activity: { highlighted: agg.highlighted, completedAt: agg.completedAt, updatedAt: agg.lastSeenAt },
+      ...(namespaced ? { group: agg.firstFlowId } : {}),
+      data: { flow: agg.firstFlowId, node: agg.canonicalNode, ops: agg.ops },
+    });
+  }
 
+  const groups: FlowGroup[] = scopeFlows.map((flow) => ({
+    id: flow.id, label: flow.label, flow: flow.id, nodeIds: groupNodeIds.get(flow.id)!, actor: flow.actor, status: flow.status,
+  }));
+
+  // Pass 3: call/data edges, merged by namespaced (source, target, relation, kind)
+  // tuple for the same reason as nodes; an edge that collapses onto a single
+  // namespaced node (both ends merged together) is suppressed like a self-edge.
+  const edgeAggs = new Map<string, EdgeAgg>();
+
+  for (const flow of scopeFlows) {
+    const isHighlighted = highlighted.has(flow.id);
     for (const edge of flow.edges) {
       if (edge.source === edge.target) continue; // self-edges suppressed; the op stays in node history
       const sourceId = namespacedId(flow, edge.source, namespaced);
       const targetId = namespacedId(flow, edge.target, namespaced);
-      edges.push({
-        id: `${flow.id}:${edge.kind}:${edge.source}->${edge.target}:${edge.relation}`,
-        source: sourceId,
-        target: targetId,
-        label: edge.relation,
-        count: edge.count,
-        showLabel: edge.kind === 'call',
-        activity: { highlighted: isHighlighted, updatedAt: edge.lastAt },
-        kind: edge.kind,
-        data: { flow: flow.id, edge },
-      });
+      if (sourceId === targetId) continue; // collapsed onto one namespaced node: suppressed like a self-edge
+
+      const key = `${edge.kind}|${sourceId}|${targetId}|${edge.relation}`;
+      const existing = edgeAggs.get(key);
+      if (!existing) {
+        edgeAggs.set(key, {
+          id: `${flow.id}:${edge.kind}:${edge.source}->${edge.target}:${edge.relation}`,
+          source: sourceId, target: targetId, relation: edge.relation, kind: edge.kind, flowId: flow.id,
+          record: { ...edge, ops: [...edge.ops] },
+          highlighted: isHighlighted,
+        });
+        continue;
+      }
+
+      const opSet = new Set(existing.record.ops);
+      const ops = [...existing.record.ops];
+      for (const opId of edge.ops) {
+        if (!opSet.has(opId)) {
+          opSet.add(opId);
+          ops.push(opId);
+        }
+      }
+      existing.record = { ...existing.record, count: existing.record.count + edge.count, ops, lastAt: Math.max(existing.record.lastAt, edge.lastAt) };
+      existing.highlighted = existing.highlighted || isHighlighted;
     }
   }
 
+  const edges: ActivityEdge<EdgeData>[] = [];
+  for (const agg of edgeAggs.values()) {
+    edges.push({
+      id: agg.id,
+      source: agg.source,
+      target: agg.target,
+      label: agg.relation,
+      count: agg.record.count,
+      showLabel: agg.kind === 'call',
+      activity: { highlighted: agg.highlighted, updatedAt: agg.record.lastAt },
+      kind: agg.kind,
+      data: { flow: agg.flowId, edge: agg.record },
+    });
+  }
+
   for (const [childFlowId, spawn] of spawns) {
+    if (spawn.sourceId === spawn.targetId) continue; // collapsed onto one namespaced node: no self-loop spawn edge
     const child = flows.get(childFlowId)!;
     edges.push({
       id: `spawn:${spawn.parentFlowId}->${childFlowId}`,

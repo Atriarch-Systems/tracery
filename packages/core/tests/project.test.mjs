@@ -184,6 +184,52 @@ test('trace scope: can be queried from any member flow id and yields the same tr
 });
 
 // ---------------------------------------------------------------------------
+// core-2: namespaced scopes merge two same-actor flows onto shared node ids
+// ---------------------------------------------------------------------------
+
+test('core-2: two flows of the same actor in one trace merge onto one namespaced node id, no duplicate ids and no self-loop spawn edge', () => {
+  const flows = buildFlows([
+    evt({ id: 'p1', ts: 1000, flow: 'p', op: 'p-root', node: 'llm:main', type: 'start', name: 'root', root: true, actor: { id: 'agent:saga' } }),
+    evt({ id: 'p2', ts: 1100, flow: 'p', op: 'p-root', node: 'llm:main', type: 'end', name: 'root', status: 'error' }),
+    evt({ id: 'c1', ts: 1200, flow: 'c', op: 'c-root', node: 'llm:main', type: 'start', name: 'root', root: true,
+      actor: { id: 'agent:saga' }, link: { parentFlow: 'p' } }), // no parentNode: falls back to parent's root node
+    // op 'c-root' is left open (no end): contributes a running op to the merged node.
+  ]);
+
+  const traceId = flows.get('p').trace;
+  const projection = project(flows, { mode: 'trace', trace: traceId });
+
+  // No duplicate node ids, in particular no two entries for 'agent:saga::llm:main'.
+  assert.equal(new Set(projection.nodes.map((n) => n.id)).size, projection.nodes.length);
+  assert.equal(projection.nodes.length, 1);
+
+  const merged = projection.nodes[0];
+  assert.equal(merged.id, 'agent:saga::llm:main');
+  // Ops from both flows are unioned.
+  assert.deepEqual(merged.data.ops.map((op) => op.id).sort(), ['c-root', 'p-root']);
+  // errorCount (from p) and running (from c) are summed; error takes precedence.
+  assert.equal(merged.status, 'error');
+  assert.equal(merged.footer, '1 errors');
+  assert.equal(merged.active, true); // running > 0 from the still-open child op
+
+  // The spawn edge from parent's llm:main to child's llm:main collapses onto the
+  // same namespaced id, so it must be suppressed like a self-edge, not rendered
+  // as a self-loop.
+  assert.equal(projection.edges.some((e) => e.kind === 'spawn'), false);
+  assert.equal(projection.edges.some((e) => e.source === e.target), false);
+
+  // Both flows still get their own group, each listing the shared node id.
+  assert.equal(projection.groups.length, 2);
+  for (const group of projection.groups) assert.ok(group.nodeIds.includes('agent:saga::llm:main'));
+});
+
+test('core-2: distinct actors are unaffected by the merge (regression against ancestors-scope namespacing)', () => {
+  const flows = buildSampleFlows();
+  const projection = project(flows, { mode: 'ancestors', flow: sampleFlowIds.research1 });
+  assert.equal(new Set(projection.nodes.map((n) => n.id)).size, projection.nodes.length);
+});
+
+// ---------------------------------------------------------------------------
 // spawn edge fallback to the parent's root node
 // ---------------------------------------------------------------------------
 

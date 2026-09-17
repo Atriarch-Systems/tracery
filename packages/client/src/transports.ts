@@ -17,14 +17,18 @@ export interface HttpTransportOptions {
   readonly fetch?: typeof fetch;
   /** Additional attempts after the first on network error or 5xx. Default 5. */
   readonly retries?: number;
-  /** Base backoff; doubled each retry. Default 200ms. */
+  /** Base backoff; doubled each retry, capped at 10s, then jittered. Default 200ms. */
   readonly backoffMs?: number;
+  /** Per-attempt request timeout, via `AbortSignal.timeout`. Default 10000ms (matches the Python SDK). */
+  readonly timeoutMs?: number;
 }
 
+const MAX_BACKOFF_MS = 10_000;
+
 /**
- * Posts `ActivityBatch`es to `${baseUrl}/v1/events`. Retries network errors
- * and 5xx responses with exponential backoff; 4xx responses are not
- * retryable and are dropped. Never throws into the caller.
+ * Posts `ActivityBatch`es to `${baseUrl}/v1/events`. Retries network errors,
+ * timeouts and 5xx responses with capped, jittered exponential backoff; 4xx
+ * responses are not retryable and are dropped. Never throws into the caller.
  */
 export function httpTransport(options: HttpTransportOptions): ActivityTransport {
   const fetchImpl = options.fetch ?? globalThis.fetch;
@@ -34,6 +38,7 @@ export function httpTransport(options: HttpTransportOptions): ActivityTransport 
   const url = `${options.baseUrl.replace(/\/+$/, '')}/v1/events`;
   const retries = options.retries ?? 5;
   const backoffMs = options.backoffMs ?? 200;
+  const timeoutMs = options.timeoutMs ?? 10_000;
 
   return {
     async send(events: readonly ActivityEvent[]): Promise<void> {
@@ -48,14 +53,20 @@ export function httpTransport(options: HttpTransportOptions): ActivityTransport 
               authorization: `Bearer ${options.apiKey}`,
             },
             body,
+            signal: AbortSignal.timeout(timeoutMs),
           });
           if (res.ok) return; // 2xx, including 207 partial-accept
           if (res.status < 500) return; // 4xx: not retryable, drop
           // 5xx: fall through to retry
         } catch {
-          // network error: fall through to retry
+          // network error, or the AbortError from a timed-out attempt: fall through to retry
         }
-        if (attempt < retries) await sleep(backoffMs * 2 ** attempt);
+        if (attempt < retries) {
+          const capped = Math.min(backoffMs * 2 ** attempt, MAX_BACKOFF_MS);
+          // Full jitter: spreads out many clients retrying against the same
+          // hub (e.g. after it restarts) instead of retrying in lockstep.
+          await sleep(Math.random() * capped);
+        }
       }
       // Retries exhausted; drop silently rather than throw into the caller.
     },

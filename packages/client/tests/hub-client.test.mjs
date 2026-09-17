@@ -182,6 +182,91 @@ test('live(): connects with ws(s) URL carrying token/flow/after, reconnects from
   assert.equal(FakeWebSocket.instances.length, countBeforeExtraWait);
 });
 
+test('live(): reconnecting immediately after every open backs off instead of resetting to the floor each time', async () => {
+  FakeWebSocket.instances.length = 0;
+  const client = new HubClient({ baseUrl: 'http://hub.example', apiKey: 'tok', WebSocket: FakeWebSocket });
+  const connectingAttempts = [];
+
+  // stableAfterMs is set far longer than this test runs, so a connection
+  // that opens and is immediately closed again never counts as "proven
+  // stable" -- exactly the case (a rejected key, load-shedding, a
+  // slow-client drop) that must back off rather than reconnect forever at
+  // the 200ms floor.
+  const dispose = client.live(
+    {},
+    () => {},
+    {
+      stableAfterMs: 10_000,
+      onStatus: (event) => {
+        if (event.status === 'connecting') connectingAttempts.push(event.attempt);
+      },
+    },
+  );
+
+  await waitFor(() => FakeWebSocket.instances.length === 1);
+  for (let i = 0; i < 4; i++) {
+    const ws = FakeWebSocket.instances[FakeWebSocket.instances.length - 1];
+    ws._emit('open', {});
+    ws._emit('close', {});
+    await waitFor(() => FakeWebSocket.instances.length === i + 2, 3000);
+  }
+  dispose();
+
+  // Strictly increasing, one connect at a time — never dropping back to the
+  // floor just because each socket briefly reached `open` before closing.
+  assert.deepEqual(connectingAttempts, [0, 1, 2, 3, 4]);
+});
+
+test("live(): onFrame's own exception is reported via onError instead of swallowed, and the frame's cursor is not adopted", async () => {
+  FakeWebSocket.instances.length = 0;
+  const client = new HubClient({ baseUrl: 'http://hub.example', apiKey: 'tok', WebSocket: FakeWebSocket });
+  const frames = [];
+  const errors = [];
+  let throwNext = false;
+
+  const dispose = client.live(
+    {},
+    (frame) => {
+      frames.push(frame);
+      if (throwNext) {
+        throwNext = false;
+        throw new Error('boom');
+      }
+    },
+    { onError: (err) => errors.push(err) },
+  );
+
+  await waitFor(() => FakeWebSocket.instances.length === 1);
+  const first = FakeWebSocket.instances[0];
+  first._emit('open', {});
+
+  // Baseline: a normal frame is delivered and its cursor adopted.
+  first._emit('message', { data: JSON.stringify({ type: 'snapshot', cursor: 5, events: [], truncated: false }) });
+  assert.equal(frames.length, 1);
+
+  // Malformed JSON: reported via onError, no frame delivered, connection stays open.
+  first._emit('message', { data: 'not json' });
+  assert.equal(errors.length, 1);
+  assert.equal(frames.length, 1);
+
+  // onFrame itself throws: the exception must be reported (not silently
+  // discarded) and this frame's cursor must NOT be adopted, so a reconnect
+  // replays it instead of leaving a permanent gap in the feed.
+  throwNext = true;
+  first._emit('message', { data: JSON.stringify({ type: 'snapshot', cursor: 10, events: [], truncated: false }) });
+  assert.equal(frames.length, 2); // onFrame was called...
+  assert.equal(errors.length, 2); // ...and its throw was reported...
+  assert.equal(errors[1].message, 'boom');
+
+  first._emit('close', {});
+  await waitFor(() => FakeWebSocket.instances.length === 2, 3000);
+  const second = FakeWebSocket.instances[1];
+  const secondQuery = new URL(second.url.replace(/^ws/, 'http')).searchParams;
+  assert.equal(secondQuery.get('after'), '5'); // ...cursor 10 was never adopted
+
+  dispose();
+});
+
 test('live() throws synchronously when no WebSocket implementation is available', () => {
   // `WebSocket: false` defeats the `options.WebSocket ?? globalThis.WebSocket`
   // fallback (Node 22 has a global WebSocket) without passing null/undefined,

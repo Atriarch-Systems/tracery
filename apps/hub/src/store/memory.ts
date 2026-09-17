@@ -4,14 +4,21 @@
  * briefly over `maxEventsPerWorkspace` is trimmed on the next sweep instead
  * of rejecting the ingest.
  *
- * Flow reduction always goes through `@atriarch/tracery-core`'s
- * `buildFlows`/`assembleTrace` over the workspace's full retained event set,
- * which is what gives late-arriving parents correct trace resolution
- * (SPEC.md §1 "Trace resolution") for free -- it is never reimplemented here.
+ * Flow state is materialised incrementally (hub-2): `append`/`deleteFlow`
+ * only re-reduce the flow(s) actually touched, via `@atriarch/tracery-core`'s
+ * single-flow `buildFlow` fast path, and only re-resolve trace ids (an
+ * O(#flows) walk over `{id, link}` pairs -- see `./trace-ids.js`) rather than
+ * re-running `buildFlows`/`assembleTrace` over the workspace's full retained
+ * event set on every call. This keeps late-arriving-parent trace correction
+ * (SPEC.md §1 "Trace resolution") working exactly as before -- it is still
+ * never reimplemented at the event-reduction level -- without ingest cost
+ * scaling with the number of events already retained.
  */
-import { buildFlows, assembleTrace, type Flow } from '@atriarch/tracery-core';
+import { buildFlow, assembleTrace, type Flow } from '@atriarch/tracery-core';
 import type { ActivityEvent, StoredEvent } from '@atriarch/tracery-core/contract';
 import { buildFrame } from './frame.js';
+import { resolveTraceIds } from './trace-ids.js';
+import { isSweepProtected, isOverRetention, orderSweepCandidates, type SweepCandidate } from './sweep.js';
 import {
   toFlowSummary,
   type AppendResult,
@@ -62,14 +69,56 @@ export class MemoryStore implements EventStore {
     return state;
   }
 
-  private rebuildFlows(state: WorkspaceState): void {
-    state.flows = new Map(buildFlows(state.events));
+  /**
+   * hub-2: re-reduces only `touchedFlowIds` (each via core's O(events-in-that-
+   * flow) `buildFlow`), then re-resolves trace ids for the whole workspace --
+   * O(#flows), not O(#events) -- so a late parent still corrects every
+   * descendant's trace exactly as `buildFlows`/`assembleTrace` would.
+   */
+  private reduceTouchedFlows(state: WorkspaceState, touchedFlowIds: ReadonlySet<string>): void {
+    for (const flowId of touchedFlowIds) {
+      const flowEvents = state.eventsByFlow.get(flowId);
+      if (flowEvents && flowEvents.length > 0) state.flows.set(flowId, buildFlow(flowEvents));
+    }
+    this.reResolveTraceIds(state);
+  }
+
+  private reResolveTraceIds(state: WorkspaceState): void {
+    const traceIds = resolveTraceIds(state.flows);
+    for (const [id, flow] of state.flows) {
+      const trace = traceIds.get(id)!;
+      if (flow.trace !== trace) state.flows.set(id, { ...flow, trace });
+    }
+  }
+
+  private lastSeenAt(state: WorkspaceState, flowId: string): number {
+    const events = state.eventsByFlow.get(flowId);
+    if (!events || events.length === 0) return Number.NEGATIVE_INFINITY;
+    let max = Number.NEGATIVE_INFINITY;
+    for (const event of events) if (event.receivedAt > max) max = event.receivedAt;
+    return max;
+  }
+
+  /** Removes a flow's events and index entries without re-resolving trace ids -- callers batch that (see `deleteFlow`, `sweep`). */
+  private removeFlowEvents(state: WorkspaceState, flowId: string): boolean {
+    const flowEvents = state.eventsByFlow.get(flowId);
+    if (!flowEvents) return false;
+
+    for (const event of flowEvents) state.eventsById.delete(event.id);
+    state.eventsByFlow.delete(flowId);
+    const removedIds = new Set(flowEvents.map((event) => event.id));
+    state.events = state.events.filter((event) => !removedIds.has(event.id));
+    state.flows.delete(flowId);
+
+    state.floorCursor = state.events.length > 0 ? state.events[0]!.cursor : this.cursor;
+    return true;
   }
 
   async append(workspace: string, events: readonly ActivityEvent[]): Promise<AppendResult> {
     const state = this.state(workspace);
     const accepted: StoredEvent[] = [];
     let duplicates = 0;
+    const touchedFlows = new Set<string>();
 
     for (const event of events) {
       if (state.eventsById.has(event.id)) {
@@ -84,10 +133,11 @@ export class MemoryStore implements EventStore {
       if (forFlow) forFlow.push(stored);
       else state.eventsByFlow.set(event.flow, [stored]);
       accepted.push(stored);
+      touchedFlows.add(event.flow);
     }
 
     if (accepted.length > 0) {
-      this.rebuildFlows(state);
+      this.reduceTouchedFlows(state, touchedFlows);
       for (const event of accepted) for (const subscriber of this.subscribers) subscriber(event);
     }
 
@@ -162,17 +212,9 @@ export class MemoryStore implements EventStore {
 
   async deleteFlow(workspace: string, flowId: string): Promise<boolean> {
     const state = this.state(workspace);
-    const flowEvents = state.eventsByFlow.get(flowId);
-    if (!flowEvents) return false;
-
-    for (const event of flowEvents) state.eventsById.delete(event.id);
-    state.eventsByFlow.delete(flowId);
-    const removedIds = new Set(flowEvents.map((event) => event.id));
-    state.events = state.events.filter((event) => !removedIds.has(event.id));
-
-    state.floorCursor = state.events.length > 0 ? state.events[0]!.cursor : this.cursor;
-    this.rebuildFlows(state);
-    return true;
+    const removed = this.removeFlowEvents(state, flowId);
+    if (removed) this.reResolveTraceIds(state); // a deleted parent's children may need a new placeholder trace id
+    return removed;
   }
 
   subscribe(subscriber: StoreSubscriber): Unsubscribe {
@@ -186,26 +228,29 @@ export class MemoryStore implements EventStore {
     let sweptEvents = 0;
 
     for (const [workspace, state] of this.workspaces) {
-      const isProtected = (flow: Flow): boolean =>
-        flow.status === 'running' && flow.startedAt !== undefined && flow.startedAt >= cutoff;
-
-      const candidates = [...state.flows.values()]
-        .filter((flow) => !isProtected(flow))
-        .sort((a, b) => (a.startedAt ?? -Infinity) - (b.startedAt ?? -Infinity));
+      const withLastSeen: SweepCandidate[] = [...state.flows.values()].map((flow) => ({
+        flow,
+        lastSeenAt: this.lastSeenAt(state, flow.id),
+      }));
+      const candidates = orderSweepCandidates(withLastSeen.filter((c) => !isSweepProtected(c, cutoff)));
 
       let totalEvents = state.events.length;
-      for (const flow of candidates) {
-        const overRetention = flow.startedAt !== undefined ? flow.startedAt < cutoff : true;
+      let sweptThisWorkspace = 0;
+      for (const candidate of candidates) {
         const overCount = totalEvents > options.maxEventsPerWorkspace;
-        if (!overRetention && !overCount) break;
+        // Candidates are ordered oldest-first within (complete, then running/unknown)
+        // groups, not globally by age, so a candidate that doesn't qualify yet must
+        // not stop the loop -- a later, older candidate in the other group might.
+        if (!isOverRetention(candidate, cutoff) && !overCount) continue;
 
-        const count = state.eventsByFlow.get(flow.id)?.length ?? 0;
-        // eslint-disable-next-line no-await-in-loop
-        await this.deleteFlow(workspace, flow.id);
+        const count = state.eventsByFlow.get(candidate.flow.id)?.length ?? 0;
+        this.removeFlowEvents(state, candidate.flow.id);
         totalEvents -= count;
         sweptFlows += 1;
         sweptEvents += count;
+        sweptThisWorkspace += 1;
       }
+      if (sweptThisWorkspace > 0) this.reResolveTraceIds(state);
     }
 
     return { sweptFlows, sweptEvents };

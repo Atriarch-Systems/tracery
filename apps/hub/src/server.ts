@@ -4,13 +4,15 @@
  * edits this file, only passes `extensions` in.
  */
 import { randomUUID } from 'node:crypto';
-import Fastify, { type FastifyInstance, type FastifyRequest } from 'fastify';
+import Fastify, { type FastifyError, type FastifyInstance, type FastifyRequest } from 'fastify';
 import websocketPlugin from '@fastify/websocket';
 import swaggerPlugin from '@fastify/swagger';
+import { ACTIVITY_LIMITS } from '@atriarch/tracery-core/contract';
 import { authenticate, AuthError, generateDevKey, type AuthContext } from './auth.js';
 import type { ApiKeyConfig, Config, Role } from './config.js';
 import { MemoryStore } from './store/memory.js';
 import { SqliteStore } from './store/sqlite.js';
+import { PostgresStore } from './store/postgres.js';
 import type { EventStore } from './store/types.js';
 import { MetricsRegistry } from './metrics.js';
 import { startRetention, type RetentionHandle } from './retention.js';
@@ -36,27 +38,99 @@ export interface CreatedServer {
   close(): Promise<void>;
 }
 
-function openStore(config: Config): EventStore {
+async function openStore(config: Config): Promise<EventStore> {
+  if (config.store === 'postgres') {
+    if (!config.postgresUrl) throw new Error('TRACERY_STORE=postgres requires TRACERY_POSTGRES_URL');
+    return PostgresStore.connect(config.postgresUrl);
+  }
   return config.store === 'sqlite' ? new SqliteStore(config.sqlitePath) : new MemoryStore();
 }
 
+/** hub-3: strips credential query params before a request URL is logged (Fastify's default `req` serializer logs `req.url` verbatim, including `?token=<api key>`). */
+export function redactedRequestUrl(rawUrl: string): string {
+  try {
+    const parsed = new URL(rawUrl, 'http://internal');
+    for (const param of ['token', 'api_key']) {
+      if (parsed.searchParams.has(param)) parsed.searchParams.set(param, '[redacted]');
+    }
+    return parsed.pathname + parsed.search;
+  } catch {
+    return rawUrl;
+  }
+}
+
+const SAFE_REQUEST_ID = /^[\x21-\x7e]+$/;
+const MAX_REQUEST_ID_LENGTH = 128;
+
+/** hub-17: a client-supplied `x-request-id` containing a control character makes `reply.header()` throw `ERR_INVALID_CHAR`, turning even `/healthz` into a 500 with no `x-request-id` in the response at all -- exactly when SPEC.md's "every request gets x-request-id" matters most. */
+export function safeRequestId(incoming: string | undefined): string {
+  if (incoming !== undefined && incoming.length <= MAX_REQUEST_ID_LENGTH && SAFE_REQUEST_ID.test(incoming)) return incoming;
+  return randomUUID();
+}
+
+/** hub-4: maps a Fastify framework error (malformed JSON, oversized body, ...) to this hub's `{ error: { code, message } }` shape instead of a blanket 500. */
+export function clientErrorCode(error: FastifyError): string {
+  switch (error.code) {
+    case 'FST_ERR_CTP_BODY_TOO_LARGE':
+      return 'body_too_large';
+    case 'FST_ERR_CTP_INVALID_JSON_BODY':
+    case 'FST_ERR_CTP_EMPTY_JSON_BODY':
+      return 'invalid_json';
+    default:
+      return 'bad_request';
+  }
+}
+
 export async function createServer(config: Config, extensions?: HubExtensions): Promise<CreatedServer> {
-  const store = openStore(config);
+  const store = await openStore(config);
   const metrics = new MetricsRegistry();
 
+  // hub-15: `config.apiKeys === undefined` means "nothing configured" (dev key
+  // mode); `[]` means an operator explicitly set TRACERY_API_KEYS='[]' to mean
+  // "no access". Collapsing both to "generate an all-roles dev key" (the old
+  // `config.apiKeys ?? []` then `keys.length === 0` check) silently handed out
+  // full access on workspace "default" in the second case, with only a log line
+  // to notice.
+  if (config.apiKeys !== undefined && config.apiKeys.length === 0) {
+    throw new Error(
+      'TRACERY_API_KEYS is explicitly empty ([]), which means "no access" -- remove the variable entirely to fall back to a generated dev key instead',
+    );
+  }
   let keys: readonly ApiKeyConfig[] = config.apiKeys ?? [];
   let devKey: string | undefined;
-  if (keys.length === 0) {
+  if (config.apiKeys === undefined) {
     const dev = generateDevKey();
     keys = [dev.config];
     devKey = dev.key;
   }
 
-  const app = Fastify({ logger: { level: config.logLevel } });
+  const app = Fastify({
+    logger: {
+      level: config.logLevel,
+      // hub-3: the hosted UI and every WS client connect via `?token=<api key>`
+      // (SPEC.md §6 "Live feed"); the default `req` serializer logs `req.url`
+      // verbatim, so without this every live connection writes a valid,
+      // long-lived API key straight into the hub's logs.
+      redact: ['req.headers.authorization', 'req.headers["x-api-key"]'],
+      serializers: {
+        req(request: { method: string; url: string; ip?: string; socket?: { remotePort?: number } }) {
+          return {
+            method: request.method,
+            url: redactedRequestUrl(request.url),
+            remoteAddress: request.ip,
+            remotePort: request.socket?.remotePort,
+          };
+        },
+      },
+    },
+    // hub-4: a spec-legal max batch (ACTIVITY_LIMITS: up to 1000 events x 64KB
+    // context each) is well over Fastify's 1 MiB default bodyLimit.
+    bodyLimit: config.bodyLimitBytes ?? ACTIVITY_LIMITS.maxEventsPerBatch * ACTIVITY_LIMITS.maxEventBytes,
+  });
 
   app.addHook('onRequest', async (request, reply) => {
     const incoming = request.headers['x-request-id'];
-    const requestId = (Array.isArray(incoming) ? incoming[0] : incoming) ?? randomUUID();
+    const requestId = safeRequestId(Array.isArray(incoming) ? incoming[0] : incoming);
     reply.header('x-request-id', requestId);
   });
 
@@ -65,8 +139,21 @@ export async function createServer(config: Config, extensions?: HubExtensions): 
       reply.code(error.status).send({ error: { code: error.code, message: error.message } });
       return;
     }
-    request.log.error(error);
-    reply.code(500).send({ error: { code: 'internal_error', message: error.message || 'internal server error' } });
+
+    const fastifyError = error as FastifyError;
+    const status =
+      typeof fastifyError.statusCode === 'number' && fastifyError.statusCode >= 400 && fastifyError.statusCode < 600
+        ? fastifyError.statusCode
+        : 500;
+
+    if (status >= 500) {
+      request.log.error(error);
+      reply.code(500).send({ error: { code: 'internal_error', message: error.message || 'internal server error' } });
+      return;
+    }
+
+    request.log.warn({ err: error }, 'tracery: client error');
+    reply.code(status).send({ error: { code: clientErrorCode(fastifyError), message: error.message } });
   });
 
   await app.register(websocketPlugin);
@@ -109,6 +196,7 @@ export async function createServer(config: Config, extensions?: HubExtensions): 
   const retention = startRetention(store, metrics, {
     retentionHours: config.retentionHours,
     maxEventsPerWorkspace: config.maxEventsPerWorkspace,
+    logger: app.log,
   });
 
   return {

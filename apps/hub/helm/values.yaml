@@ -1,0 +1,160 @@
+# Default values for the tracery-hub chart.
+# See SPEC.md §6 and apps/hub/README.md for what each hub setting does; this
+# file only documents the Helm-specific shape.
+
+image:
+  repository: atriarch/tracery-hub
+  # Defaults to .Chart.AppVersion when unset.
+  tag: ""
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+# - name: regcred
+
+nameOverride: ""
+fullnameOverride: ""
+
+# SqliteStore and MemoryStore are single-writer (SPEC.md §6 "Storage"); the
+# chart refuses to template a Deployment with replicaCount > 1 unless
+# config.store is "postgres". Leave this at 1 for memory/sqlite.
+replicaCount: 1
+
+podAnnotations: {}
+podLabels: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: false
+  capabilities:
+    drop: ["ALL"]
+
+service:
+  type: ClusterIP
+  port: 8971
+  annotations: {}
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  # kubernetes.io/tls-acme: "true"
+  host: tracery.example.internal
+  path: /
+  pathType: Prefix
+  tls:
+    enabled: false
+    # Name of an existing TLS secret. Leave empty to let cert-manager (or
+    # similar, via annotations above) create one at this name instead.
+    secretName: ""
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    memory: 512Mi
+
+livenessProbe:
+  httpGet:
+    path: /healthz
+    port: http
+  initialDelaySeconds: 10
+  periodSeconds: 15
+
+readinessProbe:
+  httpGet:
+    path: /readyz
+    port: http
+  initialDelaySeconds: 5
+  periodSeconds: 10
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+# Non-secret hub settings (rendered into a ConfigMap, apps/hub/README.md
+# "Environment variables"). Unknown/empty values are omitted.
+config:
+  port: 8971
+  host: "0.0.0.0"
+  # memory | sqlite | postgres
+  store: sqlite
+  # Only used when store is "sqlite".
+  sqlitePath: /data/tracery.db
+  retentionHours: 72
+  maxEventsPerWorkspace: 500000
+  logLevel: info
+  # Overrides TRACERY_UI_DIR when set; leave empty to use the image default.
+  uiDir: ""
+
+# PersistentVolumeClaim for /data. Only rendered (and only mounted on the
+# Deployment) when config.store is "sqlite".
+persistence:
+  enabled: true
+  size: 10Gi
+  # Empty uses the cluster's default StorageClass.
+  storageClassName: ""
+  accessMode: ReadWriteOnce
+  # Use an existing PVC instead of creating one. When set, `enabled` above
+  # still controls whether it's mounted, `size`/`storageClassName` are
+  # ignored.
+  existingClaim: ""
+
+# TRACERY_API_KEYS_FILE (apps/hub/README.md "API key file format"). Provide
+# either inline `keys` (rendered into a Secret this chart manages) or point
+# at a Secret you already provisioned (e.g. via OpenBao/ExternalSecret).
+# Leaving both empty makes no Secret at all, so the hub falls back to its
+# generated dev key -- fine for a quick `helm template`/local try, never for
+# a real deployment.
+apiKeys:
+  existingSecret: ""
+  existingSecretKey: keys.json
+  keys: []
+  # keys:
+  #   - id: saga
+  #     key: CHANGE_ME
+  #     workspace: saga
+  #     roles: ["ingest", "read"]
+  #   - id: operator
+  #     key: CHANGE_ME
+  #     workspace: "*"
+  #     roles: ["ingest", "read", "admin"]
+
+# TRACERY_LICENSE_KEY (SPEC.md §7). Optional; the community edition runs
+# fine without it.
+license:
+  enabled: false
+  key: ""
+  existingSecret: ""
+  existingSecretKey: license
+
+# TRACERY_POSTGRES_URL, required when config.store is "postgres". Prefer
+# existingSecret (provisioned via OpenBao/ExternalSecret, SPEC.md §6); `url`
+# is provided for convenience and renders into a Secret this chart manages,
+# but a plaintext connection string in values is not recommended for
+# anything beyond a throwaway environment.
+postgres:
+  existingSecret: ""
+  existingSecretKey: url
+  url: ""
+
+# TRACERY_METRICS_TOKEN. Optional; /metrics is public when unset.
+metrics:
+  token: ""
+  existingSecret: ""
+  existingSecretKey: token
+
+# Prometheus Operator ServiceMonitor for GET /metrics.
+serviceMonitor:
+  enabled: false
+  namespace: ""
+  interval: 30s
+  scrapeTimeout: 10s
+  labels: {}
+  path: /metrics

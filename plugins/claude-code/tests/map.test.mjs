@@ -318,3 +318,132 @@ test('event ids are unique and stable within a session', async () => {
   assert.equal(new Set(ids).size, ids.length, 'event ids must be unique');
   for (const id of ids) assert.ok(id.startsWith('sess-main-1:'));
 });
+
+// Regression for plugin-1: ids must not depend solely on the persisted
+// counter, so that two independent emit.mjs processes -- which necessarily
+// have different OS process ids -- can never mint the same id even when
+// both load an identical (or absent) state at the same instant. This pins
+// the id format; plugins/claude-code/tests/emit.test.mjs exercises the
+// actual cross-process guarantee with two real child processes.
+test('event ids embed the process id, not just the session and a persisted counter', async () => {
+  const { events } = mapHookToEvents(await fixture('session-start'), createInitialState(), 1000);
+  assert.equal(events[0].id, `sess-main-1:${process.pid}:1000:1`);
+});
+
+// Regression for plugin-6: a leading `VAR=value` Bash environment assignment
+// must never be forwarded as (or leak into) command_token.
+test('redaction: a leading Bash environment assignment never leaks a secret as command_token', async () => {
+  const payload = {
+    session_id: 'sess-main-1',
+    cwd: '/home/user/my-project',
+    hook_event_name: 'PreToolUse',
+    tool_name: 'Bash',
+    tool_input: { command: 'GITHUB_TOKEN=ghp_liveTokenValue gh pr list' },
+    tool_use_id: 'toolu_ENV1',
+  };
+  const { events } = mapHookToEvents(payload, createInitialState(), 1000);
+  assertAllValid(events);
+  const serialized = JSON.stringify(events);
+  assert.equal(serialized.includes('ghp_liveTokenValue'), false, 'secret from an env assignment leaked into events');
+  assert.equal(serialized.includes('GITHUB_TOKEN'), false, 'env var name leaked into events');
+  const start = events.find((e) => e.type === 'start' && e.op === 'toolu_ENV1');
+  assert.equal(start.context.command_token, 'gh');
+
+  // Two leading assignments are also skipped, and a path-like token is
+  // reduced to its basename.
+  const payload2 = { ...payload, tool_input: { command: 'A=1 B=2 /usr/bin/psql -c "select 1"' }, tool_use_id: 'toolu_ENV2' };
+  const { events: events2 } = mapHookToEvents(payload2, createInitialState(), 1000);
+  const start2 = events2.find((e) => e.type === 'start' && e.op === 'toolu_ENV2');
+  assert.equal(start2.context.command_token, 'psql');
+});
+
+// Regression for plugin-11: an oversized prompt must be truncated, not make
+// the whole event exceed the hub's 64 KB cap and get silently dropped.
+test('UserPromptSubmit truncates an oversized prompt instead of losing the whole event', async () => {
+  const hugePrompt = 'x'.repeat(200_000);
+  const payload = {
+    session_id: 'sess-main-1',
+    cwd: '/home/user/my-project',
+    hook_event_name: 'UserPromptSubmit',
+    user_prompt: hugePrompt,
+  };
+  let state = createInitialState();
+  ({ state } = mapHookToEvents(await fixture('session-start'), state, 1000));
+  const { events } = mapHookToEvents(payload, { ...state, config: { includePrompts: true } }, 2000);
+  assertAllValid(events); // would fail validateEvent's maxEventBytes check if left unbounded
+  const annotate = events.find((e) => e.type === 'annotate');
+  assert.equal(annotate.context.prompt_chars, hugePrompt.length, 'exact original length is still reported');
+  assert.equal(annotate.context.prompt_truncated, true);
+  assert.ok(Buffer.byteLength(annotate.context.prompt, 'utf8') <= 16 * 1024);
+  assert.ok(hugePrompt.startsWith(annotate.context.prompt), 'truncated prompt must be a prefix of the original');
+});
+
+// Regression for plugin-12: the privacy contract was only asserted for the
+// Bash command and the user prompt. This drives every PreToolUse fixture
+// (plus a synthetic tool carrying secret-valued inputs) through the mapper
+// and checks that no tool_input *value* escapes except the fields the
+// privacy table explicitly allows for that tool, and that the generic/MCP
+// branch's context is exactly {input_keys, input_bytes}.
+test('privacy contract: no tool_input value leaks except the documented allowlist, for every tool branch', async () => {
+  const ALLOWED_BY_TOOL = {
+    Agent: new Set(['description', 'subagent_type']),
+    Read: new Set(['file_path']),
+    Write: new Set(['file_path']),
+    Edit: new Set(['file_path']),
+    Glob: new Set(['pattern']),
+    Grep: new Set(['pattern']),
+  };
+  const preToolFixtures = ['pre-tool-use-bash', 'pre-tool-use-agent', 'pre-tool-use-mcp', 'subagent-pre-tool-use'];
+
+  for (const name of preToolFixtures) {
+    const payload = await fixture(name);
+    let state = createInitialState();
+    ({ state } = mapHookToEvents(await fixture('session-start'), state, 1000));
+    if (payload.agent_id) {
+      ({ state } = mapHookToEvents(
+        {
+          session_id: payload.session_id,
+          hook_event_name: 'SubagentStart',
+          agent_id: payload.agent_id,
+          agent_type: payload.agent_type,
+          agent_description: 'placeholder',
+        },
+        state,
+        1050,
+      ));
+    }
+    const { events } = mapHookToEvents(payload, state, 1100);
+    assertAllValid(events);
+    const start = events.find((e) => e.type === 'start' && e.op === String(payload.tool_use_id));
+    assert.ok(start, `${name}: expected a start event for tool_use_id ${payload.tool_use_id}`);
+    // Scoped to this tool's own context: node/name/label legitimately derive
+    // from tool_name (e.g. an mcp__server__method name), which is a
+    // different, non-secret field and must not trip a substring match here.
+    const serializedContext = JSON.stringify(start.context ?? {});
+    const allowed = ALLOWED_BY_TOOL[payload.tool_name] ?? new Set();
+    for (const [key, value] of Object.entries(payload.tool_input ?? {})) {
+      if (typeof value !== 'string' || allowed.has(key)) continue;
+      assert.equal(serializedContext.includes(value), false, `${name}: tool_input.${key} leaked verbatim into events`);
+    }
+  }
+
+  // The generic/MCP fallback branch: only key names and a byte count may
+  // leave, never the values -- including secret-shaped ones.
+  const secretPayload = {
+    session_id: 'sess-main-1',
+    cwd: '/home/user/my-project',
+    hook_event_name: 'PreToolUse',
+    tool_name: 'mcp__vault__write_secret',
+    tool_input: { token: 'sk-live-XYZ', body: 'contents-that-must-not-leak' },
+    tool_use_id: 'toolu_SECRET',
+  };
+  let state = createInitialState();
+  ({ state } = mapHookToEvents(await fixture('session-start'), state, 1000));
+  const { events } = mapHookToEvents(secretPayload, state, 1100);
+  assertAllValid(events);
+  const start = events.find((e) => e.type === 'start');
+  assert.deepEqual(Object.keys(start.context).sort(), ['input_bytes', 'input_keys']);
+  const serialized = JSON.stringify(events);
+  assert.equal(serialized.includes('sk-live-XYZ'), false);
+  assert.equal(serialized.includes('contents-that-must-not-leak'), false);
+});

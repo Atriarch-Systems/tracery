@@ -18,7 +18,7 @@ import type { ActivityNode, NodeData, NodePresentation, NodeRecord, Flow, Scope 
 import type { ReactNode, CSSProperties } from 'react';
 import type { ActivitySource } from './source.js';
 import { useProjection } from './useProjection.js';
-import { computeScope, scopeModeForKey, activatedFlow, SCOPE_LABELS, type ScopeMode } from './scope.js';
+import { computeScope, scopeModeForKey, activatedFlow, isScopeShortcutTarget, SCOPE_LABELS, type ScopeMode } from './scope.js';
 import { latestFlows, latestFlowId } from './flow-order.js';
 import { Inspector, type InspectorSelection } from './Inspector.js';
 import { rootStyle, styles, type ActivityThemeVars } from './style.js';
@@ -111,7 +111,15 @@ export function ActivityExplorer(props: ActivityExplorerProps) {
     <div
       className={className}
       style={{ ...rootStyle(theme), ...style }}
+      // Focusable so `1`/`2`/`3` are reachable without first clicking into a
+      // descendant (nothing here is focusable-by-default until a flow/scope
+      // button or the graph itself is focused, so bubbling keydowns from
+      // `document.body` on first load never reached this handler otherwise).
+      tabIndex={0}
+      role="group"
+      aria-label={ariaLabel ?? 'Tracery activity explorer'}
       onKeyDown={(event) => {
+        if (!isScopeShortcutTarget(event.target as { tagName?: string; isContentEditable?: boolean }, event.ctrlKey || event.metaKey || event.altKey)) return;
         const next = scopeModeForKey(event.key);
         if (next) {
           switchMode(next);

@@ -1,5 +1,16 @@
 # Build from the repo root: docker compose -f apps/hub/docker-compose.yaml build
 # (the build context is the monorepo root; see apps/hub/Dockerfile).
+#
+# Default (`docker compose -f apps/hub/docker-compose.yaml up`) runs the
+# `hub` service below against SqliteStore. The `postgres` profile is a
+# Postgres-backed alternative (SPEC.md §6 "Storage") -- the only setup that
+# supports more than one hub replica (SqliteStore/MemoryStore are
+# single-writer). It's a separate service (`hub-postgres`, on host port 8972)
+# rather than a swap-in-place for `hub`, so bring it up explicitly, naming
+# just its own services to avoid also starting the default sqlite `hub`:
+#
+#   docker compose -f apps/hub/docker-compose.yaml --profile postgres up postgres hub-postgres
+#
 services:
   hub:
     build:
@@ -29,5 +40,52 @@ services:
       retries: 3
       start_period: 10s
 
+  # --- postgres profile: Postgres-backed alternative, see the header comment above ---
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    profiles: ["postgres"]
+    environment:
+      POSTGRES_USER: tracery
+      POSTGRES_PASSWORD: tracery
+      POSTGRES_DB: tracery
+    volumes:
+      - tracery-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tracery -d tracery"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  hub-postgres:
+    build:
+      context: ../..
+      dockerfile: apps/hub/Dockerfile
+    image: atriarch/tracery-hub:dev
+    restart: unless-stopped
+    profiles: ["postgres"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8972:8971"
+    environment:
+      TRACERY_STORE: postgres
+      TRACERY_POSTGRES_URL: postgres://tracery:tracery@postgres:5432/tracery
+      TRACERY_RETENTION_HOURS: "72"
+      TRACERY_MAX_EVENTS_PER_WORKSPACE: "500000"
+      TRACERY_LOG_LEVEL: info
+      TRACERY_API_KEYS_FILE: /run/secrets/tracery-keys.json
+    volumes:
+      - ./keys.example.json:/run/secrets/tracery-keys.json:ro
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8971/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
 volumes:
   tracery-data:
+  tracery-postgres-data:

@@ -369,7 +369,14 @@ class ActivityTracer:
         timer.start()
 
     def _on_timer(self) -> None:
-        self.flush()
+        # Hand batches to the transport but do not wait for delivery: the
+        # transport's own `flush()` can block for a substantial (bounded but
+        # not short) time against a stalled hub, and this runs on the
+        # tracer's own timer thread -- blocking it here would stop this
+        # tracer's queue from draining even though the transport still has
+        # room. `flush()`/`close()` still wait for delivery; only the
+        # periodic timer skips that wait.
+        self._drain()
         self._schedule_timer()
 
     def _emit(self, event: dict[str, Any]) -> None:
@@ -417,8 +424,12 @@ class ActivityTracer:
             context=context,
         )
 
-    def flush(self) -> None:
-        """Drain the queue to the transport in ``max_batch``-sized chunks. Never raises."""
+    def _drain(self) -> None:
+        """Hand queued events to the transport's ``send`` in ``max_batch`` chunks.
+
+        Does not wait for delivery -- ``send`` is only required to enqueue
+        (see ``Transport``'s contract). Never raises.
+        """
         while True:
             with self._lock:
                 if not self._queue:
@@ -431,6 +442,10 @@ class ActivityTracer:
                 # Transports are expected to swallow their own errors; this
                 # guard just keeps a misbehaving one from breaking the flush loop.
                 pass
+
+    def flush(self) -> None:
+        """Drain the queue to the transport and wait for delivery. Never raises."""
+        self._drain()
         try:
             flush_fn = getattr(self._transport, "flush", None)
             if flush_fn is not None:

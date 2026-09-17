@@ -12,6 +12,7 @@ import type { ApiKeyConfig } from './config.js';
 import type { EventStore } from './store/types.js';
 import type { MetricsRegistry } from './metrics.js';
 import type { HubExtensions } from './server-context.js';
+import { InvalidQueryError, parseCursor } from './routes/query.js';
 
 const HEARTBEAT_MS = 15_000;
 const SEND_DEADLINE_MS = 2_000;
@@ -69,8 +70,15 @@ export function registerLive(app: FastifyInstance, deps: LiveDeps): void {
       return;
     }
 
+    let initialAfter: number | undefined;
+    try {
+      initialAfter = parseCursor(query.after, 'after');
+    } catch (err) {
+      const message = err instanceof InvalidQueryError ? err.message : 'invalid after cursor';
+      socket.close(4400, message);
+      return;
+    }
     const filter = { flow: query.flow, trace: query.trace };
-    const initialAfter = query.after !== undefined && query.after !== '' ? Number(query.after) : undefined;
 
     deps.metrics.wsClientConnected();
     let closed = false;
@@ -95,7 +103,19 @@ export function registerLive(app: FastifyInstance, deps: LiveDeps): void {
       sendWithDeadline(socket, filtered, drop);
     };
 
-    void frameFor(initialAfter).then(send);
+    // hub-9: a store failure here must close this one connection, not crash the
+    // process -- these `void promise.then(...)` calls had no `.catch` at all, so a
+    // rejection (e.g. sqlite hitting SQLITE_BUSY) was an unhandled rejection under
+    // Node's default `--unhandled-rejections=throw`.
+    const onStoreError = (err: unknown): void => {
+      request.log.error({ err, keyId: auth.keyId }, 'tracery live: store call failed');
+      if (!closed) {
+        closed = true;
+        socket.close(1011, 'internal error');
+      }
+    };
+
+    void frameFor(initialAfter).then(send).catch(onStoreError);
 
     const belongsToFilter = async (event: StoredEvent): Promise<boolean> => {
       if (event.workspace !== auth.workspace) return false;
@@ -108,13 +128,17 @@ export function registerLive(app: FastifyInstance, deps: LiveDeps): void {
     };
 
     const unsubscribe = deps.store.subscribe((event) => {
-      void belongsToFilter(event).then((matches) => {
-        if (matches) send({ type: 'events', cursor: event.cursor, events: [event] });
-      });
+      void belongsToFilter(event)
+        .then((matches) => {
+          if (matches) send({ type: 'events', cursor: event.cursor, events: [event] });
+        })
+        .catch(onStoreError);
     });
 
     const heartbeat = setInterval(() => {
-      void frameFor(undefined).then((current) => send({ type: 'heartbeat', cursor: current.cursor }));
+      void frameFor(undefined)
+        .then((current) => send({ type: 'heartbeat', cursor: current.cursor }))
+        .catch(onStoreError);
     }, HEARTBEAT_MS);
     heartbeat.unref?.();
 

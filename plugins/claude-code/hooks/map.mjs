@@ -6,7 +6,7 @@
 //
 // State shape (persisted per session_id by hooks/emit.mjs):
 //   {
-//     counter: number,                       // event-id counter for `${session_id}:${counter}`
+//     counter: number,                       // per-invocation event-id suffix; see nextId()
 //     rootStarted: boolean,                   // main flow's root op has been started
 //     rootStartedAt: number | null,           // ts of the main root start, for durationMs
 //     tools: { [tool_use_id]: { node, ts } }, // in-flight tool_use ids: node + start time
@@ -23,6 +23,16 @@ import { basename } from 'node:path';
 
 export const ROOT_OP = 'root';
 export const ROOT_NODE = 'session';
+
+// Bounds on producer-controlled free text before it goes into an event.
+// `context` is capped hub-side at 64 KB per event (ACTIVITY_LIMITS.
+// maxEventBytes); these keep well under that on their own so one oversized
+// prompt or agent description can never make the whole event get silently
+// rejected by the hub.
+const MAX_PROMPT_BYTES = 16 * 1024;
+const MAX_LABEL_CHARS = 500;
+const MAX_TOKEN_CHARS = 64;
+const ENV_ASSIGNMENT_RE = /^[A-Za-z_][A-Za-z0-9_]*=/;
 
 /** Fresh per-session state, as used before any hook has fired. */
 export function createInitialState() {
@@ -76,6 +86,24 @@ function firstLineTruncated(text, max) {
   return line.length > max ? line.slice(0, max) : line;
 }
 
+function clampChars(text, max) {
+  return typeof text === 'string' && text.length > max ? text.slice(0, max) : text;
+}
+
+/** Truncate `text` to fit `maxBytes` of UTF-8, respecting multi-byte characters. */
+function truncateToBytes(text, maxBytes) {
+  const s = typeof text === 'string' ? text : '';
+  if (byteLength(s) <= maxBytes) return { text: s, truncated: false };
+  let lo = 0;
+  let hi = s.length;
+  while (lo < hi) {
+    const mid = Math.ceil((lo + hi) / 2);
+    if (byteLength(s.slice(0, mid)) <= maxBytes) lo = mid;
+    else hi = mid - 1;
+  }
+  return { text: s.slice(0, lo), truncated: true };
+}
+
 /** node/name/kind for a tool call, per PLAN §H's redaction/mapping rules. */
 export function classifyTool(toolName) {
   const name = typeof toolName === 'string' ? toolName : 'unknown';
@@ -94,7 +122,7 @@ export function redactToolInput(toolName, toolInput) {
   const input = toolInput && typeof toolInput === 'object' ? toolInput : {};
   if (toolName === 'Bash') {
     const command = typeof input.command === 'string' ? input.command : '';
-    const token = command.trim().split(/\s+/)[0] ?? '';
+    const token = firstMeaningfulToken(command);
     return compact({ command_token: token || undefined, command_length: command.length });
   }
   if (toolName === 'Read' || toolName === 'Write' || toolName === 'Edit' || toolName === 'Glob' || toolName === 'Grep') {
@@ -105,12 +133,27 @@ export function redactToolInput(toolName, toolInput) {
   }
   if (toolName === 'Agent') {
     return compact({
-      description: typeof input.description === 'string' ? input.description : undefined,
-      subagent_type: typeof input.subagent_type === 'string' ? input.subagent_type : undefined,
+      description: typeof input.description === 'string' ? clampChars(input.description, MAX_LABEL_CHARS) : undefined,
+      subagent_type: typeof input.subagent_type === 'string' ? clampChars(input.subagent_type, MAX_LABEL_CHARS) : undefined,
     });
   }
   const keys = Object.keys(input);
   return { input_keys: keys, input_bytes: byteLength(JSON.stringify(input)) };
+}
+
+/**
+ * The first token of a Bash command, safe to forward: leading `VAR=value`
+ * environment assignments (a common way secrets end up on a command line,
+ * e.g. `GITHUB_TOKEN=ghp_xxx gh pr list`) are skipped rather than emitted,
+ * a path-like token is reduced to its basename, and the result is bounded.
+ */
+function firstMeaningfulToken(command) {
+  const tokens = command.trim().split(/\s+/).filter(Boolean);
+  let i = 0;
+  while (i < tokens.length && i < 2 && ENV_ASSIGNMENT_RE.test(tokens[i])) i += 1;
+  const token = tokens[i] ?? '';
+  const base = basename(token) || token;
+  return base.length > MAX_TOKEN_CHARS ? base.slice(0, MAX_TOKEN_CHARS) : base;
 }
 
 function flowFor(payload, sessionId) {
@@ -135,7 +178,15 @@ export function mapHookToEvents(payload, state, now) {
 
   const nextId = () => {
     next.counter += 1;
-    return `${sessionId}:${next.counter}`;
+    // Uniqueness cannot rest on the persisted counter alone: Claude Code runs
+    // hooks in parallel, so two independent emit.mjs processes can load the
+    // same stale counter (or both start from 0 after any state loss) and mint
+    // the same id for two different events, which the hub's dedup then
+    // silently collapses into one. process.pid + the event's own timestamp
+    // make the id unique across concurrent processes without requiring any
+    // cross-process coordination; `counter` still disambiguates multiple
+    // events minted within a single invocation.
+    return `${sessionId}:${process.pid}:${now}:${next.counter}`;
   };
 
   const mkEvent = (fields) => ({ v: 1, id: nextId(), ts: now, ...fields });
@@ -176,7 +227,11 @@ export function mapHookToEvents(payload, state, now) {
 
   const startChildRoot = (agentId, agentType, description) => {
     const flow = `${sessionId}/agent-${agentId}`;
+    // Correlate on the raw, unclamped description so a long description still
+    // matches its in-flight Agent tool call; only the emitted label/context
+    // need bounding.
     const parentOp = correlateAgentCall(description);
+    const boundedDescription = clampChars(description, MAX_LABEL_CHARS);
     events.push(
       mkEvent({
         flow,
@@ -186,10 +241,10 @@ export function mapHookToEvents(payload, state, now) {
         name: 'session',
         kind: 'subagent',
         root: true,
-        label: description ?? agentType ?? 'subagent',
+        label: boundedDescription ?? agentType ?? 'subagent',
         actor: { id: `agent:claude-code/${agentType ?? 'unknown'}`, kind: 'subagent' },
         link: compact({ parentFlow: sessionId, parentNode: 'tool:Agent', parentOp }),
-        context: compact({ agent_type: agentType, agent_description: description }),
+        context: compact({ agent_type: agentType, agent_description: boundedDescription }),
       }),
     );
     next.subagents[agentId] = { flow, ts: now, rootStarted: true };
@@ -214,6 +269,7 @@ export function mapHookToEvents(payload, state, now) {
       ensureMainRoot();
       const includePrompts = Boolean(next.config?.includePrompts);
       const text = typeof p.user_prompt === 'string' ? p.user_prompt : '';
+      const bounded = includePrompts ? truncateToBytes(text, MAX_PROMPT_BYTES) : undefined;
       events.push(
         mkEvent({
           flow: sessionId,
@@ -221,7 +277,11 @@ export function mapHookToEvents(payload, state, now) {
           node: ROOT_NODE,
           type: 'annotate',
           name: 'session',
-          context: compact({ prompt_chars: text.length, prompt: includePrompts ? text : undefined }),
+          context: compact({
+            prompt_chars: text.length,
+            prompt: bounded?.text,
+            prompt_truncated: bounded?.truncated ? true : undefined,
+          }),
         }),
       );
       break;

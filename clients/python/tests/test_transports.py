@@ -155,6 +155,87 @@ def test_http_transport_drops_and_counts_when_delivery_queue_is_full():
         stop_fake_hub(server, thread)
 
 
+def test_http_transport_refuses_redirects_and_never_leaks_the_api_key():
+    """A hub (or a MITM/hijacked-DNS answer for it) that redirects the ingest
+    POST to a different origin must never have the Authorization header
+    replayed to it -- see `_RefuseRedirectHandler`.
+    """
+    victim_requests: list[dict] = []
+
+    class VictimHandler(http.server.BaseHTTPRequestHandler):
+        def log_message(self, format, *args):  # noqa: A002 - stdlib signature
+            pass
+
+        def do_POST(self):
+            length = int(self.headers.get("content-length", 0))
+            self.rfile.read(length) if length else None
+            victim_requests.append({k.lower(): v for k, v in self.headers.items()})
+            self.send_response(200)
+            self.send_header("content-length", "0")
+            self.end_headers()
+
+    victim = http.server.HTTPServer(("127.0.0.1", 0), VictimHandler)
+    victim_thread = threading.Thread(target=victim.serve_forever, daemon=True)
+    victim_thread.start()
+    victim_url = f"http://127.0.0.1:{victim.server_port}/steal"
+
+    hub_requests: list[dict] = []
+
+    class RedirectingHubHandler(http.server.BaseHTTPRequestHandler):
+        def log_message(self, format, *args):  # noqa: A002 - stdlib signature
+            pass
+
+        def do_POST(self):
+            length = int(self.headers.get("content-length", 0))
+            self.rfile.read(length) if length else None
+            hub_requests.append({k.lower(): v for k, v in self.headers.items()})
+            self.send_response(302)
+            self.send_header("Location", victim_url)
+            self.send_header("content-length", "0")
+            self.end_headers()
+
+    hub = http.server.HTTPServer(("127.0.0.1", 0), RedirectingHubHandler)
+    hub_thread = threading.Thread(target=hub.serve_forever, daemon=True)
+    hub_thread.start()
+    hub_base = f"http://127.0.0.1:{hub.server_port}"
+
+    try:
+        transport = HttpTransport(base_url=hub_base, api_key="SUPER-SECRET-KEY", retries=5, backoff_ms=5)
+        transport.send(SAMPLE_EVENTS)
+        transport.flush()
+        transport.close()
+
+        assert len(victim_requests) == 0, "the redirect target must never be contacted"
+        # Refused outright: the redirect (a code < 500) is dropped, not retried.
+        assert len(hub_requests) == 1
+        assert hub_requests[0]["authorization"] == "Bearer SUPER-SECRET-KEY"  # sent to the real hub only
+    finally:
+        stop_fake_hub(hub, hub_thread)
+        stop_fake_hub(victim, victim_thread)
+
+
+def test_http_transport_flush_bounded_timeout_returns_false_without_blocking_forever():
+    """`flush(timeout=...)` must return within the deadline even if delivery
+    never completes, instead of blocking the caller indefinitely.
+    """
+
+    def never_returns(request, timeout=None):
+        time.sleep(2)  # far longer than the flush timeout below; thread is a daemon
+        raise urllib.error.URLError("should not get here")
+
+    transport = HttpTransport(base_url="http://127.0.0.1:1", api_key="k", opener=never_returns, retries=0)
+    transport.send(SAMPLE_EVENTS)
+
+    start = time.monotonic()
+    completed = transport.flush(timeout=0.2)
+    elapsed = time.monotonic() - start
+
+    assert completed is False
+    assert elapsed < 1.0, f"flush(timeout=0.2) must not block past its deadline, took {elapsed}s"
+    # Do not call transport.close() here: the worker thread is still stuck in
+    # the fake opener's sleep, and close() would block on `_thread.join`.
+
+
 def test_memory_transport_records_every_batch_verbatim_in_order():
     transport = MemoryTransport()
     transport.send(SAMPLE_EVENTS)

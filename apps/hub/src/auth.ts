@@ -43,14 +43,23 @@ function hash(value: string): Buffer {
   return createHash('sha256').update(value, 'utf8').digest();
 }
 
+/**
+ * Constant-time string equality (hub-14): hashes both sides to a fixed
+ * length first so `timingSafeEqual` never throws on a length mismatch, and
+ * the early-exit that a plain `===` on the raw strings would give an
+ * attacker (leaking how many leading bytes matched) never happens. Used for
+ * every bearer credential the hub compares -- API keys (`findApiKey`) and the
+ * `/metrics` token (`routes/health.ts`) alike.
+ */
+export function constantTimeEquals(a: string, b: string): boolean {
+  return timingSafeEqual(hash(a), hash(b));
+}
+
 /** Finds the configured key matching `presented`, comparing every candidate in constant time. */
 export function findApiKey(keys: readonly ApiKeyConfig[], presented: string): ApiKeyConfig | undefined {
-  const presentedHash = hash(presented);
   let found: ApiKeyConfig | undefined;
   for (const candidate of keys) {
-    const candidateHash = hash(candidate.key);
-    // Both hashes are fixed-length (32 bytes, SHA-256) so timingSafeEqual never throws on length mismatch.
-    if (timingSafeEqual(candidateHash, presentedHash)) found = candidate;
+    if (constantTimeEquals(candidate.key, presented)) found = candidate;
   }
   return found;
 }
@@ -69,10 +78,53 @@ function extractPresentedKey(headers: Record<string, string | string[] | undefin
 }
 
 /**
+ * ee-sso seam: lets the enterprise layer's OIDC session cookie stand in for
+ * an API key on requests carrying no credential at all. `authenticate` is a
+ * pure function called from two places outside this package's control --
+ * `server.ts`'s `requireAuth` closure and `live.ts`'s WS upgrade handler --
+ * neither of which this task may edit, so there is no call site to thread a
+ * new "also check ee's session cookie" parameter through. Both call sites
+ * already pass this function the request's raw headers (which carry any
+ * `Cookie` header verbatim), so a settable resolver here is the smallest
+ * seam that lets ee (`apps/hub/ee/src/sso.ts`) participate in authentication
+ * itself, not just observe it after the fact the way `HubExtensions.
+ * onRequestAuthed` does (that hook only runs *after* `authenticate` has
+ * already returned an `AuthContext`, so it cannot manufacture one when no
+ * API key was presented at all).
+ *
+ * `resolver` gets the same header record `authenticate` was called with and
+ * returns a ready-made `AuthContext` (or `undefined` -- no session, an
+ * invalid/expired one, or the `sso` feature isn't currently licensed; ee
+ * decides all of that itself) synchronously, since verifying a self-
+ * contained, HMAC-signed session cookie needs no I/O. `createEnterpriseExtensions`
+ * installs its resolver once at construction and clears it (passes
+ * `undefined`) from its `close()`, so a closed-out ee instance never keeps
+ * authenticating requests for a server that no longer exists -- important in
+ * tests, which construct many short-lived servers in one process. At most
+ * one resolver is active at a time, matching every other piece of
+ * process-wide hub state (there is exactly one hub per process). The
+ * community edition (no `ee`) never calls this, so `authenticate` behaves
+ * exactly as it always has when ee isn't installed or configured.
+ */
+export type SessionAuthResolver = (headers: Record<string, string | string[] | undefined>) => AuthContext | undefined;
+
+let sessionAuthResolver: SessionAuthResolver | undefined;
+
+export function setSessionAuthResolver(resolver: SessionAuthResolver | undefined): void {
+  sessionAuthResolver = resolver;
+}
+
+/**
  * Authenticates a request: finds the key, checks the required role, and
  * resolves the workspace (the key's own workspace, or the caller-supplied
  * `requestedWorkspace` when the key is the `*` operator key). Throws
  * `AuthError` on any failure; callers turn that into the `{ error }` body.
+ *
+ * When the request presents no API key at all (no `Authorization: Bearer`,
+ * no `x-api-key`, no `?token=`), and ee has installed a `SessionAuthResolver`
+ * (see above), that resolver gets a chance to authenticate the request from
+ * a session cookie instead before this falls through to the ordinary
+ * "missing API key" error.
  */
 export function authenticate(
   keys: readonly ApiKeyConfig[],
@@ -83,7 +135,19 @@ export function authenticate(
   options?: { readonly operatorWorkspaceOptional?: boolean },
 ): AuthContext {
   const presented = extractPresentedKey(headers, queryToken);
-  if (!presented) throw new AuthError(401, 'unauthorized', 'missing API key: use Authorization: Bearer <key> or x-api-key');
+  if (!presented) {
+    const sessionAuth = sessionAuthResolver?.(headers);
+    if (sessionAuth) {
+      if (!sessionAuth.roles.includes(requiredRole)) {
+        throw new AuthError(403, 'forbidden', `session lacks role "${requiredRole}"`);
+      }
+      if (!sessionAuth.isOperator && requestedWorkspace && requestedWorkspace !== sessionAuth.workspace) {
+        throw new AuthError(403, 'workspace_forbidden', `session is bound to workspace "${sessionAuth.workspace}"`);
+      }
+      return sessionAuth;
+    }
+    throw new AuthError(401, 'unauthorized', 'missing API key: use Authorization: Bearer <key> or x-api-key');
+  }
 
   const found = findApiKey(keys, presented);
   if (!found) throw new AuthError(401, 'unauthorized', 'invalid API key');
@@ -92,7 +156,12 @@ export function authenticate(
     throw new AuthError(403, 'forbidden', `key "${found.id}" lacks role "${requiredRole}"`);
   }
 
-  const isOperator = found.workspace === '*';
+  // hub-15: SPEC.md §6 defines the operator key as workspace "*" AND role "admin".
+  // `config.ts`'s `parseApiKeys` already rejects a "*" key without "admin" at
+  // startup; this mirrors the same rule here so a `*` key built any other way
+  // (e.g. constructed directly rather than parsed from TRACERY_API_KEYS) can't
+  // get the operator's cross-workspace reach on a lesser role.
+  const isOperator = found.workspace === '*' && found.roles.includes('admin');
   if (isOperator) {
     if (!requestedWorkspace) {
       // Some admin endpoints (e.g. GET /v1/workspaces) let the operator key omit a

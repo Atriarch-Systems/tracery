@@ -19,6 +19,23 @@ export interface LiveFilter {
 /** Stops reconnecting and closes the live socket. */
 export type LiveDisposer = () => void;
 
+export interface LiveStatusEvent {
+  readonly status: 'connecting' | 'open' | 'closed' | 'error';
+  /** Reconnect attempts made since the backoff last reset (0 on the very first connect). */
+  readonly attempt: number;
+}
+
+export interface LiveOptions {
+  /** Called on every connecting/open/closed/error transition, so a caller can tell "connected and quiet" from "reconnect-looping on a bad key". */
+  readonly onStatus?: (event: LiveStatusEvent) => void;
+  /** Called with a malformed-frame parse error, or an error `onFrame` itself threw (frames are otherwise never re-delivered after a handler throws). */
+  readonly onError?: (error: unknown) => void;
+  /** Stop reconnecting after this many consecutive failed attempts. Default: unlimited. */
+  readonly maxAttempts?: number;
+  /** How long a connection must stay open before a later close resets the backoff to its floor, rather than continuing to climb. Default 1000ms. */
+  readonly stableAfterMs?: number;
+}
+
 interface ErrorBody {
   readonly error?: { readonly code?: string; readonly message?: string };
 }
@@ -106,22 +123,28 @@ export class HubClient {
 
   /**
    * Subscribe to `WS /v1/live`. Calls `onFrame` for every snapshot/events/
-   * heartbeat frame. On disconnect, reconnects with exponential backoff
-   * (capped at 10s) using `after=<last cursor seen>` so the resumed feed
-   * never repeats or loses events. Returns a disposer that stops
-   * reconnecting and closes the socket.
+   * heartbeat frame. On disconnect, reconnects with capped, jittered
+   * exponential backoff using `after=<last cursor seen>` so the resumed feed
+   * never repeats or loses events. The backoff only resets to its floor once
+   * a connection has stayed open past `stableAfterMs`, so a hub that
+   * completes the upgrade and then immediately closes (a rejected key,
+   * load-shedding, a slow-client drop) backs off instead of reconnecting
+   * forever at the 200ms floor. Returns a disposer that stops reconnecting
+   * and closes the socket.
    */
-  live(filter: LiveFilter, onFrame: (frame: ActivityFrame) => void): LiveDisposer {
+  live(filter: LiveFilter, onFrame: (frame: ActivityFrame) => void, liveOptions: LiveOptions = {}): LiveDisposer {
     if (typeof this.WebSocketImpl !== 'function') {
       throw new Error('HubClient.live: no WebSocket implementation available; pass { WebSocket }');
     }
     // Narrowed once here; captured as a definite (non-undefined) constructor
     // so the nested `connect` function below does not need to re-check it.
     const WebSocketImpl: typeof WebSocket = this.WebSocketImpl;
+    const { onStatus, onError, maxAttempts, stableAfterMs = 1000 } = liveOptions;
 
     let disposed = false;
     let socket: WebSocket | null = null;
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    let stableTimer: ReturnType<typeof setTimeout> | null = null;
     let attempt = 0;
     let cursor = filter.after;
 
@@ -135,31 +158,64 @@ export class HubClient {
       return url.toString().replace(/^http/, 'ws');
     };
 
+    const clearStableTimer = (): void => {
+      if (stableTimer !== null) {
+        clearTimeout(stableTimer);
+        stableTimer = null;
+      }
+    };
+
     const scheduleReconnect = (): void => {
+      clearStableTimer();
+      onStatus?.({ status: 'closed', attempt });
       if (disposed) return;
-      const delay = Math.min(200 * 2 ** attempt, 10_000);
+      if (maxAttempts !== undefined && attempt >= maxAttempts) return;
+      const capped = Math.min(200 * 2 ** attempt, 10_000);
+      // Full jitter: many clients reconnecting after the same hub restart
+      // should not all retry in lockstep.
+      const delay = Math.random() * capped;
       attempt++;
       reconnectTimer = setTimeout(connect, delay);
     };
 
     function connect(): void {
       if (disposed) return;
+      onStatus?.({ status: 'connecting', attempt });
       const ws = new WebSocketImpl(socketUrl());
       socket = ws;
       ws.addEventListener('open', () => {
-        attempt = 0;
+        onStatus?.({ status: 'open', attempt });
+        // Reset the backoff only once the connection has proven itself by
+        // staying open a while, not immediately on `open` — see the doc
+        // comment above.
+        clearStableTimer();
+        stableTimer = setTimeout(() => {
+          attempt = 0;
+          stableTimer = null;
+        }, stableAfterMs);
       });
       ws.addEventListener('message', (event: MessageEvent) => {
+        let frame: ActivityFrame;
         try {
-          const frame = JSON.parse(String(event.data)) as ActivityFrame;
-          cursor = frame.cursor;
+          frame = JSON.parse(String(event.data)) as ActivityFrame;
+        } catch (err) {
+          onError?.(err); // malformed frame; ignore and keep the connection open
+          return;
+        }
+        try {
+          // Advance the cursor only once the frame has actually been handed
+          // off: if the consumer's own handler throws, the frame is not
+          // marked seen, so a reconnect will replay it instead of leaving a
+          // silent, permanent gap in the feed.
           onFrame(frame);
-        } catch {
-          // malformed frame; ignore and keep the connection open
+          cursor = frame.cursor;
+        } catch (err) {
+          onError?.(err);
         }
       });
-      ws.addEventListener('error', () => {
-        // swallow; the 'close' event that follows drives reconnection
+      ws.addEventListener('error', (event) => {
+        onError?.(event);
+        // the 'close' event that follows drives reconnection
       });
       ws.addEventListener('close', scheduleReconnect);
     }
@@ -168,6 +224,7 @@ export class HubClient {
 
     return () => {
       disposed = true;
+      clearStableTimer();
       if (reconnectTimer !== null) clearTimeout(reconnectTimer);
       socket?.close();
     };
