@@ -1,5 +1,5 @@
-import type { ActivityBatch, ActivityEvent } from '@atriarch/activity-core';
-import { ACTIVITY_CONTRACT_VERSION } from '@atriarch/activity-core';
+import type { ActivityBatch, ActivityEvent } from '@atriarch/tracery-core';
+import { ACTIVITY_CONTRACT_VERSION } from '@atriarch/tracery-core';
 import type { ActivityTransport, JournalLike } from './types.js';
 
 function sleep(ms: number): Promise<void> {
@@ -88,7 +88,7 @@ export function memoryTransport(): MemoryTransport {
 
 /**
  * Feeds batches straight into an in-process journal (e.g.
- * `@atriarch/activity-core`'s `Journal`) instead of a network hub, for the
+ * `@atriarch/tracery-core`'s `Journal`) instead of a network hub, for the
  * library-only usage mode.
  */
 export function journalTransport(journal: JournalLike): ActivityTransport {

@@ -4,7 +4,7 @@ import time
 
 import pytest
 
-from atriarch.activity import ActivityTracer, Clock, MemoryTransport, current_op
+from atriarch.tracery import ActivityTracer, Clock, MemoryTransport, current_op
 
 
 def make_fake_clock():

@@ -28,4 +28,4 @@ jobs:
     needs: [node]
     steps:
       - uses: actions/checkout@v4
-      - run: docker build -f apps/hub/Dockerfile -t atriarch-activity-hub:ci .
+      - run: docker build -f apps/hub/Dockerfile -t atriarch/tracery-hub:ci .

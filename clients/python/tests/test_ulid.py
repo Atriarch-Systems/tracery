@@ -1,7 +1,7 @@
 import re
 import time
 
-from atriarch.activity import ulid
+from atriarch.tracery import ulid
 
 CROCKFORD = re.compile(r"^[0-9A-HJKMNP-TV-Z]{26}$")
 

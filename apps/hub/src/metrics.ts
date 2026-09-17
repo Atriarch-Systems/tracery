@@ -37,37 +37,37 @@ export class MetricsRegistry {
     return this.wsClients;
   }
 
-  /** Renders the full Prometheus text-exposition body, including `activity_flows_total` / `activity_store_events` read fresh from the store. */
+  /** Renders the full Prometheus text-exposition body, including `tracery_flows_total` / `tracery_store_events` read fresh from the store. */
   async render(store: EventStore): Promise<string> {
     const stats = await store.stats();
     const totalEvents = stats.reduce((sum, workspace) => sum + workspace.events, 0);
     const totalFlows = stats.reduce((sum, workspace) => sum + workspace.flows, 0);
 
     const lines: string[] = [
-      '# HELP activity_events_ingested_total Total events accepted by the hub.',
-      '# TYPE activity_events_ingested_total counter',
-      `activity_events_ingested_total ${this.ingested}`,
-      '# HELP activity_events_rejected_total Total events rejected during ingest.',
-      '# TYPE activity_events_rejected_total counter',
-      `activity_events_rejected_total ${this.rejected}`,
-      '# HELP activity_events_duplicate_total Total events ignored as duplicates.',
-      '# TYPE activity_events_duplicate_total counter',
-      `activity_events_duplicate_total ${this.duplicates}`,
-      '# HELP activity_flows_total Flows currently retained across all workspaces.',
-      '# TYPE activity_flows_total gauge',
-      `activity_flows_total ${totalFlows}`,
-      '# HELP activity_store_events Events currently retained across all workspaces.',
-      '# TYPE activity_store_events gauge',
-      `activity_store_events ${totalEvents}`,
-      '# HELP activity_ws_clients Live WebSocket clients currently connected.',
-      '# TYPE activity_ws_clients gauge',
-      `activity_ws_clients ${this.wsClients}`,
-      '# HELP activity_sweeps_total Retention sweeps run.',
-      '# TYPE activity_sweeps_total counter',
-      `activity_sweeps_total ${this.sweeps}`,
-      '# HELP activity_swept_flows_total Flows deleted by retention sweeps.',
-      '# TYPE activity_swept_flows_total counter',
-      `activity_swept_flows_total ${this.sweptFlows}`,
+      '# HELP tracery_events_ingested_total Total events accepted by the hub.',
+      '# TYPE tracery_events_ingested_total counter',
+      `tracery_events_ingested_total ${this.ingested}`,
+      '# HELP tracery_events_rejected_total Total events rejected during ingest.',
+      '# TYPE tracery_events_rejected_total counter',
+      `tracery_events_rejected_total ${this.rejected}`,
+      '# HELP tracery_events_duplicate_total Total events ignored as duplicates.',
+      '# TYPE tracery_events_duplicate_total counter',
+      `tracery_events_duplicate_total ${this.duplicates}`,
+      '# HELP tracery_flows_total Flows currently retained across all workspaces.',
+      '# TYPE tracery_flows_total gauge',
+      `tracery_flows_total ${totalFlows}`,
+      '# HELP tracery_store_events Events currently retained across all workspaces.',
+      '# TYPE tracery_store_events gauge',
+      `tracery_store_events ${totalEvents}`,
+      '# HELP tracery_ws_clients Live WebSocket clients currently connected.',
+      '# TYPE tracery_ws_clients gauge',
+      `tracery_ws_clients ${this.wsClients}`,
+      '# HELP tracery_sweeps_total Retention sweeps run.',
+      '# TYPE tracery_sweeps_total counter',
+      `tracery_sweeps_total ${this.sweeps}`,
+      '# HELP tracery_swept_flows_total Flows deleted by retention sweeps.',
+      '# TYPE tracery_swept_flows_total counter',
+      `tracery_swept_flows_total ${this.sweptFlows}`,
     ];
     return lines.join('\n') + '\n';
   }

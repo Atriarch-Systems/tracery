@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ACTIVITY_CONTRACT_VERSION } from '@atriarch/activity-core/contract';
-import { sampleTraceEvents, sampleFlowIds } from '@atriarch/activity-core/fixtures';
+import { ACTIVITY_CONTRACT_VERSION } from '@atriarch/tracery-core/contract';
+import { sampleTraceEvents, sampleFlowIds } from '@atriarch/tracery-core/fixtures';
 import { createTestServer, bearer, makeUiDir } from './route-helpers.mjs';
 
 const KEYS = [
@@ -372,24 +372,24 @@ test('metrics: text exposition carries every documented metric name and reflects
     assert.equal(res.statusCode, 200);
     assert.match(res.headers['content-type'], /text\/plain/);
     for (const name of [
-      'activity_events_ingested_total',
-      'activity_events_rejected_total',
-      'activity_events_duplicate_total',
-      'activity_flows_total',
-      'activity_store_events',
-      'activity_ws_clients',
-      'activity_sweeps_total',
-      'activity_swept_flows_total',
+      'tracery_events_ingested_total',
+      'tracery_events_rejected_total',
+      'tracery_events_duplicate_total',
+      'tracery_flows_total',
+      'tracery_store_events',
+      'tracery_ws_clients',
+      'tracery_sweeps_total',
+      'tracery_swept_flows_total',
     ]) {
       assert.match(res.body, new RegExp(`^${name} `, 'm'), `missing metric ${name}`);
     }
-    assert.match(res.body, new RegExp(`activity_events_ingested_total ${sampleTraceEvents.length}`));
+    assert.match(res.body, new RegExp(`tracery_events_ingested_total ${sampleTraceEvents.length}`));
   } finally {
     await created.close();
   }
 });
 
-test('metrics: a configured ACTIVITY_METRICS_TOKEN is required', async () => {
+test('metrics: a configured TRACERY_METRICS_TOKEN is required', async () => {
   const created = await createTestServer({ apiKeys: KEYS, metricsToken: 'secret-token' });
   try {
     const denied = await created.app.inject({ method: 'GET', url: '/metrics' });

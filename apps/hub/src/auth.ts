@@ -30,7 +30,7 @@ export interface DevKey {
   readonly config: ApiKeyConfig;
 }
 
-/** Generates the dev key used when no `ACTIVITY_API_KEYS*` is configured: all roles, workspace `default`. */
+/** Generates the dev key used when no `TRACERY_API_KEYS*` is configured: all roles, workspace `default`. */
 export function generateDevKey(): DevKey {
   const key = `dev_${randomBytes(24).toString('hex')}`;
   return {

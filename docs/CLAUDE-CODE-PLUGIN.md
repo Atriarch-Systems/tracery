@@ -1,8 +1,8 @@
 # Claude Code plugin
 
-`plugins/claude-code` turns a running Claude Code session into an Atriarch
-Activity flow: session start/end, every tool call, and every subagent as its
-own linked child flow. It is a thin, zero-dependency adapter from [Claude
+`plugins/claude-code` turns a running Claude Code session into a Tracery by
+Atriarch Systems flow: session start/end, every tool call, and every subagent
+as its own linked child flow. It is a thin, zero-dependency adapter from [Claude
 Code's hooks](https://code.claude.com/docs/en/hooks.md) to the [wire
 contract](SPEC.md#1-contract) -- see
 [`docs/research/claude-code-hooks.md`](research/claude-code-hooks.md) for the
@@ -19,8 +19,8 @@ its limits, and troubleshooting.
 claude --plugin-dir ./plugins/claude-code
 ```
 
-Set `hub_url` and `api_key` (`userConfig` prompt, or `ACTIVITY_HUB_URL` /
-`ACTIVITY_API_KEY`). Both unset is a silent no-op; only one set logs a single
+Set `hub_url` and `api_key` (`userConfig` prompt, or `TRACERY_HUB_URL` /
+`TRACERY_API_KEY`). Both unset is a silent no-op; only one set logs a single
 stderr line and stays a no-op. See the README for the full env var table.
 
 ## Architecture
@@ -47,7 +47,7 @@ One script, `hooks/emit.mjs`, is registered for twelve hook events in
 `map.mjs` has no I/O and imports nothing but `node:path`; `emit.mjs` imports
 only `node:*` builtins plus `map.mjs`. Neither imports from `packages/*` at
 runtime -- only the plugin's own tests do, to validate emitted events against
-`@atriarch/activity-core`.
+`@atriarch/tracery-core`.
 
 ## Event mapping
 

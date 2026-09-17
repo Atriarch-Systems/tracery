@@ -1,8 +1,8 @@
 {
-  "name": "@atriarch/activity-react",
+  "name": "@atriarch/tracery-react",
   "version": "0.1.0",
   "license": "MIT",
-  "description": "ActivityExplorer: a composite React explorer (flow picker, guided graph, inspector) and live-source hooks for Atriarch Activity.",
+  "description": "ActivityExplorer: a composite React explorer (flow picker, guided graph, inspector) and live-source hooks for Tracery.",
   "type": "module",
   "files": ["dist", "README.md", "LICENSE"],
   "exports": {
@@ -18,9 +18,9 @@
     "react-dom": ">=18 <20"
   },
   "dependencies": {
-    "@atriarch/activity-core": "*",
-    "@atriarch/activity-visualizer": "*",
-    "@atriarch/activity-client": "*"
+    "@atriarch/tracery-core": "*",
+    "@atriarch/tracery-visualizer": "*",
+    "@atriarch/tracery-client": "*"
   },
   "devDependencies": {
     "typescript": "^5.6.0",

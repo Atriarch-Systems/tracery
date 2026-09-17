@@ -6,7 +6,7 @@
  * -- and derives the `Scope` core's `project()` wants from them here, so the
  * derivation and the node-activation rule are unit-testable without React.
  */
-import type { ActivityNode, Flow, NodeData, Scope } from '@atriarch/activity-core';
+import type { ActivityNode, Flow, NodeData, Scope } from '@atriarch/tracery-core';
 
 export type ScopeMode = Scope['mode'];
 

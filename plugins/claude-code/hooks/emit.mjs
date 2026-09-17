@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Atriarch Activity Claude Code plugin: telemetry hook.
+// Tracery Claude Code plugin: telemetry hook.
 //
 // Reads one hook payload from stdin, maps it to Activity events (hooks/map.mjs),
 // appends them to a durable on-disk spool, then tries to drain the whole spool
@@ -18,10 +18,10 @@ const MAX_BATCH = 1000;
 const POST_TIMEOUT_MS = 2000;
 
 function readConfig(env) {
-  const hubUrl = firstNonEmpty(env.CLAUDE_PLUGIN_OPTION_HUB_URL, env.ACTIVITY_HUB_URL);
-  const apiKey = firstNonEmpty(env.CLAUDE_PLUGIN_OPTION_API_KEY, env.ACTIVITY_API_KEY);
-  const workspace = firstNonEmpty(env.CLAUDE_PLUGIN_OPTION_WORKSPACE, env.ACTIVITY_WORKSPACE) || 'default';
-  const includePromptsRaw = firstNonEmpty(env.CLAUDE_PLUGIN_OPTION_INCLUDE_PROMPTS, env.ACTIVITY_INCLUDE_PROMPTS) || 'false';
+  const hubUrl = firstNonEmpty(env.CLAUDE_PLUGIN_OPTION_HUB_URL, env.TRACERY_HUB_URL);
+  const apiKey = firstNonEmpty(env.CLAUDE_PLUGIN_OPTION_API_KEY, env.TRACERY_API_KEY);
+  const workspace = firstNonEmpty(env.CLAUDE_PLUGIN_OPTION_WORKSPACE, env.TRACERY_WORKSPACE) || 'default';
+  const includePromptsRaw = firstNonEmpty(env.CLAUDE_PLUGIN_OPTION_INCLUDE_PROMPTS, env.TRACERY_INCLUDE_PROMPTS) || 'false';
   const includePrompts = /^(1|true|yes)$/i.test(includePromptsRaw.trim());
   return { hubUrl: stripTrailingSlash(hubUrl), apiKey, workspace, includePrompts };
 }
@@ -40,7 +40,7 @@ function stripTrailingSlash(url) {
 function dataDirFor(env) {
   return env.CLAUDE_PLUGIN_DATA && env.CLAUDE_PLUGIN_DATA.length > 0
     ? env.CLAUDE_PLUGIN_DATA
-    : join(tmpdir(), 'atriarch-activity');
+    : join(tmpdir(), 'tracery');
 }
 
 async function readStdin() {
@@ -129,7 +129,7 @@ async function drainSpool(spoolPath, hubUrl, apiKey, workspace) {
 }
 
 function warn(message) {
-  process.stderr.write(`atriarch-activity: ${message}\n`);
+  process.stderr.write(`tracery: ${message}\n`);
 }
 
 async function main() {

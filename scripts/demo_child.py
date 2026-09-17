@@ -4,7 +4,7 @@
 
     python scripts/demo_child.py '<ActivityLink JSON>'
 
-`ACTIVITY_HUB_URL` / `ACTIVITY_API_KEY` come from the environment (demo.mjs
+`TRACERY_HUB_URL` / `TRACERY_API_KEY` come from the environment (demo.mjs
 sets both when it spawns this process). Starts a flow attached to the given
 link, does one op, ends the flow, and blocks (via `tracer.close()`) until
 the batch has been attempted -- so by the time this process exits 0, the
@@ -17,7 +17,7 @@ import json
 import os
 import sys
 
-from atriarch.activity import ActivityTracer, HttpTransport
+from atriarch.tracery import ActivityTracer, HttpTransport
 
 
 def main() -> int:
@@ -26,10 +26,10 @@ def main() -> int:
         return 1
 
     link = json.loads(sys.argv[1])
-    hub_url = os.environ.get("ACTIVITY_HUB_URL", "http://127.0.0.1:8971")
-    api_key = os.environ.get("ACTIVITY_API_KEY")
+    hub_url = os.environ.get("TRACERY_HUB_URL", "http://127.0.0.1:8971")
+    api_key = os.environ.get("TRACERY_API_KEY")
     if not api_key:
-        print("ACTIVITY_API_KEY is required", file=sys.stderr)
+        print("TRACERY_API_KEY is required", file=sys.stderr)
         return 1
 
     tracer = ActivityTracer(

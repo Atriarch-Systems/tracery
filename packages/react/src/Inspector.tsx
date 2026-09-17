@@ -4,7 +4,7 @@
  * (pretty JSON, collapsible) and the annotate timeline"). Overridable via
  * `ActivityExplorer`'s `renderInspector` prop.
  */
-import type { ActivityNode, NodeData, OpRecord, TimelineEntry } from '@atriarch/activity-core';
+import type { ActivityNode, NodeData, OpRecord, TimelineEntry } from '@atriarch/tracery-core';
 import { styles } from './style.js';
 
 export type InspectorSelection = ActivityNode<NodeData>;

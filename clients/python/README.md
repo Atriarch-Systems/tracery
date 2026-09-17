@@ -1,7 +1,7 @@
-# atriarch-activity
+# atriarch-tracery
 
-Python emitter SDK for [Atriarch Activity](../../docs/SPEC.md) (module
-`atriarch.activity`): batches `start`/`update`/`end`/`annotate` events for a
+Python emitter SDK for [Tracery](../../docs/SPEC.md) (module
+`atriarch.tracery`): batches `start`/`update`/`end`/`annotate` events for a
 flow and its ops and ships them to a hub, stdlib only. See `docs/SPEC.md` §5
 for the full contract this implements, and `../../packages/client` for the
 TypeScript sibling.
@@ -9,7 +9,7 @@ TypeScript sibling.
 ## Install
 
 ```
-pip install atriarch-activity
+pip install atriarch-tracery
 ```
 
 Requires Python >=3.11. `atriarch` is a PEP 420 namespace package (there is
@@ -20,10 +20,10 @@ no `atriarch/__init__.py`), so this can be installed alongside other
 
 ```python
 import os
-from atriarch.activity import ActivityTracer, HttpTransport
+from atriarch.tracery import ActivityTracer, HttpTransport
 
 tracer = ActivityTracer(
-    transport=HttpTransport(base_url="https://activity.example.com", api_key=os.environ["ACTIVITY_API_KEY"]),
+    transport=HttpTransport(base_url="https://tracery.example.com", api_key=os.environ["TRACERY_API_KEY"]),
     actor={"id": "agent:saga", "kind": "agent"},
 )
 
@@ -49,11 +49,11 @@ link it was handed:
 
 ```python
 import os
-from atriarch.activity import ActivityTracer, HttpTransport
+from atriarch.tracery import ActivityTracer, HttpTransport
 
 # `link` is whatever spawn_subagent above passed through (env var, IPC message, etc).
 sub_tracer = ActivityTracer(
-    transport=HttpTransport(base_url="https://activity.example.com", api_key=os.environ["ACTIVITY_API_KEY"]),
+    transport=HttpTransport(base_url="https://tracery.example.com", api_key=os.environ["TRACERY_API_KEY"]),
     actor={"id": "agent:saga/subagent:research-7", "kind": "subagent"},
 )
 
@@ -65,7 +65,7 @@ sub_flow.end()
 sub_tracer.close()
 ```
 
-The hub (or `project()` in `@atriarch/activity-core`) resolves the two flows
+The hub (or `project()` in `@atriarch/tracery-core`) resolves the two flows
 into one trace, with a `spawn` edge from the parent's `llm:main` op to the
 subagent's root node.
 

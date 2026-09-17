@@ -1,9 +1,9 @@
-# Atriarch Activity Hub (SPEC.md §6 "Packaging"). Build from the REPO ROOT:
+# Tracery Hub (SPEC.md §6 "Packaging"). Build from the REPO ROOT:
 #
-#   docker build -f apps/hub/Dockerfile -t atriarch-activity-hub:dev .
+#   docker build -f apps/hub/Dockerfile -t atriarch/tracery-hub:dev .
 #
 # Multi-stage: builds the npm workspaces this image actually needs
-# (@atriarch/activity-core + @atriarch/activity-hub), builds the hosted UI in
+# (@atriarch/tracery-core + @atriarch/tracery-hub), builds the hosted UI in
 # apps/hub/web when that directory exists (workstream E), and ships a final
 # node:22-alpine image with only production dependencies.
 
@@ -26,10 +26,10 @@ RUN npm ci
 # built" placeholder page (apps/hub/src/routes/ui.ts) at runtime.
 RUN if [ -f apps/hub/web/package.json ]; then \
       echo "building apps/hub/web"; \
-      npm run build -w @atriarch/activity-core -w @atriarch/activity-hub -w @atriarch/activity-hub-web; \
+      npm run build -w @atriarch/tracery-core -w @atriarch/tracery-hub -w @atriarch/tracery-hub-web; \
     else \
       echo "apps/hub/web not present yet; shipping without a hosted UI"; \
-      npm run build -w @atriarch/activity-core -w @atriarch/activity-hub; \
+      npm run build -w @atriarch/tracery-core -w @atriarch/tracery-hub; \
       mkdir -p apps/hub/web/dist; \
     fi
 
@@ -39,13 +39,13 @@ RUN npm prune --omit=dev
 
 FROM node:22-alpine
 WORKDIR /app
-RUN addgroup -S activity && adduser -S activity -G activity
+RUN addgroup -S tracery && adduser -S tracery -G tracery
 
 ENV NODE_ENV=production \
-    ACTIVITY_HOST=0.0.0.0 \
-    ACTIVITY_PORT=8971 \
-    ACTIVITY_STORE=memory \
-    ACTIVITY_SQLITE_PATH=/data/activity.db
+    TRACERY_HOST=0.0.0.0 \
+    TRACERY_PORT=8971 \
+    TRACERY_STORE=memory \
+    TRACERY_SQLITE_PATH=/data/tracery.db
 
 COPY --from=build /repo/node_modules ./node_modules
 COPY --from=build /repo/package.json ./package.json
@@ -57,14 +57,14 @@ COPY --from=build /repo/apps/hub/bin ./apps/hub/bin
 COPY --from=build /repo/apps/hub/ee/dist ./apps/hub/ee/dist
 COPY --from=build /repo/apps/hub/web/dist ./apps/hub/web/dist
 
-RUN mkdir -p /data && chown -R activity:activity /data /app
-USER activity
+RUN mkdir -p /data && chown -R tracery:tracery /data /app
+USER tracery
 
 VOLUME ["/data"]
 EXPOSE 8971
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD node -e "fetch('http://127.0.0.1:'+(process.env.ACTIVITY_PORT||8971)+'/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+  CMD node -e "fetch('http://127.0.0.1:'+(process.env.TRACERY_PORT||8971)+'/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
 WORKDIR /app/apps/hub
 ENTRYPOINT ["node", "bin/hub.mjs"]

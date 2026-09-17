@@ -3,17 +3,17 @@
  * `node:sqlite` (`DatabaseSync`, WAL mode). Events are the durable source of
  * truth, persisted one row per event; flow/trace reduction is kept as an
  * in-memory index (identical algorithm to `MemoryStore`, built from
- * `@atriarch/activity-core`'s `buildFlows`/`assembleTrace`) rebuilt from the
+ * `@atriarch/tracery-core`'s `buildFlows`/`assembleTrace`) rebuilt from the
  * database on startup and refreshed on every write, so `listFlows` and
  * friends never touch disk on the read path. This trades a bounded amount of
- * memory (workspaces are capped by `ACTIVITY_MAX_EVENTS_PER_WORKSPACE`) for
+ * memory (workspaces are capped by `TRACERY_MAX_EVENTS_PER_WORKSPACE`) for
  * simplicity and correctness parity with `MemoryStore`.
  */
 import { DatabaseSync } from 'node:sqlite';
 import fs from 'node:fs';
 import path from 'node:path';
-import { buildFlows, assembleTrace, type Flow } from '@atriarch/activity-core';
-import type { ActivityEvent, ActivityFrame, StoredEvent } from '@atriarch/activity-core/contract';
+import { buildFlows, assembleTrace, type Flow } from '@atriarch/tracery-core';
+import type { ActivityEvent, ActivityFrame, StoredEvent } from '@atriarch/tracery-core/contract';
 import { buildFrame } from './frame.js';
 import {
   toFlowSummary,

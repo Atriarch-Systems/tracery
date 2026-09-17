@@ -30,7 +30,7 @@ export interface CreatedServer {
   readonly store: EventStore;
   readonly metrics: MetricsRegistry;
   readonly keys: readonly ApiKeyConfig[];
-  /** The generated dev key, when no `ACTIVITY_API_KEYS*` was configured. Log it; it is never persisted. */
+  /** The generated dev key, when no `TRACERY_API_KEYS*` was configured. Log it; it is never persisted. */
   readonly devKey: string | undefined;
   readonly retention: RetentionHandle;
   close(): Promise<void>;
@@ -73,7 +73,7 @@ export async function createServer(config: Config, extensions?: HubExtensions): 
   await app.register(swaggerPlugin, {
     openapi: {
       openapi: '3.1.0',
-      info: { title: 'Atriarch Activity Hub', version: '0.1.0', description: 'SPEC.md §6 HTTP API.' },
+      info: { title: 'Tracery Hub', version: '0.1.0', description: 'SPEC.md §6 HTTP API.' },
     },
   });
 

@@ -13,11 +13,11 @@ import type { HubContext } from '../server-context.js';
 
 function placeholderHtml(): string {
   return `<!doctype html>
-<html><head><meta charset="utf-8"><title>Atriarch Activity Hub</title></head>
+<html><head><meta charset="utf-8"><title>Tracery Hub</title></head>
 <body style="font-family: system-ui, sans-serif; max-width: 40rem; margin: 4rem auto; padding: 0 1rem;">
-<h1>Atriarch Activity Hub</h1>
+<h1>Tracery Hub</h1>
 <p>The hosted UI is not built. Build <code>apps/hub/web</code> and set
-<code>ACTIVITY_UI_DIR</code> (or leave it at the default <code>web/dist</code>)
+<code>TRACERY_UI_DIR</code> (or leave it at the default <code>web/dist</code>)
 to serve it here.</p>
 <p>In the meantime: <a href="/v1/openapi.json">/v1/openapi.json</a>,
 <a href="/healthz">/healthz</a>.</p>

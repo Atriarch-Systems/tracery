@@ -36,7 +36,7 @@ export type {
 } from './hub-types.stub.js';
 
 // Re-exported for convenience so consumers rarely need to import
-// '@atriarch/activity-core' directly for everyday SDK use.
+// '@atriarch/tracery-core' directly for everyday SDK use.
 export type {
   ActivityActor,
   ActivityBatch,
@@ -49,5 +49,5 @@ export type {
   ActivityLink,
   ActivityStatus,
   StoredEvent,
-} from '@atriarch/activity-core';
-export { ACTIVITY_CONTRACT_VERSION, ACTIVITY_LIMITS } from '@atriarch/activity-core';
+} from '@atriarch/tracery-core';
+export { ACTIVITY_CONTRACT_VERSION, ACTIVITY_LIMITS } from '@atriarch/tracery-core';

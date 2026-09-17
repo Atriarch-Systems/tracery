@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { computeScope, scopeKey, scopeModeForKey, activatedFlow, SCOPE_MODE_KEYS } from '../dist/scope.js';
-import { buildSampleFlows, sampleFlowIds } from '@atriarch/activity-core/fixtures';
+import { buildSampleFlows, sampleFlowIds } from '@atriarch/tracery-core/fixtures';
 
 const flows = buildSampleFlows();
 

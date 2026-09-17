@@ -1,6 +1,6 @@
-# @atriarch/activity-client
+# @atriarch/tracery-client
 
-TypeScript emitter SDK for [Atriarch Activity](../../docs/SPEC.md): batches
+TypeScript emitter SDK for [Tracery](../../docs/SPEC.md): batches
 `start`/`update`/`end`/`annotate` events for a flow and its ops, ships them to
 a hub (or straight into an in-process `Journal`), and reads them back through
 a small hub client. See `docs/SPEC.md` §5 for the full contract this
@@ -9,16 +9,16 @@ implements.
 ## Install
 
 ```
-npm install @atriarch/activity-client
+npm install @atriarch/tracery-client
 ```
 
 ## Quick start: a parent flow spawning a subagent flow
 
 ```ts
-import { ActivityTracer, httpTransport } from '@atriarch/activity-client';
+import { ActivityTracer, httpTransport } from '@atriarch/tracery-client';
 
 const tracer = new ActivityTracer({
-  transport: httpTransport({ baseUrl: 'https://activity.example.com', apiKey: process.env.ACTIVITY_API_KEY! }),
+  transport: httpTransport({ baseUrl: 'https://tracery.example.com', apiKey: process.env.TRACERY_API_KEY! }),
   actor: { id: 'agent:saga', kind: 'agent' },
 });
 
@@ -43,11 +43,11 @@ The subagent process constructs its own tracer and starts its flow with the
 link it was handed:
 
 ```ts
-import { ActivityTracer, httpTransport } from '@atriarch/activity-client';
+import { ActivityTracer, httpTransport } from '@atriarch/tracery-client';
 
 // `link` is whatever `spawnSubagent` above passed through (env var, IPC message, etc).
 const subTracer = new ActivityTracer({
-  transport: httpTransport({ baseUrl: 'https://activity.example.com', apiKey: process.env.ACTIVITY_API_KEY! }),
+  transport: httpTransport({ baseUrl: 'https://tracery.example.com', apiKey: process.env.TRACERY_API_KEY! }),
   actor: { id: 'agent:saga/subagent:research-7', kind: 'subagent' },
 });
 
@@ -58,7 +58,7 @@ subFlow.end();
 await subTracer.close();
 ```
 
-The hub (or `project()` in `@atriarch/activity-core`) resolves the two flows
+The hub (or `project()` in `@atriarch/tracery-core`) resolves the two flows
 into one trace, with a `spawn` edge from the parent's `llm:main` op to the
 subagent's root node.
 
@@ -97,15 +97,15 @@ subagent's root node.
 - `memoryTransport()` — records every batch on `.batches` (readonly array of
   arrays); for tests.
 - `journalTransport(journal)` — calls `journal.append(events)`, feeding
-  `@atriarch/activity-core`'s `Journal` directly for the library-only usage
+  `@atriarch/tracery-core`'s `Journal` directly for the library-only usage
   mode (no hub).
 
 ### HubClient (read side)
 
 ```ts
-import { HubClient } from '@atriarch/activity-client';
+import { HubClient } from '@atriarch/tracery-client';
 
-const hub = new HubClient({ baseUrl: 'https://activity.example.com', apiKey: '...' });
+const hub = new HubClient({ baseUrl: 'https://tracery.example.com', apiKey: '...' });
 const { flows } = await hub.listFlows({ limit: 20, status: 'running' });
 const flow = await hub.getFlow(flows[0].id);
 const trace = await hub.getTrace(flow.trace);
@@ -124,7 +124,7 @@ browsers; pass `{ fetch, WebSocket }` to override either.
 
 `NodeRecord`, `OpRecord`, `EdgeRecord`, `TimelineEntry`, `FlowStatus` and
 `NodeStatus` in `src/hub-types.stub.ts` are re-exported straight from
-`@atriarch/activity-core`. `FlowSummary` and `Trace` in that same file are
+`@atriarch/tracery-core`. `FlowSummary` and `Trace` in that same file are
 still locally defined: they mirror core's `Flow`/`Trace` with `ops`/`nodes`
 flattened from `ReadonlyMap` to plain objects, since a `Map` does not
 survive `JSON.stringify`/`JSON.parse` and these two types describe the

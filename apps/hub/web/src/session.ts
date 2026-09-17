@@ -9,7 +9,7 @@ export interface HubSession {
   readonly workspace?: string;
 }
 
-const STORAGE_KEY = 'atriarch-activity-hub-session';
+const STORAGE_KEY = 'atriarch-tracery-hub-session';
 
 export function loadSession(): HubSession | null {
   try {

@@ -5,7 +5,7 @@ import time
 import urllib.error
 import urllib.request
 
-from atriarch.activity import HttpTransport, MemoryTransport
+from atriarch.tracery import HttpTransport, MemoryTransport
 
 SAMPLE_EVENTS = [
     {"v": 1, "id": "e1", "ts": 1000, "flow": "f1", "op": "o1", "node": "n1", "type": "start", "name": "x", "root": True}

@@ -1,5 +1,5 @@
 """ActivityTracer, Flow and Op: the Python emitter SDK (mirrors the TypeScript
-``@atriarch/activity-client`` tracer.ts, snake_cased). See docs/SPEC.md §5.
+``@atriarch/tracery-client`` tracer.ts, snake_cased). See docs/SPEC.md §5.
 """
 
 from __future__ import annotations
@@ -50,10 +50,10 @@ DEFAULT_CLOCK = Clock(now=lambda: int(time.time() * 1000), monotonic=lambda: tim
 # `threading.Thread`, which is how you hand a background thread the right
 # call-context parent.
 current_flow: contextvars.ContextVar["Flow | None"] = contextvars.ContextVar(
-    "atriarch_activity_current_flow", default=None
+    "atriarch_tracery_current_flow", default=None
 )
 current_op: contextvars.ContextVar["Op | None"] = contextvars.ContextVar(
-    "atriarch_activity_current_op", default=None
+    "atriarch_tracery_current_op", default=None
 )
 
 

@@ -6,13 +6,13 @@
  * this spec serves the real built UI (`vite preview`) but fakes the hub's
  * WebSocket with core's fixture trace instead of a live server. See
  * `explorer.real-hub.spec.ts` for the same assertions against an actual
- * `@atriarch/activity-hub` process, which self-skips until that exists.
+ * `@atriarch/tracery-hub` process, which self-skips until that exists.
  */
 import { test, expect, type Page } from '@playwright/test';
 import { preview, type PreviewServer } from 'vite';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { sampleTraceEvents, sampleFlowIds } from '@atriarch/activity-core/fixtures';
+import { sampleTraceEvents, sampleFlowIds } from '@atriarch/tracery-core/fixtures';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const webRoot = path.resolve(__dirname, '..');
@@ -50,7 +50,7 @@ test.afterAll(async () => {
 async function primeMockedHub(page: Page): Promise<void> {
   await page.addInitScript(
     ({ session, frame }) => {
-      window.sessionStorage.setItem('atriarch-activity-hub-session', JSON.stringify(session));
+      window.sessionStorage.setItem('atriarch-tracery-hub-session', JSON.stringify(session));
 
       class MockWebSocket extends EventTarget {
         static readonly CONNECTING = 0;

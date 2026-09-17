@@ -2,7 +2,7 @@
  * Inline style object, driven by CSS variables (SPEC.md §4 "Tailwind is not
  * required; styles are inline ... with CSS variables for theming"). No CSS
  * framework, no stylesheet: every rule here is a plain `CSSProperties`
- * object built from `var(--activity-*, <dark default>)`.
+ * object built from `var(--tracery-*, <dark default>)`.
  */
 import type { CSSProperties } from 'react';
 
@@ -24,16 +24,16 @@ const DEFAULTS = {
   border: '#262a3a',
 } as const;
 
-const v = (name: string, fallback: string): string => `var(--activity-${name}, ${fallback})`;
+const v = (name: string, fallback: string): string => `var(--tracery-${name}, ${fallback})`;
 
 /** The root element sets the CSS variables (from `theme`, when given) that every other style reads. */
 export function rootStyle(theme?: ActivityThemeVars): CSSProperties {
   return {
-    ['--activity-bg' as string]: theme?.bg ?? DEFAULTS.bg,
-    ['--activity-fg' as string]: theme?.fg ?? DEFAULTS.fg,
-    ['--activity-accent' as string]: theme?.accent ?? DEFAULTS.accent,
-    ['--activity-muted' as string]: theme?.muted ?? DEFAULTS.muted,
-    ['--activity-error' as string]: theme?.error ?? DEFAULTS.error,
+    ['--tracery-bg' as string]: theme?.bg ?? DEFAULTS.bg,
+    ['--tracery-fg' as string]: theme?.fg ?? DEFAULTS.fg,
+    ['--tracery-accent' as string]: theme?.accent ?? DEFAULTS.accent,
+    ['--tracery-muted' as string]: theme?.muted ?? DEFAULTS.muted,
+    ['--tracery-error' as string]: theme?.error ?? DEFAULTS.error,
     display: 'flex',
     flexDirection: 'column',
     width: '100%',

@@ -1,4 +1,4 @@
-# Claude Code hooks: reference for the Activity plugin
+# Claude Code hooks: reference for the Tracery plugin
 
 Researched 2026-09-16 against the official docs (sources at the end). Facts the
 docs state are given plainly; where the docs are silent it says "Not documented".
@@ -136,7 +136,7 @@ Quote `${CLAUDE_PLUGIN_ROOT}` because install paths may contain spaces.
 
 ```json
 "userConfig": {
-  "hub_url": { "type": "string", "title": "Activity hub URL", "required": true },
+  "hub_url": { "type": "string", "title": "Tracery hub URL", "required": true },
   "api_key": { "type": "string", "title": "Ingest API key", "sensitive": true, "required": true },
   "workspace": { "type": "string", "title": "Workspace", "default": "default" }
 }
@@ -145,7 +145,7 @@ Quote `${CLAUDE_PLUGIN_ROOT}` because install paths may contain spaces.
 Values reach hook commands as `${user_config.hub_url}` substitution in the
 command string and as `CLAUDE_PLUGIN_OPTION_HUB_URL` style environment
 variables. The emitter should read the env vars first and fall back to
-`ACTIVITY_HUB_URL` / `ACTIVITY_API_KEY` / `ACTIVITY_WORKSPACE` so it also works
+`TRACERY_HUB_URL` / `TRACERY_API_KEY` / `TRACERY_WORKSPACE` so it also works
 when installed as plain settings.json hooks.
 
 Install for development: `claude --plugin-dir ./plugins/claude-code`. From a

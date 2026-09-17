@@ -6,15 +6,15 @@
  * `Enter`-activating) a node that belongs to a different flow's group drills
  * into that flow.
  *
- * The graph is canvas-drawn (`@atriarch/activity-visualizer`), so alongside
+ * The graph is canvas-drawn (`@atriarch/tracery-visualizer`), so alongside
  * it this component also renders a small accessible node list per group --
  * the same selection/activation affordance as clicking/double-clicking a
  * card, reachable by keyboard and by automated testing without canvas hit
  * testing (`data-testid="node-item"`).
  */
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityGraph, placeBranches } from '@atriarch/activity-visualizer';
-import type { ActivityNode, NodeData, NodePresentation, NodeRecord, Flow, Scope } from '@atriarch/activity-core';
+import { ActivityGraph, placeBranches } from '@atriarch/tracery-visualizer';
+import type { ActivityNode, NodeData, NodePresentation, NodeRecord, Flow, Scope } from '@atriarch/tracery-core';
 import type { ReactNode, CSSProperties } from 'react';
 import type { ActivitySource } from './source.js';
 import { useProjection } from './useProjection.js';
@@ -126,7 +126,7 @@ export function ActivityExplorer(props: ActivityExplorerProps) {
           {source.partial ? ' (partial)' : ''}
         </span>
         {source.error && (
-          <span style={{ color: 'var(--activity-error, #ff6b6b)' }} role="alert">
+          <span style={{ color: 'var(--tracery-error, #ff6b6b)' }} role="alert">
             {source.error}
           </span>
         )}
@@ -161,7 +161,7 @@ export function ActivityExplorer(props: ActivityExplorerProps) {
                 style={styles.legendItem(dimmed)}
                 onClick={() => pickFlow(group.flow)}
               >
-                <span style={styles.swatch(group.status === 'error' ? 'var(--activity-error, #ff6b6b)' : 'var(--activity-accent, #7c9cff)')} />
+                <span style={styles.swatch(group.status === 'error' ? 'var(--tracery-error, #ff6b6b)' : 'var(--tracery-accent, #7c9cff)')} />
                 {group.label}
               </button>
             );

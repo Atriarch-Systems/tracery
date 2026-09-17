@@ -1,4 +1,4 @@
-// NOTE: @atriarch/activity-core now ships flows.ts/trace.ts, so OpRecord,
+// NOTE: @atriarch/tracery-core now ships flows.ts/trace.ts, so OpRecord,
 // NodeRecord, EdgeRecord, TimelineEntry, FlowStatus and NodeStatus below are
 // imported straight from it (type-only). What core does NOT (and cannot)
 // give us is the hub's JSON wire shape for a `Flow`: core's `Flow.ops` /
@@ -19,7 +19,7 @@ import type {
   NodeStatus,
   OpRecord,
   TimelineEntry,
-} from '@atriarch/activity-core';
+} from '@atriarch/tracery-core';
 
 export type { EdgeRecord, FlowStatus, NodeRecord, NodeStatus, OpRecord, TimelineEntry };
 

@@ -6,7 +6,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import WebSocket from 'ws';
-import { ACTIVITY_CONTRACT_VERSION } from '@atriarch/activity-core/contract';
+import { ACTIVITY_CONTRACT_VERSION } from '@atriarch/tracery-core/contract';
 import { createTestServer, bearer } from './route-helpers.mjs';
 
 const KEYS = [{ id: 'full', key: 'key-full', workspace: 'default', roles: ['ingest', 'read', 'admin'] }];

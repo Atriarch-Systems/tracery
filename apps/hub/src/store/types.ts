@@ -1,12 +1,12 @@
 /**
  * The hub's storage engine contract (SPEC.md §6 "Storage"). Two
  * implementations ship: `MemoryStore` (default, bounded) and `SqliteStore`
- * (`node:sqlite`, WAL). Both build on `@atriarch/activity-core`'s
+ * (`node:sqlite`, WAL). Both build on `@atriarch/tracery-core`'s
  * `buildFlows`/`assembleTrace` for every reduction -- never reimplemented
  * here.
  */
-import type { ActivityEvent, ActivityFrame, StoredEvent } from '@atriarch/activity-core/contract';
-import type { EdgeRecord, Flow, FlowStatus, NodeRecord, OpRecord } from '@atriarch/activity-core';
+import type { ActivityEvent, ActivityFrame, StoredEvent } from '@atriarch/tracery-core/contract';
+import type { EdgeRecord, Flow, FlowStatus, NodeRecord, OpRecord } from '@atriarch/tracery-core';
 
 /** `Flow`, with `Map`s replaced by JSON-serialisable `Record`s -- the wire shape for `GET /v1/flows*`. */
 export interface FlowSummary {

@@ -1,5 +1,5 @@
 /**
- * SPEC.md §8 acceptance 5, run against a real `@atriarch/activity-hub`
+ * SPEC.md §8 acceptance 5, run against a real `@atriarch/tracery-hub`
  * (workstream D, `apps/hub`) serving this app's built UI at `/ui` -- the
  * scenario `explorer.mocked.spec.ts` fakes with a WebSocket mock. This spec
  * self-skips (the whole `describe` block) until `apps/hub/dist` and
@@ -14,8 +14,8 @@
  * spawns a throwaway local hub on a fixed test port.
  *
  * SPEC.md §8 acceptance 5 also asks this to run "against the running
- * container" from acceptance step 3. Set `ACTIVITY_HUB_URL` (and
- * `ACTIVITY_API_KEY`, needing `ingest`+`read`+`admin` -- the dev key printed
+ * container" from acceptance step 3. Set `TRACERY_HUB_URL` (and
+ * `TRACERY_API_KEY`, needing `ingest`+`read`+`admin` -- the dev key printed
  * in `docker logs` has all three) to point this spec at any already-running
  * hub -- a Docker container, or otherwise -- instead of spawning a local
  * one; it seeds the same fixture trace there and skips the spawn/kill of a
@@ -28,16 +28,16 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { sampleTraceEvents, sampleFlowIds } from '@atriarch/activity-core/fixtures';
-import { ACTIVITY_CONTRACT_VERSION } from '@atriarch/activity-core';
+import { sampleTraceEvents, sampleFlowIds } from '@atriarch/tracery-core/fixtures';
+import { ACTIVITY_CONTRACT_VERSION } from '@atriarch/tracery-core';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const hubRoot = path.resolve(__dirname, '../../'); // apps/hub
 const hubBin = path.join(hubRoot, 'bin', 'hub.mjs');
 const hubDistExists = fs.existsSync(path.join(hubRoot, 'dist')) && fs.existsSync(hubBin);
 
-const EXTERNAL_HUB_URL = process.env.ACTIVITY_HUB_URL?.trim();
-const EXTERNAL_API_KEY = process.env.ACTIVITY_API_KEY?.trim();
+const EXTERNAL_HUB_URL = process.env.TRACERY_HUB_URL?.trim();
+const EXTERNAL_API_KEY = process.env.TRACERY_API_KEY?.trim();
 const useExternalHub = Boolean(EXTERNAL_HUB_URL && EXTERNAL_API_KEY);
 
 const PORT = 18971;
@@ -75,7 +75,7 @@ async function seedFixtureTrace(): Promise<void> {
 
 async function primeSession(page: Page): Promise<void> {
   await page.addInitScript(
-    (session) => window.sessionStorage.setItem('atriarch-activity-hub-session', JSON.stringify(session)),
+    (session) => window.sessionStorage.setItem('atriarch-tracery-hub-session', JSON.stringify(session)),
     { baseUrl: BASE_URL, apiKey: API_KEY, workspace: WORKSPACE },
   );
   await page.goto(`${BASE_URL}/ui/`);
@@ -84,21 +84,21 @@ async function primeSession(page: Page): Promise<void> {
 test.describe('real hub', () => {
   test.skip(
     !useExternalHub && !hubDistExists,
-    'apps/hub is not built yet (no dist/ or bin/hub.mjs) -- this spec runs once workstream D ships it, or point it at an already-running hub with ACTIVITY_HUB_URL/ACTIVITY_API_KEY',
+    'apps/hub is not built yet (no dist/ or bin/hub.mjs) -- this spec runs once workstream D ships it, or point it at an already-running hub with TRACERY_HUB_URL/TRACERY_API_KEY',
   );
 
   let hub: ChildProcess | undefined;
 
   test.beforeAll(async () => {
     if (useExternalHub) {
-      console.log(`explorer.real-hub.spec.ts: targeting external hub at ${BASE_URL} (ACTIVITY_HUB_URL set)`);
+      console.log(`explorer.real-hub.spec.ts: targeting external hub at ${BASE_URL} (TRACERY_HUB_URL set)`);
     } else {
       hub = spawn(process.execPath, [hubBin], {
         cwd: hubRoot,
         env: {
           ...process.env,
-          ACTIVITY_PORT: String(PORT),
-          ACTIVITY_API_KEYS: JSON.stringify([{ id: 'e2e', key: API_KEY, workspace: WORKSPACE, roles: ['ingest', 'read', 'admin'] }]),
+          TRACERY_PORT: String(PORT),
+          TRACERY_API_KEYS: JSON.stringify([{ id: 'e2e', key: API_KEY, workspace: WORKSPACE, roles: ['ingest', 'read', 'admin'] }]),
         },
         stdio: 'pipe',
       });

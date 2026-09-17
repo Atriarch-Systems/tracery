@@ -65,7 +65,7 @@ interface RawApiKey {
   readonly roles?: unknown;
 }
 
-/** Parses `ACTIVITY_API_KEYS` (a JSON array) or the contents of `ACTIVITY_API_KEYS_FILE`. */
+/** Parses `TRACERY_API_KEYS` (a JSON array) or the contents of `TRACERY_API_KEYS_FILE`. */
 export function parseApiKeys(json: string, source: string): ApiKeyConfig[] {
   let raw: unknown;
   try {
@@ -92,31 +92,31 @@ export function parseApiKeys(json: string, source: string): ApiKeyConfig[] {
 }
 
 function loadApiKeys(env: NodeJS.ProcessEnv): readonly ApiKeyConfig[] | undefined {
-  const inline = env.ACTIVITY_API_KEYS;
+  const inline = env.TRACERY_API_KEYS;
   if (inline !== undefined && inline.trim() !== '') {
-    return parseApiKeys(inline, 'ACTIVITY_API_KEYS');
+    return parseApiKeys(inline, 'TRACERY_API_KEYS');
   }
-  const file = env.ACTIVITY_API_KEYS_FILE;
+  const file = env.TRACERY_API_KEYS_FILE;
   if (file !== undefined && file.trim() !== '') {
     const contents = fs.readFileSync(file, 'utf8');
-    return parseApiKeys(contents, `ACTIVITY_API_KEYS_FILE (${file})`);
+    return parseApiKeys(contents, `TRACERY_API_KEYS_FILE (${file})`);
   }
   return undefined;
 }
 
 /** Reads every hub environment variable, applying defaults. Never touches `process.env` directly (pass it in). */
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
-  const store = env.ACTIVITY_STORE === 'sqlite' ? 'sqlite' : 'memory';
+  const store = env.TRACERY_STORE === 'sqlite' ? 'sqlite' : 'memory';
   return {
-    port: parseNumber(env.ACTIVITY_PORT, 8971, 'ACTIVITY_PORT'),
-    host: env.ACTIVITY_HOST ?? '0.0.0.0',
+    port: parseNumber(env.TRACERY_PORT, 8971, 'TRACERY_PORT'),
+    host: env.TRACERY_HOST ?? '0.0.0.0',
     store,
-    sqlitePath: env.ACTIVITY_SQLITE_PATH ?? '/data/activity.db',
+    sqlitePath: env.TRACERY_SQLITE_PATH ?? '/data/tracery.db',
     apiKeys: loadApiKeys(env),
-    retentionHours: parseNumber(env.ACTIVITY_RETENTION_HOURS, 72, 'ACTIVITY_RETENTION_HOURS'),
-    maxEventsPerWorkspace: parseNumber(env.ACTIVITY_MAX_EVENTS_PER_WORKSPACE, 500_000, 'ACTIVITY_MAX_EVENTS_PER_WORKSPACE'),
-    metricsToken: env.ACTIVITY_METRICS_TOKEN && env.ACTIVITY_METRICS_TOKEN.length > 0 ? env.ACTIVITY_METRICS_TOKEN : undefined,
-    logLevel: env.ACTIVITY_LOG_LEVEL ?? 'info',
-    uiDir: env.ACTIVITY_UI_DIR ?? defaultUiDir(),
+    retentionHours: parseNumber(env.TRACERY_RETENTION_HOURS, 72, 'TRACERY_RETENTION_HOURS'),
+    maxEventsPerWorkspace: parseNumber(env.TRACERY_MAX_EVENTS_PER_WORKSPACE, 500_000, 'TRACERY_MAX_EVENTS_PER_WORKSPACE'),
+    metricsToken: env.TRACERY_METRICS_TOKEN && env.TRACERY_METRICS_TOKEN.length > 0 ? env.TRACERY_METRICS_TOKEN : undefined,
+    logLevel: env.TRACERY_LOG_LEVEL ?? 'info',
+    uiDir: env.TRACERY_UI_DIR ?? defaultUiDir(),
   };
 }

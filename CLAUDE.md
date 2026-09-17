@@ -1,4 +1,4 @@
-# CLAUDE.md — atriarch-activity
+# CLAUDE.md — Tracery
 
 Agent activity graphs: an event contract, pure reducers, a React canvas
 visualizer, emitter SDKs (TS + Python) and a standalone hub server that stores
@@ -11,12 +11,12 @@ the wire contract; a change there is a versioned contract change with a golden t
 
 | Path | Package | What |
 | --- | --- | --- |
-| `packages/core` | `@atriarch/activity-core` | contract, validation, journal, flows, traces, projection. No DOM, no React. |
-| `packages/visualizer` | `@atriarch/activity-visualizer` | canvas component (moved here from atriarch-agentkit). |
-| `packages/react` | `@atriarch/activity-react` | `ActivityExplorer` composite + live-source hooks. |
-| `packages/client` | `@atriarch/activity-client` | TS emitter SDK + hub read client. |
-| `clients/python` | `atriarch-activity` | Python emitter SDK, stdlib only, `atriarch.activity`. |
-| `apps/hub` | `@atriarch/activity-hub` | Fastify server, stores, live feed, hosted UI, Docker, k8s. |
+| `packages/core` | `@atriarch/tracery-core` | contract, validation, journal, flows, traces, projection. No DOM, no React. |
+| `packages/visualizer` | `@atriarch/tracery-visualizer` | canvas component (moved here from atriarch-agentkit). |
+| `packages/react` | `@atriarch/tracery-react` | `ActivityExplorer` composite + live-source hooks. |
+| `packages/client` | `@atriarch/tracery-client` | TS emitter SDK + hub read client. |
+| `clients/python` | `atriarch-tracery` | Python emitter SDK, stdlib only, `atriarch.tracery`. |
+| `apps/hub` | `@atriarch/tracery-hub` | Fastify server, stores, live feed, hosted UI, Docker, k8s. |
 | `apps/hub/ee` | commercial | license gate, audit log, RBAC. |
 
 ## Conventions
@@ -33,7 +33,7 @@ the wire contract; a change there is a versioned contract change with a golden t
 ```bash
 npm ci && npm run build && npm test            # all workspaces
 python -m pip install -e clients/python[dev] && python -m pytest -q clients/python
-docker build -f apps/hub/Dockerfile -t atriarch-activity-hub .
+docker build -f apps/hub/Dockerfile -t atriarch/tracery-hub .
 node scripts/demo.mjs                           # end-to-end against a running hub
 ```
 

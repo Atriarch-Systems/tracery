@@ -4,7 +4,7 @@
  * live view of the flows known so far plus enough connection state to render
  * a status indicator; it never exposes the transport (Journal, HubClient) itself.
  */
-import type { Flow } from '@atriarch/activity-core';
+import type { Flow } from '@atriarch/tracery-core';
 
 export type ConnectionStatus = 'connecting' | 'live' | 'reconnecting' | 'polling' | 'offline';
 

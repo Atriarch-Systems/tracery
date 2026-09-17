@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { MemoryStore } from '../dist/store/memory.js';
 import { SqliteStore } from '../dist/store/sqlite.js';
-import { ACTIVITY_CONTRACT_VERSION } from '@atriarch/activity-core/contract';
+import { ACTIVITY_CONTRACT_VERSION } from '@atriarch/tracery-core/contract';
 
 export function evt(overrides) {
   return {
@@ -33,7 +33,7 @@ export const storeEngines = [
   {
     name: 'SqliteStore',
     async create() {
-      const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'activity-hub-sqlite-'));
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tracery-hub-sqlite-'));
       const file = path.join(dir, 'test.db');
       const store = new SqliteStore(file);
       return {

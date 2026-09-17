@@ -1,53 +1,53 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: activity-hub
-  namespace: activity
+  name: tracery-hub
+  namespace: tracery
   labels:
-    app.kubernetes.io/name: activity-hub
+    app.kubernetes.io/name: tracery-hub
 spec:
   replicas: 1 # SqliteStore/MemoryStore are single-writer; do not scale this beyond 1 until a shared store (Postgres, SPEC.md §6 follow-up) lands.
   strategy:
     type: Recreate
   selector:
     matchLabels:
-      app.kubernetes.io/name: activity-hub
+      app.kubernetes.io/name: tracery-hub
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: activity-hub
+        app.kubernetes.io/name: tracery-hub
     spec:
       securityContext:
         runAsNonRoot: true
       containers:
         - name: hub
-          image: atriarch/activity-hub:0.1.0
+          image: atriarch/tracery-hub:0.1.0
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
               containerPort: 8971
           env:
-            - name: ACTIVITY_PORT
+            - name: TRACERY_PORT
               value: "8971"
-            - name: ACTIVITY_HOST
+            - name: TRACERY_HOST
               value: "0.0.0.0"
-            - name: ACTIVITY_STORE
+            - name: TRACERY_STORE
               value: sqlite
-            - name: ACTIVITY_SQLITE_PATH
-              value: /data/activity.db
-            - name: ACTIVITY_API_KEYS_FILE
-              value: /etc/activity/keys.json
-            - name: ACTIVITY_RETENTION_HOURS
+            - name: TRACERY_SQLITE_PATH
+              value: /data/tracery.db
+            - name: TRACERY_API_KEYS_FILE
+              value: /etc/tracery/keys.json
+            - name: TRACERY_RETENTION_HOURS
               value: "72"
-            - name: ACTIVITY_MAX_EVENTS_PER_WORKSPACE
+            - name: TRACERY_MAX_EVENTS_PER_WORKSPACE
               value: "500000"
-            - name: ACTIVITY_LOG_LEVEL
+            - name: TRACERY_LOG_LEVEL
               value: info
           volumeMounts:
             - name: data
               mountPath: /data
             - name: keys
-              mountPath: /etc/activity
+              mountPath: /etc/tracery
               readOnly: true
           readinessProbe:
             httpGet:
@@ -70,7 +70,7 @@ spec:
       volumes:
         - name: data
           persistentVolumeClaim:
-            claimName: activity-hub-data
+            claimName: tracery-hub-data
         - name: keys
           secret:
-            secretName: activity-hub-keys
+            secretName: tracery-hub-keys

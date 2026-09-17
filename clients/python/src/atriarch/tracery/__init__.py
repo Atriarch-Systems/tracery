@@ -1,4 +1,4 @@
-"""Atriarch Activity: Python emitter SDK for the Atriarch Activity contract.
+"""Tracery: Python emitter SDK for the Tracery contract.
 
 Stdlib only at runtime. See docs/SPEC.md §5 for the API this implements and
 the repo README for a quick start (a parent flow spawning a subagent flow

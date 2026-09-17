@@ -1,4 +1,4 @@
-import type { ActivityFrame, StoredEvent } from '@atriarch/activity-core';
+import type { ActivityFrame, StoredEvent } from '@atriarch/tracery-core';
 import type { FlowSummary, ListFlowsQuery, ListFlowsResult, Trace } from './hub-types.stub.js';
 
 export interface HubClientOptions {

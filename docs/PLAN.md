@@ -22,11 +22,11 @@ before writing code. Rules for every workstream:
 ## A — core reducers
 
 Owns: `packages/core`.
-Deliver: `package.json` (`@atriarch/activity-core` 0.1.0, MIT), `tsconfig.json`
+Deliver: `package.json` (`@atriarch/tracery-core` 0.1.0, MIT), `tsconfig.json`
 extending `../../tsconfig.base.json`, `src/` implementing SPEC §1–§2:
 `contract.ts` (given), `validate.ts`, `journal.ts`, `flows.ts`, `trace.ts`,
 `project.ts`, `catalog.ts`, `index.ts`. Type-only dependency on
-`@atriarch/activity-visualizer/types`.
+`@atriarch/tracery-visualizer/types`.
 Tests (`tests/*.test.mjs`): validation accept/reject matrix; dedupe; ordering by
 ts/seq; op lifecycle table; end-without-start marks partial; flow status matrix;
 trace resolution incl. parent arriving late, explicit `trace`, missing parent,
@@ -51,7 +51,7 @@ Owns: `packages/client`, `clients/python`.
 Deliver: SPEC §5. TS: `ActivityTracer`, `Flow`, `Op`, transports, ULID,
 `HubClient`; tests with a local `node:http` fake hub asserting batching,
 retry/backoff, queue bound + drop counter, `spawnLink`, `durationMs`, flush on
-close. Python: `pyproject.toml` (`atriarch-activity` 0.1.0, `requires-python >=3.11`,
+close. Python: `pyproject.toml` (`atriarch-tracery` 0.1.0, `requires-python >=3.11`,
 `[project.optional-dependencies] dev = ["pytest"]`), `src/atriarch/activity/`,
 `tests/` with `http.server` fake hub; same assertions plus context managers,
 `contextvars` parent propagation, exception → `error` with class name only.
@@ -129,8 +129,8 @@ subagent's SessionStart (if it carries its own session id) or its tool calls
 attach as a child flow via `link.parentFlow`/`parentOp`; SubagentStop → child
 flow end; Stop / SessionEnd → flow end; PreCompact → annotate. The emitter is a
 single zero-dependency Node script: reads the hook JSON from stdin, builds
-events, POSTs to `${ACTIVITY_HUB_URL}/v1/events` with `ACTIVITY_API_KEY`, 2 s
-timeout, spools to `${TMP}/atriarch-activity/spool.ndjson` on failure and
+events, POSTs to `${TRACERY_HUB_URL}/v1/events` with `TRACERY_API_KEY`, 2 s
+timeout, spools to `${TMP}/tracery/spool.ndjson` on failure and
 drains the spool on the next call, always exits 0, logs nothing to stdout.
 Include a `/activity` skill that prints the hub deep link for the current
 session. Tests: node:test feeding recorded hook payloads through the mapper and

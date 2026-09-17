@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
-import { ActivityExplorer, useHubSource } from '@atriarch/activity-react';
-import type { Scope } from '@atriarch/activity-core';
+import { ActivityExplorer, useHubSource } from '@atriarch/tracery-react';
+import type { Scope } from '@atriarch/tracery-core';
 import { useRoute, type Route } from './router.js';
 import { KeyEntry } from './KeyEntry.js';
 import { loadSession, saveSession, clearSession, type HubSession } from './session.js';
@@ -60,7 +60,7 @@ function Explorer({ session, route, onSignOut }: { readonly session: HubSession;
           fontSize: 13,
         }}
       >
-        <strong>Atriarch Activity</strong>
+        <strong>Tracery</strong>
         <span>
           workspace: <span data-testid="workspace-name">{session.workspace ?? 'default'}</span>
         </span>
@@ -78,7 +78,7 @@ function Explorer({ session, route, onSignOut }: { readonly session: HubSession;
         </button>
       </header>
       <div style={{ flex: '1 1 auto', minHeight: 0 }}>
-        <ActivityExplorer source={source} initialScope={initialScope} ariaLabel="Atriarch Activity hosted explorer" />
+        <ActivityExplorer source={source} initialScope={initialScope} ariaLabel="Tracery hosted explorer" />
       </div>
     </div>
   );

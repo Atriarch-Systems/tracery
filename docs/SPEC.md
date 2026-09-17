@@ -1,6 +1,6 @@
-# Atriarch Activity — specification (v1)
+# Tracery — specification (v1)
 
-Atriarch Activity turns agent activity events into live, inspectable graphs. An
+Tracery by Atriarch Systems turns agent activity events into live, inspectable graphs. An
 application pushes small events ("op X started on node Y in flow Z"); the library
 or the hub turns them into flows, node histories and a drawable graph. When one
 flow spawns another (an agent starting a subagent), the child links to its parent
@@ -8,9 +8,9 @@ and the whole tree renders as one trace.
 
 Three ways to use it:
 
-1. **Library.** Import `@atriarch/activity-core` + `@atriarch/activity-react` and
+1. **Library.** Import `@atriarch/tracery-core` + `@atriarch/tracery-react` and
    render the graph in your own app from your own event stream.
-2. **Hub.** Run `@atriarch/activity-hub` as a container. Apps push events with a
+2. **Hub.** Run `@atriarch/tracery-hub` as a container. Apps push events with a
    client SDK; the hub stores, sorts, serves and draws. Nothing renders in the app.
 3. **Both.** Embed the React explorer in your app but point it at the hub.
 
@@ -25,12 +25,12 @@ Three ways to use it:
 ## Repository layout
 
 ```
-packages/core          @atriarch/activity-core        contract, validation, journal, reducers, trace assembly (no DOM, no React)
-packages/visualizer    @atriarch/activity-visualizer  the canvas component (moved from agentkit, MIT)
-packages/react         @atriarch/activity-react       ActivityExplorer composite + hooks (live feed, hub client)
-packages/client        @atriarch/activity-client      TS emitter SDK (batching HTTP transport) + hub read client
-clients/python         atriarch-activity              Python emitter SDK, stdlib only, namespace package atriarch.activity
-apps/hub               @atriarch/activity-hub         standalone server + hosted UI (apps/hub/web) + Dockerfile + k8s
+packages/core          @atriarch/tracery-core        contract, validation, journal, reducers, trace assembly (no DOM, no React)
+packages/visualizer    @atriarch/tracery-visualizer  the canvas component (moved from agentkit, MIT)
+packages/react         @atriarch/tracery-react       ActivityExplorer composite + hooks (live feed, hub client)
+packages/client        @atriarch/tracery-client      TS emitter SDK (batching HTTP transport) + hub read client
+clients/python         atriarch-tracery               Python emitter SDK, stdlib only, namespace package atriarch.tracery
+apps/hub               @atriarch/tracery-hub         standalone server + hosted UI (apps/hub/web) + Dockerfile + k8s
 apps/hub/ee            enterprise layer (license gate, audit log, RBAC) under a commercial license
 docs/                  SPEC.md (this), PLAN.md (workstreams), ENTERPRISE.md
 ```
@@ -111,7 +111,7 @@ Cycles in links are broken by treating the first flow seen as the root.
 
 The Virali adapter is a follow-up in the Virali repo, not part of this repo.
 
-## 2. Core reducers (`@atriarch/activity-core`)
+## 2. Core reducers (`@atriarch/tracery-core`)
 
 All pure, renderer-free, importable in Node and browsers.
 
@@ -181,11 +181,11 @@ Projection rules:
 - `catalog` lets the caller map `kind` to `NodePresentation`; a default catalog
   ships (`agent`, `subagent`, `llm`, `tool`, `memory`, `guard`, `human`, `service`, fallback).
 
-`@atriarch/activity-core` depends on `@atriarch/activity-visualizer/types` for
+`@atriarch/tracery-core` depends on `@atriarch/tracery-visualizer/types` for
 the `ActivityNode` / `ActivityEdge` / `NodePresentation` types only (a type-only
 import; no renderer code is pulled in).
 
-## 3. Visualizer (`@atriarch/activity-visualizer`) additions
+## 3. Visualizer (`@atriarch/tracery-visualizer`) additions
 
 Keep the existing contract (`VISUALIZER_CONTRACT_VERSION` becomes 2). Add:
 
@@ -201,7 +201,7 @@ Keep the existing contract (`VISUALIZER_CONTRACT_VERSION` becomes 2). Add:
 - Tests for each; SSR test still passes; `npm pack` produces a tarball that Virali
   can drop into `vendor/` unchanged in shape.
 
-## 4. React explorer (`@atriarch/activity-react`)
+## 4. React explorer (`@atriarch/tracery-react`)
 
 ```tsx
 <ActivityExplorer
@@ -219,8 +219,8 @@ showing the selected node's ops newest-first with status, timing, merged context
 (pretty JSON, collapsible) and the annotate timeline, and a group legend in trace
 mode. Double-clicking a child flow's group (or a spawn edge target) switches scope
 to that flow. Keyboard: `1/2/3` switch scope. Tailwind is not required; styles are
-inline or a single CSS module with CSS variables for theming (`--activity-bg`,
-`--activity-fg`, `--activity-accent`).
+inline or a single CSS module with CSS variables for theming (`--tracery-bg`,
+`--tracery-fg`, `--tracery-accent`).
 
 Hooks: `useHubSource` (WS live feed with snapshot + reconnect from cursor, falls
 back to polling `GET /v1/flows/:id/events?after=`), `useJournalSource` (in-process
@@ -228,7 +228,7 @@ journal), `useProjection(source, scope, options)`.
 
 ## 5. Client SDKs
 
-### TypeScript (`@atriarch/activity-client`)
+### TypeScript (`@atriarch/tracery-client`)
 
 ```ts
 const tracer = new ActivityTracer({ transport: httpTransport({ baseUrl, apiKey, workspace }),
@@ -244,13 +244,13 @@ flow.end(); await tracer.flush(); await tracer.close();
 Transports: `httpTransport` (batches, retries with backoff, never throws into
 the caller, drops with a counter when the queue exceeds `maxQueue`),
 `memoryTransport` (tests), `journalTransport(journal)` (in-process, feeds
-`@atriarch/activity-core` directly for the library-only path). Ids are ULIDs
+`@atriarch/tracery-core` directly for the library-only path). Ids are ULIDs
 generated locally (no dependency; implement the 26-char Crockford ULID).
 
 `HubClient` (read side): `listFlows`, `getFlow`, `getTrace`, `events(flow, after)`,
 `live(filter, onFrame)` returning a disposer; Node and browser (`WebSocket` global).
 
-### Python (`clients/python`, distribution `atriarch-activity`, module `atriarch.activity`)
+### Python (`clients/python`, distribution `atriarch-tracery`, module `atriarch.tracery`)
 
 Same shape: `ActivityTracer`, `Flow`, `Op`, `HttpTransport` (background thread,
 `queue.Queue`, `urllib.request`, bounded, never blocks the producer),
@@ -260,7 +260,7 @@ carry the current flow/op so nested calls get `parentOp` without plumbing.
 `flow.spawn_link(op)` returns a dict for a subagent. No third-party deps.
 Type hints, `py.typed`, PEP-420 namespace (no `atriarch/__init__.py`).
 
-## 6. Hub (`@atriarch/activity-hub`)
+## 6. Hub (`@atriarch/tracery-hub`)
 
 Fastify 5 on Node 22. Configuration by environment variables (documented in
 `apps/hub/README.md`), all with defaults so `docker run -p 8971:8971 image`
@@ -287,8 +287,8 @@ Errors are `{ error: { code, message } }`. Every request gets `x-request-id`.
 
 ### Auth
 
-API keys. `ACTIVITY_API_KEYS` is a JSON array: `[{ "id": "saga", "key": "...", "workspace": "default", "roles": ["ingest","read"] }]`;
-or `ACTIVITY_API_KEYS_FILE` path. A key with `workspace: "*"` and role `admin`
+API keys. `TRACERY_API_KEYS` is a JSON array: `[{ "id": "saga", "key": "...", "workspace": "default", "roles": ["ingest","read"] }]`;
+or `TRACERY_API_KEYS_FILE` path. A key with `workspace: "*"` and role `admin`
 is the operator key. With no keys configured the hub generates one dev key at
 boot, logs it, and grants all roles on workspace `default`. Keys are compared in
 constant time. `Authorization: Bearer <key>` or `x-api-key`. The workspace of a
@@ -301,7 +301,7 @@ request is the key's workspace, or the batch/query `workspace` when the key is
 `append`, `flowEvents`, `traceEvents`, `listFlows`, `flowSummary`, `deleteFlow`,
 `subscribe`, `sweep`, `stats`, `close`. Two implementations: `MemoryStore`
 (default, bounded) and `SqliteStore` (`node:sqlite`, WAL, file path from
-`ACTIVITY_SQLITE_PATH`, default `/data/activity.db` in the container). Flow
+`TRACERY_SQLITE_PATH`, default `/data/tracery.db` in the container). Flow
 summaries are materialised on append (a `flows` table) so listing is O(limit).
 The trace id of a flow is resolved on append and stored; when a parent arrives
 after a child, the child's stored trace is corrected. Postgres is a documented
@@ -309,7 +309,7 @@ follow-up behind the same interface.
 
 ### Retention
 
-`ACTIVITY_RETENTION_HOURS` (default 72) and `ACTIVITY_MAX_EVENTS_PER_WORKSPACE`
+`TRACERY_RETENTION_HOURS` (default 72) and `TRACERY_MAX_EVENTS_PER_WORKSPACE`
 (default 500k). A sweeper runs every minute, deletes the oldest complete flows
 first, never a running flow younger than the retention window. `sweep` results
 feed `/metrics`.
@@ -324,7 +324,7 @@ store; if the cursor is older than what the store holds, a `snapshot` with
 
 ### Hosted UI (`apps/hub/web`)
 
-Vite + React 19 + `@atriarch/activity-react`. Built to `apps/hub/web/dist` and
+Vite + React 19 + `@atriarch/tracery-react`. Built to `apps/hub/web/dist` and
 served by the hub as static files. First load asks for a read key (kept in
 `sessionStorage`), then shows the workspace's flows. Deep links:
 `/ui/flows/:id`, `/ui/traces/:id`.
@@ -336,14 +336,14 @@ served by the hub as static files. First load asks for a read key (kept in
   `HEALTHCHECK` on `/healthz`.
 - `apps/hub/docker-compose.yaml`: hub + volume, example keys file.
 - `apps/hub/k8s/`: Deployment, Service, PVC, example Secret; plain manifests (Kustomize-friendly).
-- `npx @atriarch/activity-hub` starts the server (bin entry).
+- `npx @atriarch/tracery-hub` starts the server (bin entry).
 
 ## 7. Enterprise layer (`apps/hub/ee`)
 
 Open core. Everything outside `apps/hub/ee` is MIT. `apps/hub/ee/LICENSE` is the
 Atriarch Commercial License (source-available, use requires a valid license key).
 
-- **License key**: `ACTIVITY_LICENSE_KEY` is `base64url(payload).base64url(ed25519 signature)`;
+- **License key**: `TRACERY_LICENSE_KEY` is `base64url(payload).base64url(ed25519 signature)`;
   payload `{ sub, org, features: string[], seats?, exp }`. Verified with an
   embedded public key via `node:crypto` (`crypto.verify(null, data, publicKey, sig)` for ed25519).
   A CLI `apps/hub/ee/scripts/mint-license.mjs` signs with a private key from a file
@@ -381,7 +381,7 @@ repo, executed by the integration workstream:
 
 ## 9. Decisions owed to Dan
 
-- Product name and npm org. Working name "Atriarch Activity", scope `@atriarch/activity-*`, hub image `atriarch/activity-hub`.
+- Product name and npm org. Working name "Tracery", scope `@atriarch/tracery-*`, hub image `atriarch/tracery-hub`.
 - Commercial license text for `apps/hub/ee` (a placeholder is included; legal wording is Dan's).
 - Whether to publish to npmjs.com or only the internal Nexus.
 - Whether Virali's dashboard switches to the hub or keeps its embedded journal.

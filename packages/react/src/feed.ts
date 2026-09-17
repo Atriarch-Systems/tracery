@@ -10,7 +10,7 @@
  * `polling` -- this reducer never moves the feed back to `live` on its own;
  * the hook may start a fresh socket and feed a `frame` action to recover.
  */
-import type { ActivityFrame } from '@atriarch/activity-client';
+import type { ActivityFrame } from '@atriarch/tracery-client';
 
 export type FeedStatus = 'connecting' | 'live' | 'reconnecting' | 'polling';
 

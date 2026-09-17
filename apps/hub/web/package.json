@@ -1,9 +1,9 @@
 {
-  "name": "@atriarch/activity-hub-web",
+  "name": "@atriarch/tracery-hub-web",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Hosted explorer for @atriarch/activity-hub (SPEC.md §6 \"Hosted UI\"): key entry, flow/trace deep links, ActivityExplorer full-screen. Built to dist/ and served by the hub at /ui.",
+  "description": "Hosted explorer for @atriarch/tracery-hub (SPEC.md §6 \"Hosted UI\"): key entry, flow/trace deep links, ActivityExplorer full-screen. Built to dist/ and served by the hub at /ui.",
   "scripts": {
     "dev": "vite",
     "build": "tsc -p tsconfig.json --noEmit && vite build",
@@ -11,8 +11,8 @@
     "test": "playwright test"
   },
   "dependencies": {
-    "@atriarch/activity-core": "*",
-    "@atriarch/activity-react": "*",
+    "@atriarch/tracery-core": "*",
+    "@atriarch/tracery-react": "*",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },

@@ -14,7 +14,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const emitPath = join(here, '..', 'hooks', 'emit.mjs');
 
 async function makeDataDir() {
-  return mkdtemp(join(tmpdir(), 'atriarch-activity-emit-test-'));
+  return mkdtemp(join(tmpdir(), 'tracery-emit-test-'));
 }
 
 function runEmit(payload, env, dataDir) {
@@ -59,8 +59,8 @@ test('no config at all: exits 0 silently and writes nothing', async () => {
     const { code, stdout, stderr } = await runEmit(sessionStartPayload('sess-noconf'), {
       CLAUDE_PLUGIN_OPTION_HUB_URL: '',
       CLAUDE_PLUGIN_OPTION_API_KEY: '',
-      ACTIVITY_HUB_URL: '',
-      ACTIVITY_API_KEY: '',
+      TRACERY_HUB_URL: '',
+      TRACERY_API_KEY: '',
     }, dataDir);
     assert.equal(code, 0);
     assert.equal(stdout, '');

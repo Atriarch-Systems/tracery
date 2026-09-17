@@ -6,7 +6,7 @@
  */
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { WebSocket } from 'ws';
-import type { ActivityFrame, StoredEvent } from '@atriarch/activity-core/contract';
+import type { ActivityFrame, StoredEvent } from '@atriarch/tracery-core/contract';
 import { authenticate, AuthError, type AuthContext } from './auth.js';
 import type { ApiKeyConfig } from './config.js';
 import type { EventStore } from './store/types.js';
@@ -84,7 +84,7 @@ export function registerLive(app: FastifyInstance, deps: LiveDeps): void {
     const drop = (): void => {
       if (closed) return;
       closed = true;
-      request.log.warn({ keyId: auth.keyId }, 'activity live: slow client dropped after 2s send deadline');
+      request.log.warn({ keyId: auth.keyId }, 'tracery live: slow client dropped after 2s send deadline');
       socket.terminate();
     };
 

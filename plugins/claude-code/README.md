@@ -1,7 +1,7 @@
-# atriarch-activity (Claude Code plugin)
+# tracery (Claude Code plugin)
 
 Streams Claude Code session, tool-call and subagent activity to an
-[Atriarch Activity](../../docs/SPEC.md) hub, so a running session shows up as a
+[Tracery](../../docs/SPEC.md) hub, so a running session shows up as a
 live flow graph instead of only scrollback. See
 [`../../docs/CLAUDE-CODE-PLUGIN.md`](../../docs/CLAUDE-CODE-PLUGIN.md) for the
 full reference (mapping table, privacy details, troubleshooting). This file is
@@ -15,7 +15,7 @@ For development, point Claude Code straight at this directory:
 claude --plugin-dir ./plugins/claude-code
 ```
 
-From a marketplace: `/plugin install atriarch-activity@<marketplace>`.
+From a marketplace: `/plugin install tracery@<marketplace>`.
 
 ## Configure
 
@@ -27,10 +27,10 @@ variables, which work the same way whether or not the plugin system's
 
 | Env var | Same as userConfig | Required | Default |
 | --- | --- | --- | --- |
-| `ACTIVITY_HUB_URL` | `hub_url` | yes | -- |
-| `ACTIVITY_API_KEY` | `api_key` | yes | -- |
-| `ACTIVITY_WORKSPACE` | `workspace` | no | `default` |
-| `ACTIVITY_INCLUDE_PROMPTS` | `include_prompts` | no | `false` (`1`/`true`/`yes` to enable) |
+| `TRACERY_HUB_URL` | `hub_url` | yes | -- |
+| `TRACERY_API_KEY` | `api_key` | yes | -- |
+| `TRACERY_WORKSPACE` | `workspace` | no | `default` |
+| `TRACERY_INCLUDE_PROMPTS` | `include_prompts` | no | `false` (`1`/`true`/`yes` to enable) |
 
 With neither `hub_url` nor `api_key` set, every hook is a silent no-op --
 installing the plugin without configuring it does nothing. `api_key` needs
@@ -51,16 +51,16 @@ mapping table, the correlation heuristic, and what never leaves the machine:
 ## The `activity` skill
 
 Ask "what's the activity link for this session" (or run
-`/atriarch-activity:activity`) to get the hub deep link for the running
+`/tracery:activity`) to get the hub deep link for the running
 session's flow.
 
 ## Troubleshooting
 
 - **State**: `${CLAUDE_PLUGIN_DATA}/state/<session_id>.json` (falls back to
-  `<tmpdir>/atriarch-activity/state/` when `CLAUDE_PLUGIN_DATA` is unset --
+  `<tmpdir>/tracery/state/` when `CLAUDE_PLUGIN_DATA` is unset --
   true outside a real plugin install, e.g. running the hooks by hand).
 - **Spool**: `${CLAUDE_PLUGIN_DATA}/spool.ndjson` (or
-  `<tmpdir>/atriarch-activity/spool.ndjson`) is newline-delimited JSON
+  `<tmpdir>/tracery/spool.ndjson`) is newline-delimited JSON
   events. Growing and not shrinking means the hub is unreachable, rejecting
   the API key, or `hub_url`/`api_key` are misconfigured; delete it to drop
   unsent history.

@@ -78,7 +78,7 @@ class HttpTransport:
         self._dropped = 0
         self._closed = False
 
-        self._thread = threading.Thread(target=self._run, name="atriarch-activity-http-transport", daemon=True)
+        self._thread = threading.Thread(target=self._run, name="atriarch-tracery-http-transport", daemon=True)
         self._thread.start()
 
     @property

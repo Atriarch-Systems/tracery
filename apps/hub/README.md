@@ -1,12 +1,12 @@
-# @atriarch/activity-hub
+# @atriarch/tracery-hub
 
-Standalone server for Atriarch Activity (see [`../../docs/SPEC.md`](../../docs/SPEC.md)
-§6). Apps push events with a client SDK (`@atriarch/activity-client` or the
-Python `atriarch-activity`); the hub stores, sorts, serves and draws. Nothing
+Standalone server for Tracery (see [`../../docs/SPEC.md`](../../docs/SPEC.md)
+§6). Apps push events with a client SDK (`@atriarch/tracery-client` or the
+Python `atriarch-tracery`); the hub stores, sorts, serves and draws. Nothing
 renders in the producing app.
 
 ```
-npx @atriarch/activity-hub
+npx @atriarch/tracery-hub
 ```
 
 starts the server with an in-memory store and a printed dev API key -- every
@@ -16,21 +16,21 @@ setting below has a default, so this works out of the box.
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
-| `ACTIVITY_PORT` | `8971` | HTTP/WS listen port. |
-| `ACTIVITY_HOST` | `0.0.0.0` | HTTP/WS listen host. |
-| `ACTIVITY_STORE` | `memory` | `memory` or `sqlite`. |
-| `ACTIVITY_SQLITE_PATH` | `/data/activity.db` | Database file path, used only when `ACTIVITY_STORE=sqlite`. |
-| `ACTIVITY_API_KEYS` | unset | Inline JSON array of API keys (see below). |
-| `ACTIVITY_API_KEYS_FILE` | unset | Path to a JSON file with the same shape as `ACTIVITY_API_KEYS`. Ignored when `ACTIVITY_API_KEYS` is set. |
-| `ACTIVITY_RETENTION_HOURS` | `72` | Retention window; the sweeper deletes complete flows older than this. |
-| `ACTIVITY_MAX_EVENTS_PER_WORKSPACE` | `500000` | Soft per-workspace cap enforced by the sweeper (not a hard per-append limit). |
-| `ACTIVITY_METRICS_TOKEN` | unset | When set, `GET /metrics` requires it (`?token=`, `x-metrics-token`, or `Authorization: Bearer`). Unset means `/metrics` is public. |
-| `ACTIVITY_LOG_LEVEL` | `info` | Pino log level (`fatal`..`trace`, or `silent`). |
-| `ACTIVITY_UI_DIR` | `<package>/web/dist` | Directory to serve at `/ui`. When it (or its `index.html`) is missing, `/ui` serves a plain "not built" page instead. |
+| `TRACERY_PORT` | `8971` | HTTP/WS listen port. |
+| `TRACERY_HOST` | `0.0.0.0` | HTTP/WS listen host. |
+| `TRACERY_STORE` | `memory` | `memory` or `sqlite`. |
+| `TRACERY_SQLITE_PATH` | `/data/tracery.db` | Database file path, used only when `TRACERY_STORE=sqlite`. |
+| `TRACERY_API_KEYS` | unset | Inline JSON array of API keys (see below). |
+| `TRACERY_API_KEYS_FILE` | unset | Path to a JSON file with the same shape as `TRACERY_API_KEYS`. Ignored when `TRACERY_API_KEYS` is set. |
+| `TRACERY_RETENTION_HOURS` | `72` | Retention window; the sweeper deletes complete flows older than this. |
+| `TRACERY_MAX_EVENTS_PER_WORKSPACE` | `500000` | Soft per-workspace cap enforced by the sweeper (not a hard per-append limit). |
+| `TRACERY_METRICS_TOKEN` | unset | When set, `GET /metrics` requires it (`?token=`, `x-metrics-token`, or `Authorization: Bearer`). Unset means `/metrics` is public. |
+| `TRACERY_LOG_LEVEL` | `info` | Pino log level (`fatal`..`trace`, or `silent`). |
+| `TRACERY_UI_DIR` | `<package>/web/dist` | Directory to serve at `/ui`. When it (or its `index.html`) is missing, `/ui` serves a plain "not built" page instead. |
 
-With neither `ACTIVITY_API_KEYS` nor `ACTIVITY_API_KEYS_FILE` set, the hub
+With neither `TRACERY_API_KEYS` nor `TRACERY_API_KEYS_FILE` set, the hub
 generates one dev key at boot with all roles on workspace `default`, logs it
-once (`activity-hub: ... Generated a dev key ...`), and never persists it.
+once (`tracery-hub: ... Generated a dev key ...`), and never persists it.
 Use this for local development only.
 
 ### API key file format
@@ -76,9 +76,9 @@ spec at `GET /v1/openapi.json` (OpenAPI 3.1). Errors are always
 | `DELETE` | `/v1/flows/:id` | `admin` | Deletes a flow and its events. `404` when unknown. |
 | `GET` | `/healthz` | none | Liveness. |
 | `GET` | `/readyz` | none | Readiness (the store answered `stats()`). |
-| `GET` | `/metrics` | none, or `ACTIVITY_METRICS_TOKEN` | Prometheus text exposition. |
+| `GET` | `/metrics` | none, or `TRACERY_METRICS_TOKEN` | Prometheus text exposition. |
 | `WS` | `/v1/live?workspace=&flow=&trace=&after=&token=` | `read` | Live feed: a `snapshot` frame, then `events` frames as they're ingested, then a `heartbeat` frame every 15s. Reconnect with `after=<cursor>`; a stale cursor gets a fresh `truncated: true` snapshot instead of a gap. A client that can't keep up (2s send deadline) is disconnected. |
-| `GET` | `/`, `/ui/*` | none (the UI does its own key entry) | Hosted explorer, when `apps/hub/web` was built into `ACTIVITY_UI_DIR`; otherwise a plain placeholder page. |
+| `GET` | `/`, `/ui/*` | none (the UI does its own key entry) | Hosted explorer, when `apps/hub/web` was built into `TRACERY_UI_DIR`; otherwise a plain placeholder page. |
 
 `workspace` is resolved from the API key, except for the `*` operator key,
 which must be given one explicitly (`?workspace=` on every read/WS route,
@@ -86,24 +86,24 @@ which must be given one explicitly (`?workspace=` on every read/WS route,
 
 ### Metrics
 
-`GET /metrics` exposes: `activity_events_ingested_total`,
-`activity_events_rejected_total`, `activity_events_duplicate_total`,
-`activity_flows_total`, `activity_store_events`, `activity_ws_clients`,
-`activity_sweeps_total`, `activity_swept_flows_total`.
+`GET /metrics` exposes: `tracery_events_ingested_total`,
+`tracery_events_rejected_total`, `tracery_events_duplicate_total`,
+`tracery_flows_total`, `tracery_store_events`, `tracery_ws_clients`,
+`tracery_sweeps_total`, `tracery_swept_flows_total`.
 
 ## Storage
 
-Two `EventStore` implementations, selected by `ACTIVITY_STORE`:
+Two `EventStore` implementations, selected by `TRACERY_STORE`:
 
 - **`memory`** (default): everything in process memory. Simplest option;
   lost on restart.
 - **`sqlite`**: `node:sqlite` (`DatabaseSync`, WAL mode), file at
-  `ACTIVITY_SQLITE_PATH`. Events are the durable source of truth on disk;
+  `TRACERY_SQLITE_PATH`. Events are the durable source of truth on disk;
   flow/trace reduction is rebuilt from them into an in-memory index on
   startup and kept current on every write, so reads never touch disk. This
   keeps `SqliteStore` behaviourally identical to `MemoryStore` (both run the
-  exact same `@atriarch/activity-core` reduction) while adding durability
-  across restarts. It bounds memory use to what `ACTIVITY_MAX_EVENTS_PER_WORKSPACE`
+  exact same `@atriarch/tracery-core` reduction) while adding durability
+  across restarts. It bounds memory use to what `TRACERY_MAX_EVENTS_PER_WORKSPACE`
   allows; a Postgres-backed store (for horizontal scale / very large
   histories) is a documented follow-up, not built here.
 
@@ -114,12 +114,12 @@ child's (and any further descendants') `trace` automatically.
 ### Retention
 
 Every 60s, the sweeper deletes the oldest complete flows first -- oldest by
-`startedAt` -- until the workspace is both under `ACTIVITY_RETENTION_HOURS`
-and under `ACTIVITY_MAX_EVENTS_PER_WORKSPACE`. A `running` flow younger than
+`startedAt` -- until the workspace is both under `TRACERY_RETENTION_HOURS`
+and under `TRACERY_MAX_EVENTS_PER_WORKSPACE`. A `running` flow younger than
 the retention window is never swept; a `running` flow *older* than the
 window is treated as stale and is swept like any other (this is a safety
 valve against a producer that never sends `end`, not a guarantee that
-long-running flows survive indefinitely -- keep `ACTIVITY_RETENTION_HOURS`
+long-running flows survive indefinitely -- keep `TRACERY_RETENTION_HOURS`
 generous for genuinely long-running work).
 
 ## Docker
@@ -128,8 +128,8 @@ Build from the **repository root** (the image needs `packages/core` and,
 optionally, `apps/hub/web`):
 
 ```
-docker build -f apps/hub/Dockerfile -t atriarch-activity-hub:dev .
-docker run --rm -p 8971:8971 atriarch-activity-hub:dev
+docker build -f apps/hub/Dockerfile -t atriarch/tracery-hub:dev .
+docker run --rm -p 8971:8971 atriarch/tracery-hub:dev
 ```
 
 or with compose (also root-context; see `docker-compose.yaml`):
@@ -145,7 +145,7 @@ dependency in the image). If `apps/hub/web` does not exist yet in the build
 context, the image still builds and serves the plain placeholder page at
 `/ui` (see `apps/hub/src/routes/ui.ts`).
 
-`ACTIVITY_API_KEYS_FILE` mounts well as a Docker secret or a read-only bind
+`TRACERY_API_KEYS_FILE` mounts well as a Docker secret or a read-only bind
 mount; see `docker-compose.yaml` and `keys.example.json` for the shape.
 
 ## Kubernetes
@@ -153,15 +153,15 @@ mount; see `docker-compose.yaml` and `keys.example.json` for the shape.
 Plain manifests in `k8s/` (Kustomize-friendly, no Helm):
 
 ```
-kubectl create namespace activity
+kubectl create namespace tracery
 kubectl apply -f k8s/secret.example.yaml   # replace with real keys first, or provision via OpenBao/ExternalSecret
 kubectl apply -f k8s/pvc.yaml
 kubectl apply -f k8s/deployment.yaml
 kubectl apply -f k8s/service.yaml
 ```
 
-`deployment.yaml` runs `ACTIVITY_STORE=sqlite` against the `pvc.yaml` volume,
-reads `k8s/secret.example.yaml`'s `keys.json` via `ACTIVITY_API_KEYS_FILE`,
+`deployment.yaml` runs `TRACERY_STORE=sqlite` against the `pvc.yaml` volume,
+reads `k8s/secret.example.yaml`'s `keys.json` via `TRACERY_API_KEYS_FILE`,
 and sets `replicas: 1` with `strategy: Recreate` -- both stores are
 single-writer, so do not scale this beyond one replica until a shared store
 lands.

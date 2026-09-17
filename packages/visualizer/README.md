@@ -1,4 +1,4 @@
-# @atriarch/activity-visualizer
+# @atriarch/tracery-visualizer
 
 A React 18/19 component for live activity graphs. One generic node card, configured by the consumer. There are no agent names, node-kind registries, network connections, or invocation reducers in the library.
 
@@ -6,7 +6,7 @@ This is an independent npm package inside Agent Kit. It is not part of the Pytho
 
 ```tsx
 import { ActivityGraph, type ActivityNode, type ActivityEdge,
-  type NodePresentation } from '@atriarch/activity-visualizer';
+  type NodePresentation } from '@atriarch/tracery-visualizer';
 
 // This catalog belongs to the application, not Agent Kit.
 const catalog = {
@@ -55,7 +55,7 @@ npm test
 npm pack
 ```
 
-Install the resulting tarball into a consumer with `npm install ./vendor/atriarch-activity-visualizer-0.3.0.tgz`. The package includes compiled ESM and TypeScript declarations. Local consumers can use this artifact without sibling-repository source imports; registry publishing is a separate action. Virali's prototype is the first consumer; Saga can provide its own catalog and adapter using the same exported contract.
+Install the resulting tarball into a consumer with `npm install ./vendor/atriarch-tracery-visualizer-0.3.0.tgz`. The package includes compiled ESM and TypeScript declarations. Local consumers can use this artifact without sibling-repository source imports; registry publishing is a separate action. Virali's prototype is the first consumer; Saga can provide its own catalog and adapter using the same exported contract.
 
 Tests cover frozen consumer input, stable layout across updates, engine array isolation, anchors, edge-first streams, separate directed relationships, removed nodes, duplicate IDs, lifecycle transitions, group hulls (small-group bounding rect vs. convex hull, dimmed alpha, empty groups), dashed `data` edges vs. thicker `spawn` edges, `placeBranches` ignoring `data` edges as a parent, and the pure double-click/activate window helper.
 

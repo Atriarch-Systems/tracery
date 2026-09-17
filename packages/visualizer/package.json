@@ -1,5 +1,5 @@
 {
-  "name": "@atriarch/activity-visualizer",
+  "name": "@atriarch/tracery-visualizer",
   "version": "0.3.0",
   "license": "MIT",
   "description": "Consumer-configured React canvas for live nodes and directed activity edges.",

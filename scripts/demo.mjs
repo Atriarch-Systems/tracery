@@ -18,17 +18,17 @@
  *          `duplicates > 0` and `accepted === 0`.
  *
  * Usage: `node scripts/demo.mjs [--key <api-key>]`, or `npm run demo`.
- * Env: ACTIVITY_HUB_URL (default http://127.0.0.1:8971), ACTIVITY_API_KEY
+ * Env: TRACERY_HUB_URL (default http://127.0.0.1:8971), TRACERY_API_KEY
  * (falls back to --key, then to parsing the dev key out of
- * `docker logs activity-hub-accept`, the container SPEC.md §8 acceptance 3
+ * `docker logs tracery-accept`, the container SPEC.md §8 acceptance 3
  * leaves running).
  */
 import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import WebSocket from 'ws';
-import { ActivityTracer, httpTransport, HubClient } from '@atriarch/activity-client';
-import { ACTIVITY_CONTRACT_VERSION, buildFlows, project } from '@atriarch/activity-core';
+import { ActivityTracer, httpTransport, HubClient } from '@atriarch/tracery-client';
+import { ACTIVITY_CONTRACT_VERSION, buildFlows, project } from '@atriarch/tracery-core';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -43,7 +43,7 @@ function argValue(name) {
   return i !== -1 ? process.argv[i + 1] : undefined;
 }
 
-const HUB_URL = process.env.ACTIVITY_HUB_URL || 'http://127.0.0.1:8971';
+const HUB_URL = process.env.TRACERY_HUB_URL || 'http://127.0.0.1:8971';
 
 function devKeyFromDockerLogs() {
   try {
@@ -51,7 +51,7 @@ function devKeyFromDockerLogs() {
     // literal newline inside the message survives only as the two characters
     // `\` `n` (JSON-escaped), not an actual line break -- match the dev key
     // token itself rather than relying on surrounding whitespace.
-    const out = execFileSync('docker', ['logs', 'activity-hub-accept'], { encoding: 'utf8' });
+    const out = execFileSync('docker', ['logs', 'tracery-accept'], { encoding: 'utf8' });
     const match = out.match(/dev_[0-9a-f]+/);
     return match?.[0];
   } catch {
@@ -59,12 +59,12 @@ function devKeyFromDockerLogs() {
   }
 }
 
-const API_KEY = process.env.ACTIVITY_API_KEY || argValue('key') || devKeyFromDockerLogs();
+const API_KEY = process.env.TRACERY_API_KEY || argValue('key') || devKeyFromDockerLogs();
 
 if (!API_KEY) {
   console.error(
-    'demo: no API key. Set ACTIVITY_API_KEY, pass --key <key>, or leave the container from ' +
-      'SPEC.md §8 acceptance step 3 (`docker run ... --name activity-hub-accept ...`) running so its dev key can be read from `docker logs`.',
+    'demo: no API key. Set TRACERY_API_KEY, pass --key <key>, or leave the container from ' +
+      'SPEC.md §8 acceptance step 3 (`docker run ... --name tracery-accept ...`) running so its dev key can be read from `docker logs`.',
   );
   process.exit(1);
 }
@@ -144,7 +144,7 @@ const firstFrameOrTimeout = Promise.race([
 ]);
 if (!(await firstFrameOrTimeout)) {
   disposeLive();
-  console.error('[demo] WS /v1/live did not connect within 10s -- check ACTIVITY_HUB_URL / the API key.');
+  console.error('[demo] WS /v1/live did not connect within 10s -- check TRACERY_HUB_URL / the API key.');
   process.exit(1);
 }
 console.log('[demo] WS /v1/live connected (pre-emission)');
@@ -189,7 +189,7 @@ const linkForChild2 = parentFlow.spawnLink(toolOp);
 const pythonBin = process.env.PYTHON || 'python';
 const child2 = spawnSync(pythonBin, [path.join(__dirname, 'demo_child.py'), JSON.stringify(linkForChild2)], {
   cwd: REPO_ROOT,
-  env: { ...process.env, ACTIVITY_HUB_URL: HUB_URL, ACTIVITY_API_KEY: API_KEY },
+  env: { ...process.env, TRACERY_HUB_URL: HUB_URL, TRACERY_API_KEY: API_KEY },
   encoding: 'utf8',
 });
 if (child2.status !== 0) {

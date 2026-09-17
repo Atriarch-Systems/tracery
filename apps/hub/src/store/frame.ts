@@ -3,7 +3,7 @@
  * `SqliteStore` for `flowEvents` / `traceFrame` / `workspaceFrame` and by
  * `live.ts` for WS snapshot/reconnect framing (SPEC.md §6 "Live feed").
  */
-import type { ActivityFrame, StoredEvent } from '@atriarch/activity-core/contract';
+import type { ActivityFrame, StoredEvent } from '@atriarch/tracery-core/contract';
 
 export interface FloorInfo {
   /** Smallest cursor still retained for the scope's workspace, or `undefined` if nothing has ever been evicted. */

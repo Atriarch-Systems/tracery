@@ -66,11 +66,11 @@ test('a session with a subagent produces two flows in the hub, linked parent to 
   const hub = spawn(process.execPath, [hubBin], {
     env: {
       ...process.env,
-      ACTIVITY_PORT: String(port),
-      ACTIVITY_HOST: '127.0.0.1',
-      ACTIVITY_STORE: 'memory',
-      ACTIVITY_API_KEYS: JSON.stringify([{ id: 'e2e', key: apiKey, workspace: 'default', roles: ['ingest', 'read'] }]),
-      ACTIVITY_LOG_LEVEL: 'silent',
+      TRACERY_PORT: String(port),
+      TRACERY_HOST: '127.0.0.1',
+      TRACERY_STORE: 'memory',
+      TRACERY_API_KEYS: JSON.stringify([{ id: 'e2e', key: apiKey, workspace: 'default', roles: ['ingest', 'read'] }]),
+      TRACERY_LOG_LEVEL: 'silent',
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
@@ -86,7 +86,7 @@ test('a session with a subagent produces two flows in the hub, linked parent to 
   const baseUrl = `http://127.0.0.1:${port}`;
   await waitForHealth(baseUrl, 10_000);
 
-  const dataDir = await mkdtemp(join(tmpdir(), 'atriarch-activity-e2e-'));
+  const dataDir = await mkdtemp(join(tmpdir(), 'tracery-e2e-'));
   const env = {
     CLAUDE_PLUGIN_OPTION_HUB_URL: baseUrl,
     CLAUDE_PLUGIN_OPTION_API_KEY: apiKey,

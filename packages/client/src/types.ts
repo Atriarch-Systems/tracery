@@ -1,4 +1,4 @@
-import type { ActivityEvent } from '@atriarch/activity-core';
+import type { ActivityEvent } from '@atriarch/tracery-core';
 
 /**
  * Time source used by the tracer. `now()` supplies the wire `ts` (epoch
@@ -28,7 +28,7 @@ export interface ActivityTransport {
   close?(): void | Promise<void>;
 }
 
-/** Minimal shape `journalTransport` accepts: `@atriarch/activity-core`'s `Journal` satisfies this. */
+/** Minimal shape `journalTransport` accepts: `@atriarch/tracery-core`'s `Journal` satisfies this. */
 export interface JournalLike {
   append(events: readonly ActivityEvent[]): unknown;
 }

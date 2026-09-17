@@ -4,7 +4,7 @@
  * without creating a cycle back through `server.ts`.
  */
 import type { FastifyInstance, FastifyRequest } from 'fastify';
-import type { ActivityFrame } from '@atriarch/activity-core/contract';
+import type { ActivityFrame } from '@atriarch/tracery-core/contract';
 import type { AuthContext } from './auth.js';
 import type { ApiKeyConfig, Config, Role } from './config.js';
 import type { EventStore } from './store/types.js';

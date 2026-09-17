@@ -10,7 +10,7 @@ test('loadConfig: every documented default applies when the environment is empty
   assert.equal(config.port, 8971);
   assert.equal(config.host, '0.0.0.0');
   assert.equal(config.store, 'memory');
-  assert.equal(config.sqlitePath, '/data/activity.db');
+  assert.equal(config.sqlitePath, '/data/tracery.db');
   assert.equal(config.apiKeys, undefined);
   assert.equal(config.retentionHours, 72);
   assert.equal(config.maxEventsPerWorkspace, 500_000);
@@ -21,16 +21,16 @@ test('loadConfig: every documented default applies when the environment is empty
 
 test('loadConfig: every documented env var overrides its default', () => {
   const config = loadConfig({
-    ACTIVITY_PORT: '9000',
-    ACTIVITY_HOST: '127.0.0.1',
-    ACTIVITY_STORE: 'sqlite',
-    ACTIVITY_SQLITE_PATH: '/tmp/x.db',
-    ACTIVITY_API_KEYS: JSON.stringify([{ key: 'k', workspace: 'w', roles: ['read'] }]),
-    ACTIVITY_RETENTION_HOURS: '24',
-    ACTIVITY_MAX_EVENTS_PER_WORKSPACE: '10',
-    ACTIVITY_METRICS_TOKEN: 'tok',
-    ACTIVITY_LOG_LEVEL: 'debug',
-    ACTIVITY_UI_DIR: '/somewhere',
+    TRACERY_PORT: '9000',
+    TRACERY_HOST: '127.0.0.1',
+    TRACERY_STORE: 'sqlite',
+    TRACERY_SQLITE_PATH: '/tmp/x.db',
+    TRACERY_API_KEYS: JSON.stringify([{ key: 'k', workspace: 'w', roles: ['read'] }]),
+    TRACERY_RETENTION_HOURS: '24',
+    TRACERY_MAX_EVENTS_PER_WORKSPACE: '10',
+    TRACERY_METRICS_TOKEN: 'tok',
+    TRACERY_LOG_LEVEL: 'debug',
+    TRACERY_UI_DIR: '/somewhere',
   });
   assert.equal(config.port, 9000);
   assert.equal(config.host, '127.0.0.1');
@@ -45,7 +45,7 @@ test('loadConfig: every documented env var overrides its default', () => {
 });
 
 test('loadConfig: an unparseable numeric env var throws with the variable name', () => {
-  assert.throws(() => loadConfig({ ACTIVITY_PORT: 'not-a-number' }), /ACTIVITY_PORT/);
+  assert.throws(() => loadConfig({ TRACERY_PORT: 'not-a-number' }), /TRACERY_PORT/);
 });
 
 test('parseApiKeys: rejects malformed entries with a precise reason', () => {
@@ -56,12 +56,12 @@ test('parseApiKeys: rejects malformed entries with a precise reason', () => {
   assert.throws(() => parseApiKeys('[{"key":"k","workspace":"w","roles":["bogus"]}]', 'SRC'), /\.roles must be/);
 });
 
-test('loadConfig: ACTIVITY_API_KEYS_FILE is read and parsed when ACTIVITY_API_KEYS is absent', () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'activity-hub-keys-'));
+test('loadConfig: TRACERY_API_KEYS_FILE is read and parsed when TRACERY_API_KEYS is absent', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tracery-hub-keys-'));
   const file = path.join(dir, 'keys.json');
   fs.writeFileSync(file, JSON.stringify([{ id: 'ops', key: 'opkey', workspace: '*', roles: ['ingest', 'read', 'admin'] }]));
   try {
-    const config = loadConfig({ ACTIVITY_API_KEYS_FILE: file });
+    const config = loadConfig({ TRACERY_API_KEYS_FILE: file });
     assert.deepEqual(config.apiKeys, [{ id: 'ops', key: 'opkey', workspace: '*', roles: ['ingest', 'read', 'admin'] }]);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });

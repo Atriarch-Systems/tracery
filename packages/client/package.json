@@ -1,8 +1,8 @@
 {
-  "name": "@atriarch/activity-client",
+  "name": "@atriarch/tracery-client",
   "version": "0.1.0",
   "license": "MIT",
-  "description": "Atriarch Activity emitter SDK: ActivityTracer, transports and a hub read client.",
+  "description": "Tracery emitter SDK: ActivityTracer, transports and a hub read client.",
   "type": "module",
   "files": ["dist", "README.md", "LICENSE"],
   "exports": {
@@ -14,7 +14,7 @@
     "prepack": "npm run build"
   },
   "dependencies": {
-    "@atriarch/activity-core": "*"
+    "@atriarch/tracery-core": "*"
   },
   "devDependencies": {
     "typescript": "^5.6.0"

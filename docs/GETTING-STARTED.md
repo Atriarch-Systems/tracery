@@ -20,8 +20,8 @@ cd apps/hub
 docker compose -f docker-compose.yaml up --build
 ```
 
-This starts the hub with `ACTIVITY_STORE=sqlite` (durable across restarts,
-volume `activity-data`) and `ACTIVITY_API_KEYS_FILE` pointed at
+This starts the hub with `TRACERY_STORE=sqlite` (durable across restarts,
+volume `tracery-data`) and `TRACERY_API_KEYS_FILE` pointed at
 `./keys.example.json`, mounted read-only. **Copy that file and replace the
 placeholder keys before using this anywhere but a laptop**:
 
@@ -50,21 +50,21 @@ except `GET /v1/workspaces`. `roles` controls what the key may do: `ingest`
 ### Plain `docker run` (quickest way to try it)
 
 ```sh
-docker build -f apps/hub/Dockerfile -t atriarch-activity-hub:dev .   # from the repo root
-docker run --rm -p 8971:8971 atriarch-activity-hub:dev
+docker build -f apps/hub/Dockerfile -t atriarch/tracery-hub:dev .   # from the repo root
+docker run --rm -p 8971:8971 atriarch/tracery-hub:dev
 ```
 
-With no `ACTIVITY_API_KEYS`/`ACTIVITY_API_KEYS_FILE` set, the hub generates
+With no `TRACERY_API_KEYS`/`TRACERY_API_KEYS_FILE` set, the hub generates
 one dev key at boot with every role on workspace `default`, and logs it
 once — read it from the container's stdout. This mode keeps everything in
-memory (`ACTIVITY_STORE=memory`, the default); nothing survives a restart.
+memory (`TRACERY_STORE=memory`, the default); nothing survives a restart.
 Full environment variable reference: [`apps/hub/README.md`](../apps/hub/README.md).
 
 Either way, confirm it's up:
 
 ```sh
 curl http://127.0.0.1:8971/healthz          # {"status":"ok"}
-curl http://127.0.0.1:8971/v1/license        # community edition unless ACTIVITY_LICENSE_KEY is set
+curl http://127.0.0.1:8971/v1/license        # community edition unless TRACERY_LICENSE_KEY is set
 open http://127.0.0.1:8971/ui/               # hosted explorer (asks for an API key on first load)
 ```
 
@@ -73,14 +73,14 @@ open http://127.0.0.1:8971/ui/               # hosted explorer (asks for an API 
 ### TypeScript
 
 ```sh
-npm install @atriarch/activity-client
+npm install @atriarch/tracery-client
 ```
 
 ```ts
-import { ActivityTracer, httpTransport } from '@atriarch/activity-client';
+import { ActivityTracer, httpTransport } from '@atriarch/tracery-client';
 
 const tracer = new ActivityTracer({
-  transport: httpTransport({ baseUrl: 'http://127.0.0.1:8971', apiKey: process.env.ACTIVITY_API_KEY! }),
+  transport: httpTransport({ baseUrl: 'http://127.0.0.1:8971', apiKey: process.env.TRACERY_API_KEY! }),
   actor: { id: 'agent:saga', kind: 'agent' },
 });
 
@@ -103,7 +103,7 @@ link it was handed (env var, IPC message, CLI argument — whatever fits):
 
 ```ts
 const subTracer = new ActivityTracer({
-  transport: httpTransport({ baseUrl: 'http://127.0.0.1:8971', apiKey: process.env.ACTIVITY_API_KEY! }),
+  transport: httpTransport({ baseUrl: 'http://127.0.0.1:8971', apiKey: process.env.TRACERY_API_KEY! }),
   actor: { id: 'agent:saga/subagent:research-7', kind: 'subagent' },
 });
 const subFlow = subTracer.startFlow({ label: 'Research CVE-2026-1234', link });
@@ -119,15 +119,15 @@ parent's `llm:main` op to the subagent's root node. Full API:
 ### Python
 
 ```sh
-python -m pip install atriarch-activity
+python -m pip install atriarch-tracery
 ```
 
 ```python
 import os
-from atriarch.activity import ActivityTracer, HttpTransport
+from atriarch.tracery import ActivityTracer, HttpTransport
 
 tracer = ActivityTracer(
-    transport=HttpTransport(base_url="http://127.0.0.1:8971", api_key=os.environ["ACTIVITY_API_KEY"]),
+    transport=HttpTransport(base_url="http://127.0.0.1:8971", api_key=os.environ["TRACERY_API_KEY"]),
     actor={"id": "agent:saga", "kind": "agent"},
 )
 
@@ -151,15 +151,15 @@ parent — no explicit `parent=` plumbing needed. Full API:
 
 ## 3. Embed the explorer
 
-Point `@atriarch/activity-react`'s `ActivityExplorer` at the hub you started
+Point `@atriarch/tracery-react`'s `ActivityExplorer` at the hub you started
 in step 1 — no server code of your own:
 
 ```sh
-npm install @atriarch/activity-react
+npm install @atriarch/tracery-react
 ```
 
 ```tsx
-import { ActivityExplorer, useHubSource } from '@atriarch/activity-react';
+import { ActivityExplorer, useHubSource } from '@atriarch/tracery-react';
 
 function ActivityPage() {
   const source = useHubSource({
@@ -195,18 +195,18 @@ watch any other producer's activity.
 claude --plugin-dir ./plugins/claude-code
 ```
 
-(or `/plugin install atriarch-activity@<marketplace>` once published to
+(or `/plugin install tracery@<marketplace>` once published to
 one). Configure it with environment variables or the prompts Claude Code
 shows when the plugin is enabled:
 
 | Env var | Required | Default |
 | --- | --- | --- |
-| `ACTIVITY_HUB_URL` | yes | — |
-| `ACTIVITY_API_KEY` | yes (needs the `ingest` role) | — |
-| `ACTIVITY_WORKSPACE` | no | `default` |
-| `ACTIVITY_INCLUDE_PROMPTS` | no | `false` |
+| `TRACERY_HUB_URL` | yes | — |
+| `TRACERY_API_KEY` | yes (needs the `ingest` role) | — |
+| `TRACERY_WORKSPACE` | no | `default` |
+| `TRACERY_INCLUDE_PROMPTS` | no | `false` |
 
-With neither `ACTIVITY_HUB_URL` nor `ACTIVITY_API_KEY` set, every hook is a
+With neither `TRACERY_HUB_URL` nor `TRACERY_API_KEY` set, every hook is a
 silent no-op — installing the plugin without configuring it does nothing. A
 session becomes one flow; each subagent becomes its own child flow linked
 back to the `Agent` tool call that spawned it. Full hook-to-event mapping,

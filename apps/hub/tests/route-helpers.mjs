@@ -6,7 +6,7 @@ import { createServer } from '../dist/server.js';
 
 /** Builds a `Config` (SPEC.md §6) for tests, overriding only what a test cares about. */
 export function testConfig(overrides = {}) {
-  const uiDir = overrides.uiDir ?? path.join(os.tmpdir(), 'activity-hub-test-ui-missing');
+  const uiDir = overrides.uiDir ?? path.join(os.tmpdir(), 'tracery-hub-test-ui-missing');
   return {
     port: 0,
     host: '127.0.0.1',
@@ -35,7 +35,7 @@ export function bearer(key) {
 
 /** A built UI dist directory with a minimal `index.html`, for the SPA-fallback test. */
 export function makeUiDir() {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'activity-hub-test-ui-'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tracery-hub-test-ui-'));
   fs.writeFileSync(path.join(dir, 'index.html'), '<!doctype html><html><body>ui-shell</body></html>');
   fs.writeFileSync(path.join(dir, 'app.js'), 'console.log("ui");');
   return dir;

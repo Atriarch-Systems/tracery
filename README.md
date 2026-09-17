@@ -1,6 +1,6 @@
-# Atriarch Activity
+# Tracery
 
-Atriarch Activity turns agent activity events into live, inspectable graphs.
+Tracery by Atriarch Systems turns agent activity events into live, inspectable graphs.
 An application pushes small events ("op X started on node Y in flow Z"); the
 library or the hub turns them into flows, node histories, and a drawable
 graph you can render live or replay after the fact. When one flow spawns
@@ -10,10 +10,10 @@ for the full specification.
 
 ## Usage modes
 
-1. **Library** — embed `@atriarch/activity-core` + `@atriarch/activity-react`
+1. **Library** — embed `@atriarch/tracery-core` + `@atriarch/tracery-react`
    directly in your own app and render the graph from your own event stream.
    No server to run.
-2. **Hub** — run `@atriarch/activity-hub` as a container. Apps push events
+2. **Hub** — run `@atriarch/tracery-hub` as a container. Apps push events
    with a client SDK (TypeScript or Python); the hub stores, sorts, serves
    and draws. Nothing renders in the producing app.
 3. **Both** — embed the React explorer in your app, but point it at a
@@ -25,13 +25,13 @@ Plus a **Claude Code plugin** that streams a running Claude Code session
 ### Quick start: library
 
 ```
-npm install @atriarch/activity-core @atriarch/activity-react
+npm install @atriarch/tracery-core @atriarch/tracery-react
 ```
 
 ```tsx
 import { useMemo } from 'react';
-import { Journal } from '@atriarch/activity-core';
-import { ActivityExplorer, useJournalSource } from '@atriarch/activity-react';
+import { Journal } from '@atriarch/tracery-core';
+import { ActivityExplorer, useJournalSource } from '@atriarch/tracery-react';
 
 function MyPage() {
   const journal = useMemo(() => new Journal({ maxEvents: 20_000 }), []);
@@ -48,19 +48,19 @@ function MyPage() {
 ### Quick start: hub
 
 ```
-docker run -d --name activity-hub -p 8971:8971 atriarch/activity-hub
-docker logs activity-hub   # prints a dev API key on first boot
+docker run -d --name tracery-hub -p 8971:8971 atriarch/tracery-hub
+docker logs tracery-hub   # prints a dev API key on first boot
 ```
 
 ```
-npm install @atriarch/activity-client
+npm install @atriarch/tracery-client
 ```
 
 ```ts
-import { ActivityTracer, httpTransport } from '@atriarch/activity-client';
+import { ActivityTracer, httpTransport } from '@atriarch/tracery-client';
 
 const tracer = new ActivityTracer({
-  transport: httpTransport({ baseUrl: 'http://127.0.0.1:8971', apiKey: process.env.ACTIVITY_API_KEY! }),
+  transport: httpTransport({ baseUrl: 'http://127.0.0.1:8971', apiKey: process.env.TRACERY_API_KEY! }),
   actor: { id: 'agent:saga', kind: 'agent' },
 });
 const flow = tracer.startFlow({ label: 'Triage CVE-2026-1234' });
@@ -69,17 +69,17 @@ flow.end();
 await tracer.close();
 ```
 
-Or from Python: `pip install atriarch-activity` (see
+Or from Python: `pip install atriarch-tracery` (see
 [`clients/python/README.md`](clients/python/README.md)).
 
 ### Quick start: both
 
 ```
-npm install @atriarch/activity-react
+npm install @atriarch/tracery-react
 ```
 
 ```tsx
-import { ActivityExplorer, useHubSource } from '@atriarch/activity-react';
+import { ActivityExplorer, useHubSource } from '@atriarch/tracery-react';
 
 function MyPage() {
   const source = useHubSource({ baseUrl: 'http://127.0.0.1:8971', apiKey: '...', workspace: 'default' });
@@ -93,8 +93,8 @@ function MyPage() {
 claude --plugin-dir ./plugins/claude-code
 ```
 
-or, from a marketplace: `/plugin install atriarch-activity@<marketplace>`. Set
-`ACTIVITY_HUB_URL` and `ACTIVITY_API_KEY` (env vars or the plugin's own
+or, from a marketplace: `/plugin install tracery@<marketplace>`. Set
+`TRACERY_HUB_URL` and `TRACERY_API_KEY` (env vars or the plugin's own
 config prompts); with neither set, every hook is a silent no-op. See
 [`plugins/claude-code/README.md`](plugins/claude-code/README.md).
 
@@ -102,14 +102,14 @@ config prompts); with neither set, every hook is a silent no-op. See
 
 | Package | Path | Version | License |
 | --- | --- | --- | --- |
-| `@atriarch/activity-core` | `packages/core` | 0.1.0 | MIT |
-| `@atriarch/activity-visualizer` | `packages/visualizer` | 0.3.0 | MIT |
-| `@atriarch/activity-client` | `packages/client` | 0.1.0 | MIT |
-| `@atriarch/activity-react` | `packages/react` | 0.1.0 | MIT |
-| `atriarch-activity` (Python, `atriarch.activity`) | `clients/python` | 0.1.0 | MIT |
-| `@atriarch/activity-hub` | `apps/hub` | 0.1.0 | MIT (`apps/hub/ee` excluded, see below) |
-| `@atriarch/activity-hub-web` (hosted UI, not published) | `apps/hub/web` | 0.1.0 | MIT |
-| `atriarch-activity` (Claude Code plugin) | `plugins/claude-code` | 0.1.0 | MIT |
+| `@atriarch/tracery-core` | `packages/core` | 0.1.0 | MIT |
+| `@atriarch/tracery-visualizer` | `packages/visualizer` | 0.3.0 | MIT |
+| `@atriarch/tracery-client` | `packages/client` | 0.1.0 | MIT |
+| `@atriarch/tracery-react` | `packages/react` | 0.1.0 | MIT |
+| `atriarch-tracery` (Python, `atriarch.tracery`) | `clients/python` | 0.1.0 | MIT |
+| `@atriarch/tracery-hub` | `apps/hub` | 0.1.0 | MIT (`apps/hub/ee` excluded, see below) |
+| `@atriarch/tracery-hub-web` (hosted UI, not published) | `apps/hub/web` | 0.1.0 | MIT |
+| `tracery` (Claude Code plugin) | `plugins/claude-code` | 0.1.0 | MIT |
 
 ## Event model
 
@@ -175,11 +175,11 @@ items passed:
    yields exactly two `spawn` edges and three groups, a WS live subscription
    opened before emission received every event with monotonic cursors, and
    re-sending the first batch reports `duplicates > 0` / `accepted: 0`.
-   `npm run demo` runs it against `ACTIVITY_HUB_URL`
+   `npm run demo` runs it against `TRACERY_HUB_URL`
    (default `http://127.0.0.1:8971`).
 5. **Playwright (`apps/hub/web/tests`) against the running container** —
-   PASSED. `explorer.real-hub.spec.ts` now accepts `ACTIVITY_HUB_URL` /
-   `ACTIVITY_API_KEY` to target an already-running hub instead of always
+   PASSED. `explorer.real-hub.spec.ts` now accepts `TRACERY_HUB_URL` /
+   `TRACERY_API_KEY` to target an already-running hub instead of always
    spawning its own; run that way against a freshly-started container, all
    4 tests passed (flow list shows three flows, trace scope shows three
    groups, inspector context, drill-in on double-click).

@@ -3,7 +3,7 @@
  * (SPEC.md §6 HTTP API table).
  */
 import type { FastifyInstance } from 'fastify';
-import type { FlowStatus } from '@atriarch/activity-core';
+import type { FlowStatus } from '@atriarch/tracery-core';
 import type { HubContext } from '../server-context.js';
 import { errorBody } from './errors.js';
 

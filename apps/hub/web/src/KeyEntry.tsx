@@ -32,7 +32,7 @@ export function KeyEntry({ onReady }: KeyEntryProps) {
           onReady({ baseUrl: baseUrl.trim() || window.location.origin, apiKey: apiKey.trim(), workspace: workspace.trim() || undefined });
         }}
       >
-        <h1 style={{ fontSize: 16, margin: 0 }}>Atriarch Activity</h1>
+        <h1 style={{ fontSize: 16, margin: 0 }}>Tracery</h1>
         <p style={{ fontSize: 12, color: '#8892a6', margin: 0 }}>Enter a read key to view this hub's flows.</p>
 
         <label style={{ fontSize: 12 }}>

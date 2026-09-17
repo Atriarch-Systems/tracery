@@ -1,8 +1,8 @@
 {
-  "name": "@atriarch/activity-core",
+  "name": "@atriarch/tracery-core",
   "version": "0.1.0",
   "license": "MIT",
-  "description": "Atriarch Activity wire contract, validation, journal, flow reducers, trace assembly and visualizer projection. No DOM, no React.",
+  "description": "Tracery wire contract, validation, journal, flow reducers, trace assembly and visualizer projection. No DOM, no React.",
   "type": "module",
   "files": ["dist", "README.md", "LICENSE"],
   "exports": {
@@ -18,6 +18,6 @@
   "dependencies": {},
   "devDependencies": {
     "typescript": "^5.6.0",
-    "@atriarch/activity-visualizer": "*"
+    "@atriarch/tracery-visualizer": "*"
   }
 }

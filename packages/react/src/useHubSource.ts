@@ -16,8 +16,8 @@
  * delivered the events.
  */
 import { useEffect, useState } from 'react';
-import { HubClient, type ActivityFrame, type StoredEvent } from '@atriarch/activity-client';
-import { Journal, buildFlows, type Flow } from '@atriarch/activity-core';
+import { HubClient, type ActivityFrame, type StoredEvent } from '@atriarch/tracery-client';
+import { Journal, buildFlows, type Flow } from '@atriarch/tracery-core';
 import { feedReducer, initialFeedState, shouldPoll, type FeedState } from './feed.js';
 import type { ActivitySource } from './source.js';
 

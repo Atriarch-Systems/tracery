@@ -4,13 +4,13 @@
  * briefly over `maxEventsPerWorkspace` is trimmed on the next sweep instead
  * of rejecting the ingest.
  *
- * Flow reduction always goes through `@atriarch/activity-core`'s
+ * Flow reduction always goes through `@atriarch/tracery-core`'s
  * `buildFlows`/`assembleTrace` over the workspace's full retained event set,
  * which is what gives late-arriving parents correct trace resolution
  * (SPEC.md §1 "Trace resolution") for free -- it is never reimplemented here.
  */
-import { buildFlows, assembleTrace, type Flow } from '@atriarch/activity-core';
-import type { ActivityEvent, StoredEvent } from '@atriarch/activity-core/contract';
+import { buildFlows, assembleTrace, type Flow } from '@atriarch/tracery-core';
+import type { ActivityEvent, StoredEvent } from '@atriarch/tracery-core/contract';
 import { buildFrame } from './frame.js';
 import {
   toFlowSummary,
@@ -98,7 +98,7 @@ export class MemoryStore implements EventStore {
     return { floorCursor: state.floorCursor };
   }
 
-  async flowEvents(workspace: string, flowId: string, after?: number): Promise<import('@atriarch/activity-core/contract').ActivityFrame> {
+  async flowEvents(workspace: string, flowId: string, after?: number): Promise<import('@atriarch/tracery-core/contract').ActivityFrame> {
     const state = this.state(workspace);
     const scoped = state.eventsByFlow.get(flowId) ?? [];
     return buildFrame(scoped, this.cursor, this.floorInfo(state), after);
@@ -113,13 +113,13 @@ export class MemoryStore implements EventStore {
     return events;
   }
 
-  async traceFrame(workspace: string, traceId: string, after?: number): Promise<import('@atriarch/activity-core/contract').ActivityFrame> {
+  async traceFrame(workspace: string, traceId: string, after?: number): Promise<import('@atriarch/tracery-core/contract').ActivityFrame> {
     const scoped = await this.traceEvents(workspace, traceId);
     const state = this.state(workspace);
     return buildFrame(scoped, this.cursor, this.floorInfo(state), after);
   }
 
-  async workspaceFrame(workspace: string, after?: number): Promise<import('@atriarch/activity-core/contract').ActivityFrame> {
+  async workspaceFrame(workspace: string, after?: number): Promise<import('@atriarch/tracery-core/contract').ActivityFrame> {
     const state = this.state(workspace);
     return buildFrame(state.events, this.cursor, this.floorInfo(state), after);
   }
