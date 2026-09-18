@@ -17,3 +17,4 @@ playwright-report/
 # makes it work for anyone who clones this repo fresh.
 !apps/hub/web/vendor/vite-plugin-singlefile/dist/
 !apps/hub/web/vendor/vite-plugin-singlefile/dist/**
+.hero-video-tmp*

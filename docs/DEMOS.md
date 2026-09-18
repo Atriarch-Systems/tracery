@@ -15,6 +15,17 @@ demo hub used to build these screenshots: a Docker container named
 `tdk_a7f3c9e2b1d4` (workspace `default`, roles `ingest`/`read`/`admin`). Swap
 in your own `TRACERY_HUB_URL`/`TRACERY_API_KEY` for any other hub.
 
+The root README's hero image and GIF (an orchestrator planning, searching,
+and spawning two concurrent subagents — one succeeds, one errors — while a
+guard check and a human approval run alongside them, in whole-trace scope
+with a node selected to show real context) are captured the same way, by
+[`scripts/capture-hero.mjs`](../scripts/capture-hero.mjs): a throwaway hub of
+its own (never `tracery-demo`), the exact event schedule from
+[`examples/embedded/src/scenario.ts`](../examples/embedded/src/scenario.ts)
+replayed as real `/v1/events` calls while a headless browser records video,
+then `ffmpeg` encodes a palette-optimized GIF. Regenerate with
+`node scripts/capture-hero.mjs` (requires `ffmpeg` on `PATH`).
+
 ## 1. Claude Code plugin
 
 **What it demonstrates**: `plugins/claude-code` turning a Claude Code

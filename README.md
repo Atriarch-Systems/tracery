@@ -1,5 +1,15 @@
 # Tracery
 
+<p align="center">
+  <img src="docs/images/hero.gif" alt="Tracery drawing a live trace: an orchestrator plans and searches, spawns two subagents (one succeeds, one errors), while a guard check and a human approval run concurrently — all rendered live as the graph grows" width="900">
+</p>
+
+<p align="center">
+  <em>An orchestrator plans, searches, and spawns two subagents — one succeeds, one hits an error — while a guard
+  check and a human approval run alongside them. Captured live from the real hosted UI; no editing.
+  More in <a href="docs/DEMOS.md">docs/DEMOS.md</a>.</em>
+</p>
+
 Tracery by Atriarch Systems turns agent activity events into live, inspectable graphs.
 An application pushes small events ("op X started on node Y in flow Z"); the
 library or the hub turns them into flows, node histories, and a drawable
