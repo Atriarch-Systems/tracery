@@ -4,8 +4,13 @@
   "license": "Apache-2.0",
   "description": "Tracery emitter SDK: ActivityTracer, transports and a hub read client.",
   "type": "module",
+  "engines": { "node": ">=22.13" },
   "files": ["dist", "README.md", "LICENSE", "NOTICE"],
   "funding": { "type": "ko-fi", "url": "https://ko-fi.com/demonslyr" },
+  "homepage": "https://github.com/atriarch-systems/tracery/tree/main/packages/client#readme",
+  "bugs": { "url": "https://github.com/atriarch-systems/tracery/issues" },
+  "repository": { "type": "git", "url": "https://github.com/atriarch-systems/tracery.git", "directory": "packages/client" },
+  "publishConfig": { "access": "public" },
   "exports": {
     ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" }
   },

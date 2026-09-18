@@ -21,7 +21,7 @@ the repo's intended future location):
 
 ```
 /plugin marketplace add atriarch-systems/tracery
-/plugin install tracery@atriarch-systems
+/plugin install tracery@tracery
 ```
 
 See [`../../docs/CLAUDE-CODE-PLUGIN.md`](../../docs/CLAUDE-CODE-PLUGIN.md#install-and-configure)
@@ -65,6 +65,66 @@ plugin without configuring it does nothing. `api_key` is only needed against
 a hub running with `TRACERY_API_KEYS` configured (needs the `ingest` role,
 see `apps/hub/README.md`); against a local-mode hub (no `TRACERY_API_KEYS`,
 the `npx @atriarch/tracery-hub` default) it should be left empty.
+
+## Sharing the plugin with someone
+
+Three ways to hand this plugin to someone else, depending on whether this
+repository is on GitHub yet.
+
+**(a) Once this repo is on GitHub** -- the normal path, and the only one
+that updates itself when the plugin changes:
+
+```
+/plugin marketplace add atriarch-systems/tracery
+/plugin install tracery@tracery
+```
+
+`atriarch-systems/tracery` is the `owner/repo` GitHub location; `tracery@tracery`
+is `<plugin-name>@<marketplace-name>`, both of which happen to be `tracery`
+here (the plugin's own name and this repo's marketplace name, both declared
+in [`../../.claude-plugin/marketplace.json`](../../.claude-plugin/marketplace.json)
+-- read that file's top-level `"name"` rather than assuming it always
+matches the repo name). A local clone works the same way with a path instead
+of `owner/repo`: `/plugin marketplace add /path/to/this/repo`.
+
+**(b) Without GitHub at all** -- zip this directory and hand the zip over;
+the recipient unzips it anywhere and points Claude Code straight at the
+folder, no marketplace involved:
+
+```sh
+# you:
+cd plugins && zip -r tracery-plugin.zip claude-code
+
+# your friend, after unzipping tracery-plugin.zip somewhere:
+claude --plugin-dir /path/to/unzipped/claude-code
+```
+
+This skips the marketplace manifest entirely -- `--plugin-dir` just needs a
+directory containing this plugin's own `plugin.json`, `hooks/`, and
+`skills/`, which is exactly what's in this folder.
+
+**(c) Either way, your friend also needs a hub to point it at.** The plugin
+only ever talks to whatever `TRACERY_HUB_URL` names -- it does not ship one.
+Cheapest option once `@atriarch/tracery-hub` is published: their own local
+hub, no install beyond `npx`:
+
+```sh
+npx @atriarch/tracery-hub
+```
+
+Until then (or if they'd rather run from source), a clone of this repo does
+the same thing:
+
+```sh
+node apps/hub/bin/hub.mjs
+```
+
+Either way, whatever `hub_url` (or `TRACERY_HUB_URL`) they configure the
+plugin with must be a URL their machine can actually reach -- `127.0.0.1`
+only works if the hub runs on the same machine as their `claude` session;
+across two machines they need the hub's real LAN/VPN address (and, per
+`apps/hub/README.md` "Auth mode," a non-loopback hub needs `TRACERY_API_KEYS`
+configured, which means an `api_key` on their end too).
 
 ## What it does
 

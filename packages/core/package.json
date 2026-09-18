@@ -4,8 +4,13 @@
   "license": "Apache-2.0",
   "description": "Tracery wire contract, validation, journal, flow reducers, trace assembly and visualizer projection. No DOM, no React.",
   "type": "module",
+  "engines": { "node": ">=22.13" },
   "files": ["dist", "README.md", "LICENSE", "NOTICE"],
   "funding": { "type": "ko-fi", "url": "https://ko-fi.com/demonslyr" },
+  "homepage": "https://github.com/atriarch-systems/tracery/tree/main/packages/core#readme",
+  "bugs": { "url": "https://github.com/atriarch-systems/tracery/issues" },
+  "repository": { "type": "git", "url": "https://github.com/atriarch-systems/tracery.git", "directory": "packages/core" },
+  "publishConfig": { "access": "public" },
   "exports": {
     ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" },
     "./contract": { "types": "./dist/contract.d.ts", "import": "./dist/contract.js" },
@@ -19,6 +24,6 @@
   "dependencies": {},
   "devDependencies": {
     "typescript": "^5.6.0",
-    "@atriarch/tracery-visualizer": "*"
+    "@atriarch/tracery-visualizer": "^0.3.0"
   }
 }

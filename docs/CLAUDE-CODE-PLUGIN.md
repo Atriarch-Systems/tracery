@@ -31,7 +31,7 @@ in wherever this checkout actually lives if that's not yet true):
 
 ```
 /plugin marketplace add atriarch-systems/tracery
-/plugin install tracery@atriarch-systems
+/plugin install tracery@tracery
 ```
 
 A local clone can be added as a marketplace the same way, with a path

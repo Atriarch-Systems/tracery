@@ -4,8 +4,13 @@
   "license": "Apache-2.0",
   "description": "ActivityExplorer: a composite React explorer (flow picker, guided graph, inspector) and live-source hooks for Tracery.",
   "type": "module",
+  "engines": { "node": ">=22.13" },
   "files": ["dist", "README.md", "LICENSE", "NOTICE"],
   "funding": { "type": "ko-fi", "url": "https://ko-fi.com/demonslyr" },
+  "homepage": "https://github.com/atriarch-systems/tracery/tree/main/packages/react#readme",
+  "bugs": { "url": "https://github.com/atriarch-systems/tracery/issues" },
+  "repository": { "type": "git", "url": "https://github.com/atriarch-systems/tracery.git", "directory": "packages/react" },
+  "publishConfig": { "access": "public" },
   "exports": {
     ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" }
   },
@@ -19,9 +24,9 @@
     "react-dom": ">=18 <20"
   },
   "dependencies": {
-    "@atriarch/tracery-core": "*",
-    "@atriarch/tracery-visualizer": "*",
-    "@atriarch/tracery-client": "*"
+    "@atriarch/tracery-core": "^0.1.0",
+    "@atriarch/tracery-visualizer": "^0.3.0",
+    "@atriarch/tracery-client": "^0.1.0"
   },
   "devDependencies": {
     "typescript": "^5.6.0",

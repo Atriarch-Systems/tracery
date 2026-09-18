@@ -18,7 +18,9 @@
     "test": "npm run test --workspaces --if-present",
     "test:plugin": "node --test plugins/claude-code/tests/*.test.mjs",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "demo": "node scripts/demo.mjs"
+    "demo": "node scripts/demo.mjs",
+    "publish:check": "node scripts/publish-check.mjs",
+    "publish:check:python": "node scripts/publish-check-python.mjs"
   },
   "engines": { "node": ">=22.13" },
   "devDependencies": { "typescript": "^5.6.0" }

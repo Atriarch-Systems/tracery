@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -7,11 +7,11 @@ name = "atriarch-tracery"
 version = "0.1.0"
 description = "Tracery emitter SDK: stdlib-only Python client for the Tracery wire contract."
 readme = "README.md"
-license = { text = "Apache-2.0" }
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
 requires-python = ">=3.11"
 authors = [{ name = "Atriarch Systems" }]
 classifiers = [
-  "License :: OSI Approved :: Apache Software License",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
@@ -21,6 +21,9 @@ classifiers = [
 dependencies = []
 
 [project.urls]
+Homepage = "https://github.com/atriarch-systems/tracery/tree/main/clients/python#readme"
+Repository = "https://github.com/atriarch-systems/tracery"
+Issues = "https://github.com/atriarch-systems/tracery/issues"
 Funding = "https://ko-fi.com/demonslyr"
 
 [project.optional-dependencies]
