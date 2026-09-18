@@ -161,6 +161,15 @@ session's flow.
 - The emitter never prints anything on success and at most one line to
   stderr on a config problem; it does not surface hub-side rejections
   (see `GET /v1/flows/:id` on the hub to inspect what actually landed).
+- **Recording raw hook payloads**: set `TRACERY_PLUGIN_CAPTURE_DIR=<dir>` and
+  every hook invocation writes the *raw, unmapped* payload it received on
+  stdin to `<dir>/<hook_event_name>-<n>.json` (verbatim JSON, before
+  redaction) in addition to its normal behaviour. This is a debugging aid for
+  comparing what Claude Code actually sends against this plugin's fixtures
+  and mapper -- it is never active unless you set the variable, and the files
+  it writes are **unredacted**: full tool input/output, prompts, file paths.
+  Only use it in a scratch directory you control, and delete the captures
+  when done; never point it at anything synced or shared.
 
 ## Tests
 

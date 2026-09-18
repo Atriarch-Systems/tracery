@@ -151,6 +151,70 @@ when installed as plain settings.json hooks.
 Install for development: `claude --plugin-dir ./plugins/claude-code`. From a
 marketplace: `/plugin install <name>@<marketplace>`.
 
+## Observed on 2.1.258
+
+Recorded 2026-09-18 by running real headless (`claude -p`) sessions with this
+plugin loaded and `TRACERY_PLUGIN_CAPTURE_DIR` set (see README.md
+"Troubleshooting"), against `claude` 2.1.258 on Windows/Node 22. Three
+sessions: a direct `Bash` tool call, an `Agent`-tool subagent dispatch, and a
+`Read` on a missing path (to trigger `PostToolUseFailure`). Where this
+disagrees with the documented shape above, the payload actually sent wins;
+the plugin's mapper (`hooks/map.mjs`) now reads the real field name, with a
+fallback to the documented one kept where cheap.
+
+| Documented field | Real field (2.1.258) | Event(s) |
+| --- | --- | --- |
+| `start_reason` | `source` | `SessionStart` |
+| `user_prompt` | `prompt` | `UserPromptSubmit` |
+| `tool_output` | `tool_response` | `PostToolUse` |
+| `end_reason` | `reason` | `SessionEnd` |
+
+Other differences:
+
+- **`SessionStart` in headless (`-p`) mode carries only `session_id`,
+  `transcript_path`, `cwd`, `hook_event_name`, `source`.** No `model`, no
+  `permission_mode`, despite both being commonly assumed present. (Whether an
+  interactive session sends them was not tested here.)
+- **`SubagentStart` never carries `agent_description`** in any of the three
+  captured sessions, only `session_id`, `transcript_path`, `cwd`, `prompt_id`,
+  `agent_id`, `agent_type`, `hook_event_name`. The "correlate on matching
+  `agent_description`" heuristic described above cannot fire at all against a
+  real payload. The plugin's fallback: when there is nothing to match against
+  and exactly one `Agent` tool call is in flight, correlate to it.
+- **`PostToolUse`'s `tool_response` for `Bash` is an object**, not a bare
+  string: `{ stdout, stderr, interrupted, isImage, noOutputExpected }`. Byte-
+  counting the whole JSON envelope (as a naive `tool_output`-shaped mapper
+  would) overcounts and includes some of the envelope's own boilerplate
+  rather than the actual command output; the mapper counts `stdout + stderr`
+  for this shape and falls back to `JSON.stringify` of the whole value
+  otherwise (e.g. the `Agent` tool's richer `tool_response` object: `{
+  status, prompt, agentId, agentType, content, resolvedModel,
+  totalDurationMs, totalTokens, totalToolUseCount, usage, toolStats, ... }`).
+- **`PostToolUse`/`PostToolUseFailure` carry their own `duration_ms`** (a
+  number, milliseconds) alongside the fields above -- useful as a fallback
+  when this process's own start-time bookkeeping was lost (state file
+  deleted, hub/spool dir cleared).
+- **`PostToolUseFailure`'s `error` field matches the documented shape** (a
+  string) and additionally carries `is_interrupt` (boolean) and `duration_ms`.
+- **`Stop`/`SubagentStop` additionally carry** `background_tasks` (array) and
+  `session_crons` (array), undocumented above and unused by this plugin.
+- **`SubagentStop` additionally carries** `agent_transcript_path`.
+- **The `Agent` tool's `tool_input`** additionally carries `prompt` (the task
+  text handed to the subagent) and `run_in_background` (boolean) alongside
+  the documented `description`/`subagent_type`. `prompt` is not on the
+  privacy allowlist for the `Agent` tool (only `description`/`subagent_type`
+  are) and must never be forwarded.
+- **Every turn-scoped event carries `effort: { level }`** (e.g. `"high"`),
+  matching the "common to nearly all events" note above; not used by this
+  plugin.
+- Not exercised by these three sessions (still only the documented shape,
+  unverified live): `PreCompact`/`PostCompact`, `StopFailure`, an MCP tool
+  call, an interactive (non-`-p`) `SessionStart` with `model`/
+  `permission_mode` present. The corresponding fixtures
+  (`tests/fixtures/pre-compact.json`, `post-compact.json`,
+  `stop-failure.json`, `pre-tool-use-mcp.json`) are marked with a
+  `_fixture_note` field recording this.
+
 ## Sources
 
 - https://code.claude.com/docs/en/hooks-guide.md

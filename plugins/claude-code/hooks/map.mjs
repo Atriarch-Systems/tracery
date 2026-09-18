@@ -80,6 +80,34 @@ function stringifyOutput(output) {
   }
 }
 
+/**
+ * Claude Code 2.1.258 sends the tool's result on PostToolUse as
+ * `tool_response`, not the documented `tool_output` -- the latter is kept as
+ * a fallback in case an older/different build still sends it. See "Observed
+ * on 2.1.258" in docs/research/claude-code-hooks.md.
+ */
+function resolveToolResponse(p) {
+  return p.tool_response !== undefined ? p.tool_response : p.tool_output;
+}
+
+/**
+ * For a Bash-shaped response ({ stdout, stderr, ... }), byte-count only the
+ * actual output text rather than the whole JSON envelope (interrupted,
+ * isImage, noOutputExpected, ...); everything else falls back to
+ * stringifyOutput's generic JSON stringification.
+ */
+function stringifyToolOutput(output) {
+  if (
+    output &&
+    typeof output === 'object' &&
+    !Array.isArray(output) &&
+    (typeof output.stdout === 'string' || typeof output.stderr === 'string')
+  ) {
+    return `${output.stdout ?? ''}${output.stderr ?? ''}`;
+  }
+  return stringifyOutput(output);
+}
+
 function firstLineTruncated(text, max) {
   const s = typeof text === 'string' ? text : text == null ? '' : String(text);
   const line = s.split(/\r?\n/, 1)[0] ?? '';
@@ -160,10 +188,16 @@ function flowFor(payload, sessionId) {
   return payload.agent_id ? `${sessionId}/agent-${payload.agent_id}` : sessionId;
 }
 
+/**
+ * Claude Code 2.1.258's SessionStart payload in headless (`-p`) sessions
+ * carries only `cwd` (and `source`) -- no `model`. Label from the cwd
+ * basename alone in that case; append the model only when the payload
+ * actually has one (observed: present is not documented as guaranteed).
+ */
 function mainRootLabel(payload) {
   const rawCwd = typeof payload.cwd === 'string' && payload.cwd.length > 0 ? payload.cwd : '.';
   const base = basename(rawCwd) || rawCwd;
-  return `${base} · ${payload.model ?? 'claude'}`;
+  return typeof payload.model === 'string' && payload.model.length > 0 ? `${base} · ${payload.model}` : base;
 }
 
 /**
@@ -203,8 +237,14 @@ export function mapHookToEvents(payload, state, now) {
         root: true,
         label: mainRootLabel(p),
         actor: { id: 'agent:claude-code', kind: 'agent' },
+        // Real payloads (2.1.258) name this field `source`, not the
+        // documented `start_reason`; the emitted context key stays
+        // `start_reason` for schema stability, `source` wins when both are
+        // present. `model`/`permission_mode` are commonly absent entirely in
+        // headless (`-p`) sessions -- compact() drops them rather than
+        // sending `null`.
         context: compact({
-          start_reason: p.start_reason,
+          start_reason: p.source ?? p.start_reason,
           cwd: typeof p.cwd === 'string' ? p.cwd : undefined,
           model: p.model,
           permission_mode: p.permission_mode,
@@ -219,18 +259,30 @@ export function mapHookToEvents(payload, state, now) {
     if (!next.rootStarted) startMainRoot();
   };
 
-  const correlateAgentCall = (description) => {
-    if (description == null) return undefined;
-    const matches = Object.entries(next.agentCalls).filter(([, v]) => v && v.description === description);
-    return matches.length === 1 ? matches[0][0] : undefined;
+  const correlateAgentCall = (description, allowSingleInFlightFallback) => {
+    if (description != null) {
+      const matches = Object.entries(next.agentCalls).filter(([, v]) => v && v.description === description);
+      return matches.length === 1 ? matches[0][0] : undefined;
+    }
+    if (!allowSingleInFlightFallback) return undefined;
+    // Claude Code 2.1.258's SubagentStart payload does not carry
+    // agent_description at all (documented, but not observed live) -- with
+    // nothing to match on, fall back to "exactly one Agent call in flight" so
+    // the common single-subagent case still gets a parentOp instead of
+    // silently losing the link every time. Only used for a real SubagentStart
+    // (see the call site below); the missed-SubagentStart fallback in
+    // ensureChildRoot deliberately does not opt into this -- it has even
+    // less certainty that the in-flight call is the right one.
+    const inFlight = Object.entries(next.agentCalls);
+    return inFlight.length === 1 ? inFlight[0][0] : undefined;
   };
 
-  const startChildRoot = (agentId, agentType, description) => {
+  const startChildRoot = (agentId, agentType, description, options) => {
     const flow = `${sessionId}/agent-${agentId}`;
     // Correlate on the raw, unclamped description so a long description still
     // matches its in-flight Agent tool call; only the emitted label/context
     // need bounding.
-    const parentOp = correlateAgentCall(description);
+    const parentOp = correlateAgentCall(description, Boolean(options?.allowSingleInFlightFallback));
     const boundedDescription = clampChars(description, MAX_LABEL_CHARS);
     events.push(
       mkEvent({
@@ -268,7 +320,9 @@ export function mapHookToEvents(payload, state, now) {
     case 'UserPromptSubmit': {
       ensureMainRoot();
       const includePrompts = Boolean(next.config?.includePrompts);
-      const text = typeof p.user_prompt === 'string' ? p.user_prompt : '';
+      // Real payloads (2.1.258) name this field `prompt`, not the documented
+      // `user_prompt`; the latter is kept as a fallback.
+      const text = typeof p.prompt === 'string' ? p.prompt : typeof p.user_prompt === 'string' ? p.user_prompt : '';
       const bounded = includePrompts ? truncateToBytes(text, MAX_PROMPT_BYTES) : undefined;
       events.push(
         mkEvent({
@@ -322,7 +376,14 @@ export function mapHookToEvents(payload, state, now) {
       const toolUseId = String(p.tool_use_id ?? '');
       const started = next.tools[toolUseId];
       const cls = classifyTool(p.tool_name);
-      const durationMs = started ? Math.max(0, now - started.ts) : undefined;
+      // Prefer our own persisted start time; fall back to the payload's own
+      // `duration_ms` (present on real PostToolUse/PostToolUseFailure
+      // payloads) when the start was never recorded, e.g. state was lost.
+      const durationMs = started
+        ? Math.max(0, now - started.ts)
+        : typeof p.duration_ms === 'number'
+          ? p.duration_ms
+          : undefined;
       const failure = p.hook_event_name === 'PostToolUseFailure';
       events.push(
         mkEvent({
@@ -335,7 +396,7 @@ export function mapHookToEvents(payload, state, now) {
           durationMs,
           context: failure
             ? { error: firstLineTruncated(p.error, 200) }
-            : compact({ output_bytes: byteLength(stringifyOutput(p.tool_output)) }),
+            : compact({ output_bytes: byteLength(stringifyToolOutput(resolveToolResponse(p))) }),
         }),
       );
       delete next.tools[toolUseId];
@@ -347,7 +408,7 @@ export function mapHookToEvents(payload, state, now) {
       const agentId = String(p.agent_id ?? '');
       const description = typeof p.agent_description === 'string' ? p.agent_description : undefined;
       if (!next.subagents[agentId]?.rootStarted) {
-        startChildRoot(agentId, p.agent_type, description);
+        startChildRoot(agentId, p.agent_type, description, { allowSingleInFlightFallback: true });
       }
       break;
     }
@@ -423,7 +484,11 @@ export function mapHookToEvents(payload, state, now) {
 
     case 'SessionEnd': {
       ensureMainRoot();
-      const status = p.end_reason === 'clear' ? 'cancelled' : 'success';
+      // Real payloads (2.1.258) name this field `reason`, not the documented
+      // `end_reason`; the emitted context key stays `end_reason` for schema
+      // stability, `reason` wins when both are present.
+      const endReason = p.reason ?? p.end_reason;
+      const status = endReason === 'clear' ? 'cancelled' : 'success';
       const durationMs = next.rootStartedAt != null ? Math.max(0, now - next.rootStartedAt) : undefined;
       events.push(
         mkEvent({
@@ -434,7 +499,7 @@ export function mapHookToEvents(payload, state, now) {
           name: 'session',
           status,
           durationMs,
-          context: compact({ end_reason: p.end_reason }),
+          context: compact({ end_reason: endReason }),
         }),
       );
       break;

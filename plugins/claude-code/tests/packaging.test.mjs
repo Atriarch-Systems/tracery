@@ -6,13 +6,32 @@
 // points at a plugin dir that moved" before a user's `/plugin install` does.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile, stat } from 'node:fs/promises';
+import { readFile, readdir, stat, mkdtemp, rm } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
+import { spawn } from 'node:child_process';
+import { tmpdir } from 'node:os';
+import { validateEvent } from '../../../packages/core/dist/index.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const pluginRoot = resolve(here, '..'); // plugins/claude-code
 const repoRoot = resolve(pluginRoot, '..', '..');
+const fixturesDir = join(here, 'fixtures');
+const emitPath = join(pluginRoot, 'hooks', 'emit.mjs');
+
+// Kebab-case: lowercase alphanumerics, hyphen-separated, no leading/trailing/
+// double hyphens. Claude Code plugin names must be shaped like this.
+const KEBAB_CASE_RE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+
+function assertValidAuthor(author, label) {
+  // Regression: an earlier plugin.json shipped `author` as a bare string,
+  // which Claude Code's plugin loader rejected -- this was only caught by
+  // running a real session, not by any test. `author` must be an object
+  // with at least a string `name`.
+  assert.ok(author && typeof author === 'object' && !Array.isArray(author), `${label}: author must be an object, not ${JSON.stringify(author)}`);
+  assert.equal(typeof author.name, 'string', `${label}: author.name must be a string`);
+  assert.ok(author.name.length > 0, `${label}: author.name must not be empty`);
+}
 
 async function readJson(path) {
   const raw = await readFile(path, 'utf8');
@@ -37,6 +56,8 @@ test('repo-root marketplace.json parses and lists the tracery plugin', async () 
   const entry = marketplace.plugins.find((p) => p.name === 'tracery');
   assert.ok(entry, 'marketplace.json must list a plugin named "tracery"');
   assert.equal(entry.source, './plugins/claude-code');
+  assert.match(entry.name, KEBAB_CASE_RE, `marketplace plugin entry "name" must be kebab-case, got "${entry.name}"`);
+  assertValidAuthor(entry.author, 'marketplace.json plugins[].author');
 
   // The relative source must actually resolve to a directory containing a
   // plugin manifest, from the marketplace root (the repo root).
@@ -49,9 +70,14 @@ test('repo-root marketplace.json parses and lists the tracery plugin', async () 
   );
 });
 
-test('plugin.json parses and its hooks/skills paths resolve to real files', async () => {
+test('plugin.json parses, its manifest fields are well-formed, and its hooks/skills paths resolve to real files', async () => {
   const plugin = await readJson(join(pluginRoot, '.claude-plugin', 'plugin.json'));
   assert.equal(plugin.name, 'tracery');
+  assert.match(plugin.name, KEBAB_CASE_RE, `plugin.json "name" must be kebab-case, got "${plugin.name}"`);
+  // Regression: plugin.json's `author` previously shipped as a bare string
+  // ("Atriarch Systems"), which only failed when Claude Code actually tried
+  // to load the plugin -- not caught by any test until then.
+  assertValidAuthor(plugin.author, 'plugin.json');
   assert.equal(typeof plugin.hooks, 'string', 'this plugin declares hooks as a path, not inline');
 
   const hooksPath = resolve(pluginRoot, plugin.hooks);
@@ -101,12 +127,123 @@ test('hooks.json only references command files that exist', async () => {
 test('every skill referenced under skills/ has a SKILL.md', async () => {
   const plugin = await readJson(join(pluginRoot, '.claude-plugin', 'plugin.json'));
   const skillsPath = resolve(pluginRoot, plugin.skills);
-  const { readdir } = await import('node:fs/promises');
   const entries = await readdir(skillsPath, { withFileTypes: true });
   const skillDirs = entries.filter((e) => e.isDirectory());
   assert.ok(skillDirs.length > 0, `no skill directories found under ${plugin.skills}`);
   for (const dir of skillDirs) {
     const skillMd = join(skillsPath, dir.name, 'SKILL.md');
     assert.ok(await exists(skillMd), `skills/${dir.name} has no SKILL.md`);
+  }
+});
+
+// Text that must never appear verbatim in emitted events for a given REAL
+// captured fixture (the plugin's privacy contract -- see docs/CLAUDE-CODE-
+// PLUGIN.md "Privacy: what is sent, what never is"). Fixtures not listed
+// here contribute no forbidden text of their own (e.g. SessionStart/
+// SessionEnd carry nothing free-text shaped).
+const FORBIDDEN_TEXT_BY_FIXTURE = {
+  'user-prompt-submit': (p) => [p.prompt],
+  'pre-tool-use-bash': (p) => [p.tool_input?.command],
+  'post-tool-use-bash': (p) => [p.tool_response?.stdout],
+  'pre-tool-use-agent': (p) => [p.tool_input?.prompt],
+  'post-tool-use-agent': (p) => [p.tool_input?.prompt, p.tool_response?.content?.[0]?.text],
+  'subagent-post-tool-use': (p) => [typeof p.tool_response === 'string' ? p.tool_response : undefined],
+  stop: (p) => [p.last_assistant_message],
+  'subagent-stop': (p) => [p.last_assistant_message],
+};
+
+function runEmit(rawPayload, env, dataDir) {
+  return new Promise((resolvePromise, reject) => {
+    const child = spawn(process.execPath, [emitPath], {
+      env: { ...process.env, CLAUDE_PLUGIN_DATA: dataDir, ...env },
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    child.stdout.on('data', (d) => (stdout += d.toString()));
+    child.stderr.on('data', (d) => (stderr += d.toString()));
+    child.on('error', reject);
+    child.on('close', (code) => resolvePromise({ code, stdout, stderr }));
+    child.stdin.write(rawPayload);
+    child.stdin.end();
+  });
+}
+
+// Runs the real hook script (not just the pure mapper) against every fixture
+// that was actually captured from a live Claude Code 2.1.258 session (i.e.
+// lacks `_fixture_note`), in a plausible session order, then checks two
+// things about what actually reaches the spool: every event validates
+// against @atriarch/tracery-core's validateEvent, and none of the raw
+// command/prompt/file-content/tool-output text from those real payloads
+// leaked into it verbatim.
+test('emit.mjs run against every REAL captured fixture emits only valid, leak-free events', async () => {
+  const preferredOrder = [
+    'session-start',
+    'user-prompt-submit',
+    'pre-tool-use-bash',
+    'post-tool-use-bash',
+    'pre-tool-use-agent',
+    'subagent-start',
+    'subagent-pre-tool-use',
+    'subagent-post-tool-use',
+    'subagent-stop',
+    'post-tool-use-agent',
+    'post-tool-use-failure',
+    'stop',
+    'session-end',
+  ];
+
+  const entries = await readdir(fixturesDir);
+  const allNames = entries.filter((f) => f.endsWith('.json')).map((f) => f.slice(0, -'.json'.length));
+
+  const realNames = [];
+  const forbidden = new Set();
+  for (const name of allNames) {
+    const raw = await readFile(join(fixturesDir, `${name}.json`), 'utf8');
+    const payload = JSON.parse(raw);
+    if (payload._fixture_note) continue; // documented shape only, not a real capture -- excluded
+    realNames.push(name);
+    const collect = FORBIDDEN_TEXT_BY_FIXTURE[name];
+    if (collect) {
+      for (const text of collect(payload)) {
+        if (typeof text === 'string' && text.length > 0) forbidden.add(text);
+      }
+    }
+  }
+  assert.ok(realNames.length > 0, 'expected at least one REAL captured fixture (none had _fixture_note unset)');
+  assert.ok(forbidden.size > 0, 'expected at least one forbidden-text sample to check for leaks');
+
+  const ordered = [...preferredOrder.filter((n) => realNames.includes(n)), ...realNames.filter((n) => !preferredOrder.includes(n))];
+
+  const dataDir = await mkdtemp(join(tmpdir(), 'tracery-packaging-real-'));
+  // Hub deliberately unreachable: this test only needs what lands in the
+  // spool, not a live hub round-trip (that is emit.test.mjs's job).
+  const env = { CLAUDE_PLUGIN_OPTION_HUB_URL: 'http://127.0.0.1:1', CLAUDE_PLUGIN_OPTION_API_KEY: 'test-key' };
+  try {
+    for (const name of ordered) {
+      const raw = await readFile(join(fixturesDir, `${name}.json`), 'utf8');
+      const { code, stdout, stderr } = await runEmit(raw, env, dataDir);
+      assert.equal(code, 0, `emit.mjs exited nonzero for fixture "${name}": ${stderr}`);
+      assert.equal(stdout, '', `emit.mjs printed to stdout for fixture "${name}"`);
+    }
+
+    const { spoolPathFor } = await import('../hooks/emit.mjs');
+    const spoolPath = spoolPathFor(dataDir, { hubUrl: 'http://127.0.0.1:1', apiKey: 'test-key', workspace: 'default' });
+    const spoolRaw = await readFile(spoolPath, 'utf8');
+    const lines = spoolRaw.split('\n').filter((l) => l.trim().length > 0);
+    assert.ok(lines.length > 0, 'expected at least one spooled event from the real fixtures');
+    const events = lines.map((l) => JSON.parse(l));
+
+    for (const event of events) {
+      const result = validateEvent(event);
+      assert.equal(result.ok, true, result.ok ? '' : `event ${event.id} (${event.type} on ${event.node}) invalid: ${result.reason}`);
+    }
+
+    const serialized = JSON.stringify(events);
+    for (const needle of forbidden) {
+      assert.equal(serialized.includes(needle), false, `forbidden content leaked into emitted events: ${JSON.stringify(needle.slice(0, 80))}`);
+    }
+  } finally {
+    await rm(dataDir, { recursive: true, force: true });
   }
 });

@@ -302,6 +302,38 @@ function warn(message) {
   process.stderr.write(`tracery: ${message}\n`);
 }
 
+/**
+ * Debugging aid (see README.md "Troubleshooting"): when
+ * TRACERY_PLUGIN_CAPTURE_DIR is set, writes the raw hook payload -- verbatim,
+ * unredacted, before mapping -- to `${dir}/${hook_event_name}-${n}.json`.
+ * Never active unless the env var is explicitly set; failures here must never
+ * affect the hook's always-exit-0 contract, so every error is swallowed.
+ */
+async function captureRawPayload(captureDir, hookEventName, raw) {
+  if (!captureDir || captureDir.length === 0) return;
+  try {
+    await mkdir(captureDir, { recursive: true });
+    const safeName = typeof hookEventName === 'string' && hookEventName.length > 0 ? hookEventName : 'unknown';
+    let entries = [];
+    try {
+      entries = await readdir(captureDir);
+    } catch {
+      entries = [];
+    }
+    const prefix = `${safeName}-`;
+    let max = 0;
+    for (const name of entries) {
+      if (!name.startsWith(prefix) || !name.endsWith('.json')) continue;
+      const n = Number(name.slice(prefix.length, -'.json'.length));
+      if (Number.isInteger(n) && n > max) max = n;
+    }
+    const filePath = join(captureDir, `${safeName}-${max + 1}.json`);
+    await writeFile(filePath, raw, 'utf8');
+  } catch {
+    // Capture is best-effort debugging only; never let it break the hook.
+  }
+}
+
 async function main() {
   const env = process.env;
   const config = readConfig(env);
@@ -334,6 +366,8 @@ async function main() {
     warn('failed to parse hook payload JSON');
     return;
   }
+
+  await captureRawPayload(env.TRACERY_PLUGIN_CAPTURE_DIR, payload.hook_event_name, raw);
 
   const sessionId = typeof payload.session_id === 'string' ? payload.session_id : '';
   if (sessionId.length === 0) {

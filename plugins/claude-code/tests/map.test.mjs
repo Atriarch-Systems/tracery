@@ -53,7 +53,12 @@ test('every fixture produces only valid Activity events', async () => {
   }
 });
 
-test('SessionStart emits a root start with the documented shape', async () => {
+// Regression for the plugin's real-vs-documented mismatch: a real Claude
+// Code 2.1.258 SessionStart payload (headless `-p` sessions) carries only
+// `cwd` and `source` -- no `model`, no `permission_mode`, and the reason
+// field is named `source`, not the documented `start_reason`. See "Observed
+// on 2.1.258" in docs/research/claude-code-hooks.md.
+test('SessionStart emits a root start matching the real (not documented) 2.1.258 shape', async () => {
   const payload = await fixture('session-start');
   const { events } = mapHookToEvents(payload, createInitialState(), 1000);
   assert.equal(events.length, 1);
@@ -66,11 +71,45 @@ test('SessionStart emits a root start with the documented shape', async () => {
   assert.equal(root.root, true);
   assert.equal(root.actor.id, 'agent:claude-code');
   assert.equal(root.actor.kind, 'agent');
-  assert.equal(root.label, 'my-project · claude-opus-4');
+  // No model in the payload -> label is just the cwd basename, no " · <model>" suffix.
+  assert.equal(root.label, 'my-project');
   assert.equal(root.context.start_reason, 'startup');
   assert.equal(root.context.cwd, '/home/user/my-project');
+  assert.equal(root.context.model, undefined);
+  assert.equal(root.context.permission_mode, undefined);
+});
+
+// When a payload *does* carry model/permission_mode (documented as optional;
+// not observed in the headless captures behind this plugin's fixtures, but
+// still handled), both the label and context still pick them up.
+test('SessionStart includes the model in the label and context when the payload carries one', async () => {
+  const payload = {
+    session_id: 'sess-main-1',
+    cwd: '/home/user/my-project',
+    permission_mode: 'default',
+    hook_event_name: 'SessionStart',
+    source: 'startup',
+    model: 'claude-opus-4',
+  };
+  const { events } = mapHookToEvents(payload, createInitialState(), 1000);
+  const [root] = events;
+  assertAllValid(events);
+  assert.equal(root.label, 'my-project · claude-opus-4');
   assert.equal(root.context.model, 'claude-opus-4');
   assert.equal(root.context.permission_mode, 'default');
+});
+
+// Backward-compat fallback: an older/different build that still sends the
+// documented `start_reason` field (instead of `source`) is still honoured.
+test('SessionStart falls back to the documented start_reason field when source is absent', async () => {
+  const payload = {
+    session_id: 'sess-main-1',
+    cwd: '/home/user/my-project',
+    hook_event_name: 'SessionStart',
+    start_reason: 'resume',
+  };
+  const { events } = mapHookToEvents(payload, createInitialState(), 1000);
+  assert.equal(events[0].context.start_reason, 'resume');
 });
 
 test('tool start/end pairing records durationMs from the persisted start time', async () => {
@@ -148,7 +187,7 @@ test('redaction: the Bash command text and prompt text never appear in emitted e
   assert.equal(serialized.includes(bashPayload.tool_input.command), false, 'full Bash command text leaked into events');
 
   const promptPayload = await fixture('user-prompt-submit');
-  assert.equal(serialized.includes(promptPayload.user_prompt), false, 'full prompt text leaked into events');
+  assert.equal(serialized.includes(promptPayload.prompt), false, 'full prompt text leaked into events');
   assert.equal(serialized.includes('sk-secret-123'), false, 'secret-looking token from the prompt leaked into events');
 
   function collect(payload, s, ts, sink) {
@@ -165,14 +204,35 @@ test('UserPromptSubmit includes prompt text only when include_prompts is true', 
   const withoutPrompts = mapHookToEvents(payload, { ...state, config: { includePrompts: false } }, 1000);
   const annotateWithout = withoutPrompts.events.find((e) => e.type === 'annotate');
   assert.equal(annotateWithout.context.prompt, undefined);
-  assert.equal(annotateWithout.context.prompt_chars, payload.user_prompt.length);
+  assert.equal(annotateWithout.context.prompt_chars, payload.prompt.length);
 
   const withPrompts = mapHookToEvents(payload, { ...state, config: { includePrompts: true } }, 1000);
   const annotateWith = withPrompts.events.find((e) => e.type === 'annotate');
-  assert.equal(annotateWith.context.prompt, payload.user_prompt);
+  assert.equal(annotateWith.context.prompt, payload.prompt);
 });
 
-test('subagent child flow: single matching in-flight Agent call sets parentOp', async () => {
+// Regression: the real field is `prompt` (see above), not the documented
+// `user_prompt` -- an older/different build sending the documented field is
+// still honoured as a fallback.
+test('UserPromptSubmit falls back to the documented user_prompt field when prompt is absent', async () => {
+  const payload = {
+    session_id: 'sess-main-1',
+    cwd: '/home/user/my-project',
+    hook_event_name: 'UserPromptSubmit',
+    user_prompt: 'fall back to the old field name',
+  };
+  const state = createInitialState();
+  const { events } = mapHookToEvents(payload, { ...state, config: { includePrompts: true } }, 1000);
+  const annotate = events.find((e) => e.type === 'annotate');
+  assert.equal(annotate.context.prompt, 'fall back to the old field name');
+  assert.equal(annotate.context.prompt_chars, payload.user_prompt.length);
+});
+
+// Real Claude Code 2.1.258 SubagentStart payloads carry no agent_description
+// at all (see docs/research/claude-code-hooks.md "Observed on 2.1.258"), so
+// the label falls back to agent_type and correlation falls back to "exactly
+// one Agent call in flight" rather than a description match.
+test('subagent child flow: SubagentStart (no agent_description) correlates the sole in-flight Agent call', async () => {
   let state = createInitialState();
   ({ state } = mapHookToEvents(await fixture('session-start'), state, 1000));
   ({ state } = mapHookToEvents(await fixture('pre-tool-use-agent'), state, 1100));
@@ -184,7 +244,7 @@ test('subagent child flow: single matching in-flight Agent call sets parentOp', 
   assert.equal(root.flow, 'sess-main-1/agent-agent-77');
   assert.equal(root.actor.id, 'agent:claude-code/general-purpose');
   assert.equal(root.actor.kind, 'subagent');
-  assert.equal(root.label, 'Research the widget API');
+  assert.equal(root.label, 'general-purpose');
   assert.equal(root.link.parentFlow, 'sess-main-1');
   assert.equal(root.link.parentNode, 'tool:Agent');
   assert.equal(root.link.parentOp, 'toolu_02AGENT');
@@ -255,12 +315,24 @@ test('SessionEnd clears in-memory root tracking (emit.mjs deletes the persisted 
   assert.equal(afterEnd.rootStarted, true); // map.mjs does not clear disk state; emit.mjs deletes the file
 });
 
-test('SessionEnd with end_reason "clear" maps to status cancelled', async () => {
+test('SessionEnd with reason "clear" maps to status cancelled', async () => {
   let state = createInitialState();
   ({ state } = mapHookToEvents(await fixture('session-start'), state, 1000));
-  const { events } = mapHookToEvents({ ...(await fixture('session-end')), end_reason: 'clear' }, state, 2000);
+  // Real payloads (2.1.258) name this field `reason`, not the documented
+  // `end_reason`.
+  const { events } = mapHookToEvents({ ...(await fixture('session-end')), reason: 'clear' }, state, 2000);
   const end = events.find((e) => e.type === 'end');
   assert.equal(end.status, 'cancelled');
+});
+
+test('SessionEnd falls back to the documented end_reason field when reason is absent', async () => {
+  let state = createInitialState();
+  ({ state } = mapHookToEvents(await fixture('session-start'), state, 1000));
+  const payload = { session_id: 'sess-main-1', cwd: '/home/user/my-project', hook_event_name: 'SessionEnd', end_reason: 'logout' };
+  const { events } = mapHookToEvents(payload, state, 2000);
+  const end = events.find((e) => e.type === 'end');
+  assert.equal(end.context.end_reason, 'logout');
+  assert.equal(end.status, 'success');
 });
 
 test('Stop annotates turn_complete and last_message_chars without leaking the message text', async () => {
@@ -446,4 +518,103 @@ test('privacy contract: no tool_input value leaks except the documented allowlis
   const serialized = JSON.stringify(events);
   assert.equal(serialized.includes('sk-live-XYZ'), false);
   assert.equal(serialized.includes('contents-that-must-not-leak'), false);
+});
+
+// Regression for the real-vs-documented mismatch: a real PostToolUse payload
+// (2.1.258) reports the tool's result as `tool_response`, not the documented
+// `tool_output` -- a mapper reading the wrong field name silently computes
+// output_bytes from `undefined` (byte length 0) instead of the real output.
+// See "Observed on 2.1.258" in docs/research/claude-code-hooks.md.
+test('output_bytes is computed from tool_response (the real field), not the documented tool_output', async () => {
+  let state = createInitialState();
+  ({ state } = mapHookToEvents(await fixture('session-start'), state, 1000));
+  ({ state } = mapHookToEvents(
+    {
+      session_id: 'sess-main-1',
+      cwd: '/home/user/my-project',
+      hook_event_name: 'PreToolUse',
+      tool_name: 'Bash',
+      tool_input: { command: 'echo tracery-capture' },
+      tool_use_id: 'toolu_REALFIELD',
+    },
+    state,
+    1100,
+  ));
+
+  // Bash-shaped tool_response: { stdout, stderr, ... } -- only stdout+stderr
+  // are counted, not the whole envelope (interrupted, isImage, ...).
+  const { events } = mapHookToEvents(
+    {
+      session_id: 'sess-main-1',
+      cwd: '/home/user/my-project',
+      hook_event_name: 'PostToolUse',
+      tool_name: 'Bash',
+      tool_input: { command: 'echo tracery-capture' },
+      tool_use_id: 'toolu_REALFIELD',
+      tool_response: { stdout: 'tracery-capture', stderr: '', interrupted: false, isImage: false, noOutputExpected: false },
+    },
+    state,
+    1200,
+  );
+  assertAllValid(events);
+  const end = events.find((e) => e.type === 'end');
+  assert.equal(end.context.output_bytes, Buffer.byteLength('tracery-capture', 'utf8'));
+});
+
+test('output_bytes falls back to the documented tool_output field when tool_response is absent', async () => {
+  let state = createInitialState();
+  ({ state } = mapHookToEvents(await fixture('session-start'), state, 1000));
+  const { events } = mapHookToEvents(
+    {
+      session_id: 'sess-main-1',
+      cwd: '/home/user/my-project',
+      hook_event_name: 'PostToolUse',
+      tool_name: 'Read',
+      tool_input: { file_path: '/home/user/my-project/README.md' },
+      tool_use_id: 'toolu_FALLBACK',
+      tool_output: 'hello world',
+    },
+    state,
+    1100,
+  );
+  const end = events.find((e) => e.type === 'end');
+  assert.equal(end.context.output_bytes, Buffer.byteLength('hello world', 'utf8'));
+});
+
+// A non-Bash-shaped tool_response (no stdout/stderr, e.g. the Agent tool's
+// rich result object) is byte-counted as a whole via JSON.stringify, same as
+// the generic fallback always did.
+test('output_bytes stringifies a non-Bash-shaped tool_response as a whole', async () => {
+  let state = createInitialState();
+  ({ state } = mapHookToEvents(await fixture('session-start'), state, 1000));
+  ({ state } = mapHookToEvents(await fixture('pre-tool-use-agent'), state, 1100));
+  const { events } = mapHookToEvents(await fixture('post-tool-use-agent'), state, 1200);
+  assertAllValid(events);
+  const end = events.find((e) => e.type === 'end' && e.op === 'toolu_02AGENT');
+  const payload = await fixture('post-tool-use-agent');
+  assert.equal(end.context.output_bytes, Buffer.byteLength(JSON.stringify(payload.tool_response), 'utf8'));
+});
+
+// Regression: PostToolUse/PostToolUseFailure payloads carry their own
+// `duration_ms`; when this process never saw the matching PreToolUse (state
+// was lost, e.g. a restarted hub or a cleared spool dir), fall back to it
+// instead of leaving durationMs undefined.
+test('durationMs falls back to the payload\'s own duration_ms when the start was never recorded', async () => {
+  const state = createInitialState(); // no PreToolUse ever recorded
+  const { events } = mapHookToEvents(
+    {
+      session_id: 'sess-main-1',
+      cwd: '/home/user/my-project',
+      hook_event_name: 'PostToolUse',
+      tool_name: 'Bash',
+      tool_input: { command: 'echo hi' },
+      tool_use_id: 'toolu_NOSTART',
+      tool_response: { stdout: 'hi', stderr: '' },
+      duration_ms: 1485,
+    },
+    state,
+    1000,
+  );
+  const end = events.find((e) => e.type === 'end');
+  assert.equal(end.durationMs, 1485);
 });

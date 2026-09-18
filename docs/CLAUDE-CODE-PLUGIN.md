@@ -87,23 +87,31 @@ One flow per session (`flow = session_id`); one child flow per subagent
 
 | Hook | Activity event(s) |
 | --- | --- |
-| `SessionStart` | root `start`. `actor: { id: "agent:claude-code", kind: "agent" }`, `label: "<cwd basename> · <model>"`, `context: { start_reason, cwd, model, permission_mode }`. |
-| `UserPromptSubmit` | `annotate` on the root op: `context: { prompt_chars }`, plus `prompt: <text>` only when `include_prompts` is true. |
+| `SessionStart` | root `start`. `actor: { id: "agent:claude-code", kind: "agent" }`, `label: "<cwd basename>"` (`"<cwd basename> · <model>"` only when the payload actually carries a `model` -- real 2.1.258 headless sessions do not), `context: { start_reason, cwd, model?, permission_mode? }` (`start_reason` reads the payload's `source` field, falling back to the documented `start_reason` name). |
+| `UserPromptSubmit` | `annotate` on the root op: `context: { prompt_chars }`, plus `prompt: <text>` only when `include_prompts` is true. Reads the payload's `prompt` field, falling back to the documented `user_prompt` name. |
 | `PreToolUse` | op `start`, `op: tool_use_id`, `node: "tool:<tool_name>"` (`"mcp:<server>"` for `mcp__<server>__<tool>`, with `name` set to the leaf tool), `kind: "tool"` (`"agent"` for the `Agent` tool, `"mcp"` for MCP tools), `parentOp`/`parentNode` = the flow's root. `context` is a redacted summary -- see below. |
-| `PostToolUse` | op `end`, `status: "success"`, `durationMs` from the persisted start time, `context: { output_bytes }`. |
+| `PostToolUse` | op `end`, `status: "success"`, `durationMs` from the persisted start time (falling back to the payload's own `duration_ms` when no start was recorded), `context: { output_bytes }` -- the UTF-8 byte length of the payload's `tool_response` field (falling back to the documented `tool_output` name): `stdout.length + stderr.length` for a Bash-shaped `{ stdout, stderr, ... }` response, `JSON.stringify(...).length` otherwise. |
 | `PostToolUseFailure` | op `end`, `status: "error"`, `context: { error }` (first line of the error, truncated to 200 chars). |
-| `SubagentStart` | child flow's root `start`. `actor: { id: "agent:claude-code/<agent_type>", kind: "subagent" }`, `label: agent_description ?? agent_type`, `link: { parentFlow: session_id, parentNode: "tool:Agent", parentOp? }` -- see correlation below. |
+| `SubagentStart` | child flow's root `start`. `actor: { id: "agent:claude-code/<agent_type>", kind: "subagent" }`, `label: agent_description ?? agent_type` -- real 2.1.258 payloads never carry `agent_description`, so in practice this is always `agent_type`. `link: { parentFlow: session_id, parentNode: "tool:Agent", parentOp? }` -- see correlation below. |
 | `SubagentStop` | child flow's root op `end`, `status: "success"`, `durationMs`, `context: { last_message_chars }`. |
 | `Stop` | `annotate` on the main root: `context: { turn_complete: true, last_message_chars }`. |
 | `StopFailure` | `annotate` on the main root: `context: { error_type }`. |
 | `PreCompact` / `PostCompact` | `annotate` on the main root: `context: { compact_reason }`. |
-| `SessionEnd` | main root op `end`, `status: "success"` (`"cancelled"` when `end_reason` is `"clear"`), `durationMs`, `context: { end_reason }`; the persisted state file is deleted. |
+| `SessionEnd` | main root op `end`, `status: "success"` (`"cancelled"` when the end reason is `"clear"`), `durationMs`, `context: { end_reason }`; the persisted state file is deleted. Reads the payload's `reason` field, falling back to the documented `end_reason` name. |
 
 If a subagent's tool call arrives before its `SubagentStart` was ever seen
 (a missed hook, or hooks arriving out of order), the child flow's root
 `start` is synthesized from that tool event instead, with `agent_type` as the
-label and `link.parentOp` always omitted (no `agent_description` is available
-on a tool payload to correlate with).
+label and `link.parentOp` always omitted -- deliberately, even though real
+`SubagentStart` payloads now get a same-shaped fallback (below): there is
+less certainty here that the sole in-flight `Agent` call is the right one,
+since this path only runs when a hook was already missed once.
+
+See [`docs/research/claude-code-hooks.md`](research/claude-code-hooks.md)
+"Observed on 2.1.258" for the full list of real-vs-documented field names
+this mapping was corrected against, including which of the field names above
+are the *real* ones (`source`, `prompt`, `tool_response`, `reason`) versus
+which are kept only as a fallback for the documented names.
 
 ### Redacted `tool_input` summaries
 
@@ -114,7 +122,7 @@ recognise the call:
 | --- | --- |
 | `Bash` | `{ command_token, command_length }` -- first whitespace-delimited token of the command, and the command's length. Never the command text. |
 | `Read`, `Write`, `Edit`, `Glob`, `Grep` | `{ file_path? , pattern? }` -- whichever the tool's input carries. Never file contents. |
-| `Agent` | `{ description?, subagent_type? }` -- the task description Claude itself wrote for the subagent, not a prompt in the "never forward it" sense; needed for the correlation heuristic below. |
+| `Agent` | `{ description?, subagent_type? }` -- the task description Claude itself wrote for the subagent, not a prompt in the "never forward it" sense; needed for the correlation heuristic below. Real payloads also carry `tool_input.prompt` (the subagent's actual task text) and `run_in_background`; neither is on this allowlist and neither is ever forwarded. |
 | anything else (including MCP tools) | `{ input_keys, input_bytes }` -- the input object's own key names and total serialized byte size, never its values. |
 
 ## Privacy: what is sent, what never is
@@ -137,17 +145,26 @@ in this table is fixed regardless of configuration.
 Claude Code does not document a way to correlate a `SubagentStart` event with
 the specific `Agent` tool call (`tool_use_id`) that spawned it (see
 [`docs/research/claude-code-hooks.md`](research/claude-code-hooks.md)
-"Subagents"). The plugin's heuristic: track every in-flight `Agent` tool call
-keyed by its `tool_input.description`; when a `SubagentStart` arrives with a
-matching `agent_description`, set `link.parentOp` to that call's
-`tool_use_id` only if **exactly one** in-flight call has that description.
+"Subagents"). The plugin's heuristic was designed around the documented
+`agent_description` field, but real 2.1.258 `SubagentStart` payloads never
+carry it at all, so in practice the heuristic actually used is:
 
-- One matching in-flight `Agent` call -> `link.parentOp` set, so the hub can
-  draw the spawn edge from the exact tool call.
-- Zero matches (no description, or nothing in flight with it) -> omitted.
-- Two or more in-flight `Agent` calls sharing the same description (e.g. two
-  identical-looking parallel subagent dispatches) -> omitted, deliberately,
-  rather than guessing which one it was.
+- If the payload *does* carry `agent_description` (a future/different build,
+  or the documented shape): track every in-flight `Agent` tool call keyed by
+  its `tool_input.description`; set `link.parentOp` to the matching call's
+  `tool_use_id` only if **exactly one** in-flight call has that description,
+  omit it if zero or more than one match.
+- If it does not (the observed, common case): fall back to "exactly one
+  `Agent` tool call in flight" -- with nothing to match against, this is the
+  only case where the spawn edge can be pinned with any confidence. Omitted
+  when zero or more than one `Agent` call is in flight (e.g. two parallel
+  subagent dispatches with no way to tell which `SubagentStart` belongs to
+  which).
+
+This single-in-flight-call fallback applies only to a real `SubagentStart`
+event, never to the missed-`SubagentStart` synthesis described above (a tool
+event opening the child root because the start hook itself never arrived) --
+that path always omits `parentOp`.
 
 The child flow itself is never ambiguous -- `flow =
 "${session_id}/agent-${agent_id}"` always identifies the right subagent. Only

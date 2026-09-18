@@ -1,12 +1,28 @@
 {
   "session_id": "sess-main-1",
   "prompt_id": "550e8400-e29b-41d4-a716-446655440000",
-  "transcript_path": "/home/user/.claude/projects/my-project/sess-main-1/transcript.jsonl",
+  "transcript_path": "/home/user/.claude/projects/my-project/sess-main-1.jsonl",
   "cwd": "/home/user/my-project",
   "permission_mode": "default",
   "hook_event_name": "PostToolUse",
   "tool_name": "Agent",
-  "tool_input": { "description": "Research the widget API", "subagent_type": "general-purpose", "prompt": "Look into how the widget API paginates results." },
+  "tool_input": {
+    "description": "Research the widget API",
+    "prompt": "Look into how the widget API paginates results.",
+    "subagent_type": "general-purpose",
+    "run_in_background": false
+  },
   "tool_use_id": "toolu_02AGENT",
-  "tool_output": "The widget API paginates with an opaque cursor query parameter."
+  "tool_response": {
+    "status": "completed",
+    "prompt": "Look into how the widget API paginates results.",
+    "agentId": "agent-77",
+    "agentType": "general-purpose",
+    "content": [{ "type": "text", "text": "The widget API paginates with an opaque cursor query parameter." }],
+    "resolvedModel": "claude-opus-4",
+    "totalDurationMs": 4200,
+    "totalTokens": 5000,
+    "totalToolUseCount": 1
+  },
+  "duration_ms": 4200
 }

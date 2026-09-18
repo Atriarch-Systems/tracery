@@ -1,9 +1,12 @@
 {
   "session_id": "sess-main-1",
-  "transcript_path": "/home/user/.claude/projects/my-project/sess-main-1/subagents/agent-77.jsonl",
+  "transcript_path": "/home/user/.claude/projects/my-project/sess-main-1.jsonl",
   "cwd": "/home/user/my-project",
+  "prompt_id": "550e8400-e29b-41d4-a716-446655440000",
   "hook_event_name": "SubagentStop",
   "agent_id": "agent-77",
   "agent_type": "general-purpose",
+  "stop_hook_active": false,
+  "agent_transcript_path": "/home/user/.claude/projects/my-project/sess-main-1/subagents/agent-77.jsonl",
   "last_assistant_message": "The widget API paginates with an opaque cursor query parameter."
 }

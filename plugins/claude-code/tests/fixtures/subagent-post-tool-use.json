@@ -8,7 +8,8 @@
   "tool_name": "Read",
   "tool_input": { "file_path": "/home/user/my-project/src/widgets/api.ts" },
   "tool_use_id": "toolu_03READ",
-  "tool_output": "export function listWidgets(cursor) { /* ... */ }",
+  "tool_response": "export function listWidgets(cursor) { /* ... */ }",
+  "duration_ms": 40,
   "agent_id": "agent-77",
   "agent_type": "general-purpose"
 }

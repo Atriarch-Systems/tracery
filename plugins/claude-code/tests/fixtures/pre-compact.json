@@ -1,4 +1,5 @@
 {
+  "_fixture_note": "documented shape (docs/research/claude-code-hooks.md), not captured from a real 2.1.258 session -- PreCompact never fired in the recorded capture sessions (no compaction was triggered)",
   "session_id": "sess-main-1",
   "transcript_path": "/home/user/.claude/projects/my-project/sess-main-1/transcript.jsonl",
   "cwd": "/home/user/my-project",

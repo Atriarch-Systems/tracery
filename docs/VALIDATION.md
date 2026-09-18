@@ -306,6 +306,14 @@ flow (`flow: "<session_id>/agent-<agent_id>"`) from the subagent in prompt
 `Agent` tool (some phrasings make Claude Code answer directly without
 spawning a subagent) — rephrase and retry before calling this a bug.
 
+The main flow's label is the `cwd` basename, plus ` · <model>` only if
+Claude Code's `SessionStart` payload actually included a `model` field —
+real 2.1.258 headless (`-p`) sessions do not send one, so seeing just the
+bare directory name in the label is expected, not a bug (see
+`docs/research/claude-code-hooks.md` "Observed on 2.1.258"; this track uses
+an interactive session, which was not itself captured, so either label shape
+is a PASS here).
+
 Finally, open (or curl) the deep link itself:
 
 ```sh
