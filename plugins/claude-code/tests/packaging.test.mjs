@@ -78,10 +78,16 @@ test('plugin.json parses, its manifest fields are well-formed, and its hooks/ski
   // ("Atriarch Systems"), which only failed when Claude Code actually tried
   // to load the plugin -- not caught by any test until then.
   assertValidAuthor(plugin.author, 'plugin.json');
-  assert.equal(typeof plugin.hooks, 'string', 'this plugin declares hooks as a path, not inline');
+  // Claude Code auto-loads hooks/hooks.json by convention; plugin.json must NOT
+  // also declare "hooks": "./hooks/hooks.json" -- that is a documented "duplicate
+  // hooks file" load failure (manifest.hooks is only for an ADDITIONAL file at a
+  // non-conventional path). Verified live: the plugin installed via the real
+  // marketplace flow (`claude plugin marketplace add` + `plugin install`) failed
+  // to load with exactly this error until the explicit "hooks" key was removed.
+  assert.equal(plugin.hooks, undefined, 'plugin.json must not declare "hooks" -- hooks/hooks.json is auto-loaded by convention; an explicit path duplicates it and Claude Code refuses to load the plugin');
 
-  const hooksPath = resolve(pluginRoot, plugin.hooks);
-  assert.ok(await exists(hooksPath), `plugin.json "hooks" points at ${plugin.hooks}, which does not exist`);
+  const hooksPath = resolve(pluginRoot, 'hooks', 'hooks.json');
+  assert.ok(await exists(hooksPath), 'the conventional hooks/hooks.json is missing');
 
   assert.equal(typeof plugin.skills, 'string');
   const skillsPath = resolve(pluginRoot, plugin.skills);
@@ -89,8 +95,7 @@ test('plugin.json parses, its manifest fields are well-formed, and its hooks/ski
 });
 
 test('hooks.json only references command files that exist', async () => {
-  const plugin = await readJson(join(pluginRoot, '.claude-plugin', 'plugin.json'));
-  const hooksPath = resolve(pluginRoot, plugin.hooks);
+  const hooksPath = resolve(pluginRoot, 'hooks', 'hooks.json');
   const hooksConfig = await readJson(hooksPath);
 
   assert.ok(hooksConfig.hooks && typeof hooksConfig.hooks === 'object');

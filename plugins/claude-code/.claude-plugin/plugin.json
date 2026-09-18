@@ -7,7 +7,6 @@
     "url": "https://atriarch.systems"
   },
   "license": "Apache-2.0",
-  "hooks": "./hooks/hooks.json",
   "skills": "./skills/",
   "userConfig": {
     "hub_url": {
