@@ -47,10 +47,32 @@ function MyPage() {
 
 ### Quick start: hub
 
+The fastest way to a running hub -- no Docker, no keys:
+
 ```
-docker run -d --name tracery-hub -p 8971:8971 atriarch/tracery-hub
-docker logs tracery-hub   # prints a dev API key on first boot
+npx @atriarch/tracery-hub
 ```
+
+That binds `127.0.0.1:8971`, runs entirely in memory, and serves the hosted
+UI at `http://127.0.0.1:8971/ui/` with auth off ("local mode" -- SPEC.md §6
+"Auth mode"): a single `default` workspace, no API key to generate or paste
+anywhere. Fine for a laptop, a demo, or trying the plugin; for anything a
+second person or process should reach, run it as a container instead with
+real keys:
+
+```
+docker run -d --name tracery-hub -p 8971:8971 \
+  -e TRACERY_API_KEYS='[{"id":"me","key":"CHANGE_ME","workspace":"default","roles":["ingest","read","admin"]}]' \
+  atriarch/tracery-hub
+```
+
+(a bare `docker run` with no env at all still starts -- the image's own
+default is `TRACERY_AUTH=none`, i.e. also local mode, since it binds
+`0.0.0.0` rather than loopback; see `apps/hub/README.md`.) Running on a
+cluster: `apps/hub/k8s/` (plain manifests) or the
+[Helm chart](apps/hub/helm/README.md) -- both expect real
+`TRACERY_API_KEYS`/`_FILE` to be configured, same as any other shared
+deployment.
 
 ```
 npm install @atriarch/tracery-client
@@ -60,7 +82,9 @@ npm install @atriarch/tracery-client
 import { ActivityTracer, httpTransport } from '@atriarch/tracery-client';
 
 const tracer = new ActivityTracer({
-  transport: httpTransport({ baseUrl: 'http://127.0.0.1:8971', apiKey: process.env.TRACERY_API_KEY! }),
+  // apiKey is optional against a local-mode hub (see above); against a hub
+  // configured with TRACERY_API_KEYS, pass one with the `ingest` role.
+  transport: httpTransport({ baseUrl: 'http://127.0.0.1:8971', apiKey: process.env.TRACERY_API_KEY }),
   actor: { id: 'agent:saga', kind: 'agent' },
 });
 const flow = tracer.startFlow({ label: 'Triage CVE-2026-1234' });
@@ -82,15 +106,23 @@ npm install @atriarch/tracery-react
 import { ActivityExplorer, useHubSource } from '@atriarch/tracery-react';
 
 function MyPage() {
-  const source = useHubSource({ baseUrl: 'http://127.0.0.1:8971', apiKey: '...', workspace: 'default' });
+  // apiKey is optional against a local-mode hub (npx @atriarch/tracery-hub, see above).
+  const source = useHubSource({ baseUrl: 'http://127.0.0.1:8971', workspace: 'default' });
   return <div style={{ height: '100vh' }}><ActivityExplorer source={source} /></div>;
 }
 ```
 
 ### Quick start: Claude Code plugin
 
+One command starts a hub, one starts a session pointed at it -- no key to
+generate or paste:
+
 ```
-claude --plugin-dir ./plugins/claude-code
+npx @atriarch/tracery-hub
+```
+
+```
+TRACERY_HUB_URL=http://127.0.0.1:8971 claude --plugin-dir ./plugins/claude-code
 ```
 
 or, from this repo as a marketplace (see
@@ -103,9 +135,10 @@ or, from this repo as a marketplace (see
 
 (`atriarch-systems/tracery` is this repo's intended future GitHub location;
 point `/plugin marketplace add` at wherever it actually lives, local path
-included, until then.) Set `TRACERY_HUB_URL` and `TRACERY_API_KEY` (env vars
-or the plugin's own config prompts); with neither set, every hook is a
-silent no-op. See
+included, until then.) `TRACERY_HUB_URL` (env var or the plugin's own
+`hub_url` config prompt) is the only thing required; `TRACERY_API_KEY`/
+`api_key` is only needed against a hub configured with `TRACERY_API_KEYS`.
+With no `TRACERY_HUB_URL` at all, every hook is a silent no-op. See
 [`plugins/claude-code/README.md`](plugins/claude-code/README.md) and
 [`docs/CLAUDE-CODE-PLUGIN.md`](docs/CLAUDE-CODE-PLUGIN.md).
 
@@ -179,10 +212,12 @@ items passed:
    `python -m pytest -q clients/python`** — PASSED. 24 tests, 0 failures
    (Python 3.13; the package also targets 3.11).
 3. **`docker build -f apps/hub/Dockerfile .` and `docker run`** — PASSED.
-   The image builds from the repo root, ships `apps/hub/ee/dist`, prints a
-   dev API key on first boot, and serves `/healthz`, `/v1/openapi.json`,
+   The image builds from the repo root, ships `apps/hub/ee/dist`, and (as of
+   the "local mode" change superseding this run's original dev-key-printing
+   behavior) boots with `TRACERY_AUTH=none` by default and serves
+   `/healthz`, `/v1/info` (`{"auth":"none",...}`), `/v1/openapi.json`,
    `/v1/license` (`{"valid":false,"reason":"no_license"}`, the unmodified
-   community edition) and `/ui/`.
+   community edition) and `/ui/` -- with no key minted or printed anywhere.
 4. **`scripts/demo.mjs`** — PASSED. All 9 checks: three flows in one trace,
    both children's resolved trace equals the parent flow id, `project()`
    yields exactly two `spawn` edges and three groups, a WS live subscription

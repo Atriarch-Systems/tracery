@@ -27,8 +27,11 @@ services:
       TRACERY_MAX_EVENTS_PER_WORKSPACE: "500000"
       TRACERY_LOG_LEVEL: info
       # Either set TRACERY_API_KEYS inline, or mount a keys file and point
-      # TRACERY_API_KEYS_FILE at it (see ./keys.example.json below). With
-      # neither set, the hub prints a dev key to its logs on boot.
+      # TRACERY_API_KEYS_FILE at it (see ./keys.example.json below). There is
+      # no dev-key fallback (apps/hub/README.md "Auth mode"); with neither
+      # set on a non-loopback TRACERY_HOST, the hub fails at boot unless
+      # TRACERY_AUTH=none is also set (the image's own Dockerfile default --
+      # only for a hub deliberately run with no auth of its own).
       TRACERY_API_KEYS_FILE: /run/secrets/tracery-keys.json
     volumes:
       - tracery-data:/data

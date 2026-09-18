@@ -70,6 +70,22 @@ test('httpTransport gives up after exhausting retries on persistent 5xx, never t
   await closeHub(hub);
 });
 
+// Task ("local mode"): a hub running with `authMode: 'none'` needs no
+// credential at all -- httpTransport must not send an Authorization header
+// when no apiKey is configured.
+test('httpTransport with no apiKey configured sends no Authorization header at all', async () => {
+  const hub = await startFakeHub((req, res) => sendJson(res, 200, { accepted: 1, duplicates: 0, rejected: [], cursor: 1 }));
+  const transport = httpTransport({ baseUrl: hub.baseUrl });
+
+  await transport.send(sampleEvents);
+
+  assert.equal(hub.requests.length, 1);
+  assert.equal('authorization' in hub.requests[0].headers, false);
+  assert.equal(hub.requests[0].headers['content-type'], 'application/json');
+
+  await closeHub(hub);
+});
+
 test('httpTransport does not retry a 4xx response', async () => {
   const hub = await startFakeHub((req, res) => sendJson(res, 400, { error: { code: 'bad', message: 'no' } }));
   const transport = httpTransport({ baseUrl: hub.baseUrl, apiKey: 'k', retries: 5, backoffMs: 5 });

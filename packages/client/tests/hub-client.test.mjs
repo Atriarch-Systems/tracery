@@ -103,6 +103,20 @@ test('traceEvents: GET /v1/traces/:id/events returns the raw array', async () =>
   await closeHub(hub);
 });
 
+// Task ("local mode"): a hub running with `authMode: 'none'` needs no
+// credential at all -- HubClient must not send an `Authorization` header (or
+// a `?token=` on the WS URL, tested below) when no `apiKey` is configured.
+test('getFlow: with no apiKey configured, no Authorization header is sent at all', async () => {
+  const hub = await startFakeHub((req, res) => sendJson(res, 200, { id: 'f1', status: 'running', partial: false, trace: 'f1', ops: {}, nodes: {}, edges: [] }));
+  const client = new HubClient({ baseUrl: hub.baseUrl });
+
+  await client.getFlow('f1');
+
+  assert.equal(hub.requests[0].headers.authorization, undefined);
+
+  await closeHub(hub);
+});
+
 test('a non-ok response rejects with the hub-provided error message', async () => {
   const hub = await startFakeHub((req, res) => sendJson(res, 404, { error: { code: 'not_found', message: 'no such flow' } }));
   const client = new HubClient({ baseUrl: hub.baseUrl, apiKey: 'k' });
@@ -263,6 +277,19 @@ test("live(): onFrame's own exception is reported via onError instead of swallow
   const second = FakeWebSocket.instances[1];
   const secondQuery = new URL(second.url.replace(/^ws/, 'http')).searchParams;
   assert.equal(secondQuery.get('after'), '5'); // ...cursor 10 was never adopted
+
+  dispose();
+});
+
+test('live(): with no apiKey configured, the WS URL carries no token= param at all', async () => {
+  FakeWebSocket.instances.length = 0;
+  const client = new HubClient({ baseUrl: 'http://hub.example', WebSocket: FakeWebSocket });
+
+  const dispose = client.live({ flow: 'f1' }, () => {});
+  await waitFor(() => FakeWebSocket.instances.length === 1);
+
+  const query = new URL(FakeWebSocket.instances[0].url.replace(/^ws/, 'http')).searchParams;
+  assert.equal(query.has('token'), false);
 
   dispose();
 });

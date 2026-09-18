@@ -3,7 +3,7 @@
  * `crypto.timingSafeEqual` over a fixed-length hash of the presented key, so
  * comparisons never leak timing information about key length or prefix.
  */
-import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
+import { createHash, timingSafeEqual } from 'node:crypto';
 import type { ApiKeyConfig, Role } from './config.js';
 
 export interface AuthContext {
@@ -25,18 +25,31 @@ export class AuthError extends Error {
   }
 }
 
-export interface DevKey {
-  readonly key: string;
-  readonly config: ApiKeyConfig;
-}
+/** The one workspace `authMode: 'none'` (local mode) ever serves -- see `localModeAuth`. */
+export const LOCAL_MODE_WORKSPACE = 'default';
 
-/** Generates the dev key used when no `TRACERY_API_KEYS*` is configured: all roles, workspace `default`. */
-export function generateDevKey(): DevKey {
-  const key = `dev_${randomBytes(24).toString('hex')}`;
-  return {
-    key,
-    config: { id: 'dev', key, workspace: 'default', roles: ['ingest', 'read', 'admin'] },
-  };
+const LOCAL_MODE_ROLES: readonly Role[] = ['ingest', 'read', 'admin'];
+
+/**
+ * `config.authMode === 'none'` (task: "local mode", `npx @atriarch/tracery-hub`
+ * with no env): every request and WS connection is a full-access principal on
+ * the single `default` workspace -- no key, no header, no `Authorization`
+ * ever consulted. `requireAuth`/`registerLive` call this instead of
+ * `authenticate` below whenever `config.authMode` is `'none'`.
+ *
+ * The single-workspace promise is enforced here: a batch/query naming any
+ * workspace other than `default` is rejected outright (400), not silently
+ * redirected to `default` and not silently allowed.
+ */
+export function localModeAuth(requestedWorkspace?: string): AuthContext {
+  if (requestedWorkspace !== undefined && requestedWorkspace !== LOCAL_MODE_WORKSPACE) {
+    throw new AuthError(
+      400,
+      'workspace_not_local',
+      `local mode (no auth) only serves workspace "${LOCAL_MODE_WORKSPACE}"; set TRACERY_API_KEYS to use more than one workspace`,
+    );
+  }
+  return { keyId: 'local', workspace: LOCAL_MODE_WORKSPACE, roles: LOCAL_MODE_ROLES, isOperator: false };
 }
 
 function hash(value: string): Buffer {

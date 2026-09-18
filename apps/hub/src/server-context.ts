@@ -28,6 +28,14 @@ export interface HubContext {
     requestedWorkspace?: string,
     options?: { readonly operatorWorkspaceOptional?: boolean },
   ): Promise<AuthContext>;
+  /**
+   * Same "community vs. licensed" check `server.ts` uses for the `X-Ko-fi`
+   * header, exposed on the context so route modules (`routes/info.ts`'s
+   * `GET /v1/info`) can report `edition` without importing `HubExtensions`
+   * directly. Always present; returns `false` when no `extensions` (or no
+   * `isLicensed`) was passed to `createServer` at all.
+   */
+  isLicensed(): boolean;
 }
 
 export interface HubExtensions {

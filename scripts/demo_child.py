@@ -5,10 +5,12 @@
     python scripts/demo_child.py '<ActivityLink JSON>'
 
 `TRACERY_HUB_URL` / `TRACERY_API_KEY` come from the environment (demo.mjs
-sets both when it spawns this process). Starts a flow attached to the given
-link, does one op, ends the flow, and blocks (via `tracer.close()`) until
-the batch has been attempted -- so by the time this process exits 0, the
-parent script can rely on the event having reached the hub.
+sets both when it spawns this process). `TRACERY_API_KEY` is optional (task:
+"local mode" -- a hub running with no TRACERY_API_KEYS needs no key at all).
+Starts a flow attached to the given link, does one op, ends the flow, and
+blocks (via `tracer.close()`) until the batch has been attempted -- so by
+the time this process exits 0, the parent script can rely on the event
+having reached the hub.
 """
 
 from __future__ import annotations
@@ -27,10 +29,7 @@ def main() -> int:
 
     link = json.loads(sys.argv[1])
     hub_url = os.environ.get("TRACERY_HUB_URL", "http://127.0.0.1:8971")
-    api_key = os.environ.get("TRACERY_API_KEY")
-    if not api_key:
-        print("TRACERY_API_KEY is required", file=sys.stderr)
-        return 1
+    api_key = os.environ.get("TRACERY_API_KEY") or None
 
     tracer = ActivityTracer(
         transport=HttpTransport(base_url=hub_url, api_key=api_key),

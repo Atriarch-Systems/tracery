@@ -83,7 +83,7 @@ class HttpTransport:
         self,
         *,
         base_url: str,
-        api_key: str,
+        api_key: str | None = None,
         workspace: str | None = None,
         retries: int = 5,
         backoff_ms: float = 200,
@@ -188,18 +188,25 @@ class HttpTransport:
             batch["workspace"] = self._workspace
         return json.dumps(batch).encode("utf-8")
 
+    def _build_headers(self) -> dict[str, str]:
+        # Task ("local mode"): a hub running with `authMode: 'none'` needs no
+        # credential at all -- omit Authorization entirely when no api_key was
+        # configured, rather than send "Bearer None"/"Bearer ".
+        headers = {"content-type": "application/json"}
+        if self._api_key:
+            headers["authorization"] = f"Bearer {self._api_key}"
+        return headers
+
     def _send_with_retry(self, events: list[dict[str, Any]]) -> None:
         body = self._build_body(events)
+        headers = self._build_headers()
         for attempt in range(self._retries + 1):
             try:
                 request = urllib.request.Request(
                     self._url,
                     data=body,
                     method="POST",
-                    headers={
-                        "content-type": "application/json",
-                        "authorization": f"Bearer {self._api_key}",
-                    },
+                    headers=headers,
                 )
                 with self._urlopen(request, timeout=self._timeout_s):
                     return  # 2xx

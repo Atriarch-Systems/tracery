@@ -27,6 +27,24 @@ the repo's intended future location):
 See [`../../docs/CLAUDE-CODE-PLUGIN.md`](../../docs/CLAUDE-CODE-PLUGIN.md#install-and-configure)
 for the local-path variant of `/plugin marketplace add`.
 
+## Quick start: one command, no key
+
+Point the plugin at a hub started with no configuration at all -- it runs
+loopback-only with auth off (SPEC.md §6 "Auth mode"), so there is no key to
+generate, copy, or configure:
+
+```sh
+npx @atriarch/tracery-hub
+```
+
+```sh
+TRACERY_HUB_URL=http://127.0.0.1:8971 claude --plugin-dir ./plugins/claude-code
+```
+
+That's the whole setup. `TRACERY_HUB_URL` (or the `hub_url` userConfig
+prompt) is the only thing this needs against a local hub; leave `api_key`
+empty.
+
 ## Configure
 
 Either answer the prompts Claude Code shows when the plugin is enabled
@@ -37,14 +55,16 @@ variables, which work the same way whether or not the plugin system's
 
 | Env var | Same as userConfig | Required | Default |
 | --- | --- | --- | --- |
-| `TRACERY_HUB_URL` | `hub_url` | yes | -- |
-| `TRACERY_API_KEY` | `api_key` | yes | -- |
+| `TRACERY_HUB_URL` | `hub_url` | yes | `http://127.0.0.1:8971` |
+| `TRACERY_API_KEY` | `api_key` | no -- only against a hub that requires keys | -- |
 | `TRACERY_WORKSPACE` | `workspace` | no | `default` |
 | `TRACERY_INCLUDE_PROMPTS` | `include_prompts` | no | `false` (`1`/`true`/`yes` to enable) |
 
-With neither `hub_url` nor `api_key` set, every hook is a silent no-op --
-installing the plugin without configuring it does nothing. `api_key` needs
-the hub's `ingest` role (see `apps/hub/README.md`).
+With no `hub_url` at all, every hook is a silent no-op -- installing the
+plugin without configuring it does nothing. `api_key` is only needed against
+a hub running with `TRACERY_API_KEYS` configured (needs the `ingest` role,
+see `apps/hub/README.md`); against a local-mode hub (no `TRACERY_API_KEYS`,
+the `npx @atriarch/tracery-hub` default) it should be left empty.
 
 ## What it does
 
@@ -74,9 +94,10 @@ session's flow.
   events. Growing and not shrinking means the hub is unreachable, rejecting
   the API key, or `hub_url`/`api_key` are misconfigured; delete it to drop
   unsent history.
-- Nothing arriving at the hub and no error: check both `hub_url` and
-  `api_key` are actually set (env var or userConfig) -- with neither set the
-  emitter is a deliberate, silent no-op.
+- Nothing arriving at the hub and no error: check `hub_url` is actually set
+  (env var or userConfig) -- with it unset the emitter is a deliberate,
+  silent no-op. `api_key` is optional (see "Quick start: one command, no
+  key" above); leaving it empty is not a misconfiguration by itself.
 - The emitter never prints anything on success and at most one line to
   stderr on a config problem; it does not surface hub-side rejections
   (see `GET /v1/flows/:id` on the hub to inspect what actually landed).

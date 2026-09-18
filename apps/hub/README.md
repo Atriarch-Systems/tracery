@@ -9,30 +9,63 @@ renders in the producing app.
 npx @atriarch/tracery-hub
 ```
 
-starts the server with an in-memory store and a printed dev API key -- every
-setting below has a default, so this works out of the box.
+starts the server bound to `127.0.0.1:8971` with an in-memory store and
+**no authentication of its own** ("local mode" -- see "Auth mode" below): a
+single `default` workspace, no key to generate, copy, or configure. Every
+other setting below has a default, so this works entirely out of the box.
 
 ## Environment variables
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
 | `TRACERY_PORT` | `8971` | HTTP/WS listen port. |
-| `TRACERY_HOST` | `0.0.0.0` | HTTP/WS listen host. |
+| `TRACERY_HOST` | `127.0.0.1` | HTTP/WS listen host. A loopback value (`127.0.0.1`, `::1`, `localhost`) is what makes "local mode" (below) apply automatically; the Dockerfile sets this to `0.0.0.0` explicitly for the container case. |
 | `TRACERY_STORE` | `memory` | `memory`, `sqlite`, or `postgres`. |
 | `TRACERY_SQLITE_PATH` | `/data/tracery.db` | Database file path, used only when `TRACERY_STORE=sqlite`. |
 | `TRACERY_POSTGRES_URL` | unset | `postgres://user:pass@host:5432/db` connection string. **Required** when `TRACERY_STORE=postgres` (the hub fails at boot without it); ignored otherwise. |
-| `TRACERY_API_KEYS` | unset | Inline JSON array of API keys (see below). |
+| `TRACERY_API_KEYS` | unset | Inline JSON array of API keys (see below). Setting this (or `_FILE`) always selects `authMode: 'keys'`, on any host. |
 | `TRACERY_API_KEYS_FILE` | unset | Path to a JSON file with the same shape as `TRACERY_API_KEYS`. Ignored when `TRACERY_API_KEYS` is set. |
+| `TRACERY_AUTH` | unset | Set to `none` to run with no authentication on a **non-loopback** host (e.g. a container already sitting behind a reverse proxy/service mesh/network policy that authenticates for it) -- see "Auth mode" below. Ignored when `TRACERY_API_KEYS`/`_FILE` is set, and irrelevant on a loopback host (already local mode by default). |
 | `TRACERY_RETENTION_HOURS` | `72` | Retention window; the sweeper deletes complete flows older than this. |
 | `TRACERY_MAX_EVENTS_PER_WORKSPACE` | `500000` | Soft per-workspace cap enforced by the sweeper (not a hard per-append limit). |
 | `TRACERY_METRICS_TOKEN` | unset | When set, `GET /metrics` requires it (`?token=`, `x-metrics-token`, or `Authorization: Bearer`). Unset means `/metrics` is public. |
 | `TRACERY_LOG_LEVEL` | `info` | Pino log level (`fatal`..`trace`, or `silent`). |
 | `TRACERY_UI_DIR` | `<package>/web/dist` | Directory to serve at `/ui`. When it (or its `index.html`) is missing, `/ui` serves a plain "not built" page instead. |
 
-With neither `TRACERY_API_KEYS` nor `TRACERY_API_KEYS_FILE` set, the hub
-generates one dev key at boot with all roles on workspace `default`, logs it
-once (`tracery-hub: ... Generated a dev key ...`), and never persists it.
-Use this for local development only.
+### Auth mode
+
+Resolved once at boot into `authMode: 'none' | 'keys'`, in this order:
+
+1. `TRACERY_API_KEYS` or `TRACERY_API_KEYS_FILE` set -> `'keys'`, regardless
+   of host. Unchanged from before: see "API key file format" below.
+2. Otherwise, `TRACERY_HOST` resolves to a loopback address (`127.0.0.1`,
+   `::1`, `localhost` -- the default) -> `'none'` ("local mode"): every
+   request and WS connection is a full-access principal on the single
+   `default` workspace. No key is ever checked, minted, or printed. A
+   batch/query naming any workspace other than `default` is rejected with
+   `400 workspace_not_local`, not silently redirected to `default`.
+3. Otherwise, `TRACERY_AUTH=none` set explicitly -> `'none'`, same as above,
+   plus a one-line warning logged at boot -- this is for a container that
+   binds a non-loopback host (so it isn't caught by rule 2) but sits behind
+   something that already authenticates (reverse proxy, service mesh,
+   network policy).
+4. Otherwise: **the hub fails to start** with
+   `TRACERY_HOST is not loopback and no API keys are configured; set
+   TRACERY_API_KEYS (see README) or TRACERY_AUTH=none if something in front
+   of the hub already authenticates`. There is no dev-key fallback (the old
+   behavior of generating and logging one all-roles key when nothing was
+   configured has been removed entirely) -- a non-loopback bind always needs
+   an explicit decision, one way or the other.
+
+`GET /v1/info` (public, no auth) reports `{ product, version, edition, auth,
+workspace? }` -- `workspace` is present only in `'none'` mode -- so a client
+can discover which mode a hub is running in with one unauthenticated call;
+the hosted UI uses it to skip the key-entry screen entirely in local mode.
+
+The Dockerfile's own default `ENV` includes `TRACERY_AUTH=none` (alongside
+`TRACERY_HOST=0.0.0.0`) specifically so a bare `docker run -p 8971:8971
+image` with no other env still starts -- see "Docker" below for why a real
+deployment should instead configure real keys and leave that unset.
 
 ### API key file format
 
@@ -87,6 +120,7 @@ spec at `GET /v1/openapi.json` (OpenAPI 3.1). Errors are always
 
 | Method | Path | Role | Purpose |
 | --- | --- | --- | --- |
+| `GET` | `/v1/info` | none | Hub identity: `{ product, version, edition, auth, workspace? }` -- `workspace` present only in `authMode: 'none'`. See "Auth mode" above. |
 | `POST` | `/v1/events` | `ingest` | Batch ingest. Body is an `ActivityBatch` (`{ v, workspace?, events }`). Returns `ActivityBatchResult`; `200` when every event was accepted, `207` when some were rejected (see `rejected[]`), `400` for a malformed envelope or a batch over 1000 events. |
 | `GET` | `/v1/flows` | `read` | List flows, newest-activity first. Query: `limit` (default 50, max 1000), `before` (opaque cursor from a previous page's `nextBefore`), `status`, `actor`, `trace`, `q` (label substring). |
 | `GET` | `/v1/flows/:id` | `read` | Flow summary (`ops`/`nodes`/`edges`, no events). `404` when unknown. |
@@ -218,7 +252,26 @@ docker build -f apps/hub/Dockerfile -t atriarch/tracery-hub:dev .
 docker run --rm -p 8971:8971 atriarch/tracery-hub:dev
 ```
 
-or with compose (also root-context; see `docker-compose.yaml`):
+That bare `docker run` still starts with no other env at all: the image's
+own `ENV` sets `TRACERY_HOST=0.0.0.0` (a container needs to accept
+connections from outside its network namespace, unlike the Node-process
+default of `127.0.0.1`) and `TRACERY_AUTH=none` (so rule 2 of "Auth mode"
+above -- loopback gets local mode automatically -- doesn't apply here, and
+the hub doesn't just fail to start). This is the same "local mode" as
+`npx @atriarch/tracery-hub`, just reachable from outside the container.
+**For anything beyond a quick local look, configure real
+`TRACERY_API_KEYS`/`_FILE` instead** (rule 1 always wins over the image's
+`TRACERY_AUTH=none` default, regardless of host):
+
+```
+docker run --rm -p 8971:8971 \
+  -e TRACERY_API_KEYS='[{"id":"me","key":"CHANGE_ME","workspace":"default","roles":["ingest","read","admin"]}]' \
+  atriarch/tracery-hub:dev
+```
+
+or with compose (also root-context; see `docker-compose.yaml`, which
+already configures a keys file rather than relying on the image's
+`TRACERY_AUTH=none` default):
 
 ```
 docker compose -f apps/hub/docker-compose.yaml up --build

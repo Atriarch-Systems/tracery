@@ -1,7 +1,9 @@
 /**
  * Environment-variable configuration for the hub (SPEC.md §6 "Hub"). Every
- * value has a default so `docker run -p 8971:8971 image` works out of the
- * box with an in-memory store and a printed dev API key.
+ * value has a default, so `node bin/hub.mjs` (`npx @atriarch/tracery-hub`)
+ * with no env at all works out of the box: an in-memory store, bound to
+ * `127.0.0.1`, `authMode: 'none'` -- no key is ever minted or printed (see
+ * `AuthMode` and `resolveAuthMode`).
  *
  * `loadConfig` is a pure function of an env record so it is easy to unit
  * test without touching `process.env`.
@@ -13,6 +15,15 @@ import fs from 'node:fs';
 export type StoreKind = 'memory' | 'sqlite' | 'postgres';
 
 export type Role = 'ingest' | 'read' | 'admin';
+
+/**
+ * "Local mode" (task: npx @atriarch/tracery-hub with no env): `'none'` means
+ * every request is a full-access principal on the single `default` workspace
+ * with no key ever checked (see `auth.ts`'s `localModeAuth`); `'keys'` is the
+ * original SPEC.md §6 API-key behavior, unchanged. Resolved once at config
+ * load time by `resolveAuthMode` below -- never re-derived per-request.
+ */
+export type AuthMode = 'none' | 'keys';
 
 export interface ApiKeyConfig {
   readonly id: string;
@@ -29,8 +40,19 @@ export interface Config {
   readonly sqlitePath: string;
   /** `postgres://...` connection string for `PostgresStore`. Required when `store === 'postgres'` (validated eagerly by `loadConfig`); otherwise `undefined`. */
   readonly postgresUrl: string | undefined;
-  /** Configured keys, or `undefined` when none were configured (dev key mode). */
+  /** Configured keys, or `undefined` when none were configured (`authMode` is then `'none'` on a loopback host, or the hub fails to boot -- see `resolveAuthMode`). */
   readonly apiKeys: readonly ApiKeyConfig[] | undefined;
+  /** Resolved once at boot; see `AuthMode` and `resolveAuthMode`. */
+  readonly authMode: AuthMode;
+  /**
+   * Set only when `authMode` is `'none'` because `TRACERY_AUTH=none` was set
+   * explicitly on a non-loopback host (the "something in front of the hub
+   * already authenticates" escape hatch) -- `bin/hub.mjs` logs this once at
+   * startup. `undefined` in every other case, including the ordinary
+   * loopback-default local mode (that one needs no warning: nothing outside
+   * the machine can reach it).
+   */
+  readonly authWarning: string | undefined;
   readonly retentionHours: number;
   readonly maxEventsPerWorkspace: number;
   readonly metricsToken: string | undefined;
@@ -88,6 +110,60 @@ function packageRoot(): string {
 
 function defaultUiDir(): string {
   return path.join(packageRoot(), 'web', 'dist');
+}
+
+/** apps/hub's own `package.json` version -- single source of truth for the OpenAPI doc's `info.version` and `GET /v1/info`'s `version` field. */
+export function hubVersion(): string {
+  try {
+    const raw = fs.readFileSync(path.join(packageRoot(), 'package.json'), 'utf8');
+    const pkg = JSON.parse(raw) as { version?: unknown };
+    return typeof pkg.version === 'string' && pkg.version.length > 0 ? pkg.version : '0.0.0';
+  } catch {
+    return '0.0.0';
+  }
+}
+
+const LOOPBACK_HOSTS = new Set(['127.0.0.1', '::1', 'localhost']);
+
+/** Task ("local mode"): the exact loopback spellings that make a bind "local only" -- anything else (including `0.0.0.0`) is not loopback. */
+export function isLoopbackHost(host: string): boolean {
+  return LOOPBACK_HOSTS.has(host.trim().toLowerCase());
+}
+
+interface ResolvedAuthMode {
+  readonly mode: AuthMode;
+  readonly warning: string | undefined;
+}
+
+/**
+ * Task ("local mode"): decides `authMode` from the host and whether keys were
+ * configured, in this order --
+ *   1. `TRACERY_API_KEYS`/`TRACERY_API_KEYS_FILE` set -> `'keys'` (unchanged
+ *      SPEC.md §6 behavior, regardless of host).
+ *   2. else the resolved host is loopback -> `'none'` (npx/local dev: no
+ *      keys needed, nothing outside the machine can reach it).
+ *   3. else `TRACERY_AUTH=none` set explicitly -> `'none'` with a warning
+ *      (a container behind its own auth/proxy/mesh).
+ *   4. else: fail fast at boot -- a non-loopback bind with no keys and no
+ *      explicit opt-out is exactly the "open source dev key on 0.0.0.0"
+ *      mistake this task removes.
+ */
+function resolveAuthMode(env: NodeJS.ProcessEnv, host: string, apiKeys: readonly ApiKeyConfig[] | undefined): ResolvedAuthMode {
+  if (apiKeys !== undefined) return { mode: 'keys', warning: undefined };
+  if (isLoopbackHost(host)) return { mode: 'none', warning: undefined };
+  if ((env.TRACERY_AUTH ?? '').trim() === 'none') {
+    return {
+      mode: 'none',
+      warning:
+        `TRACERY_HOST ("${host}") is not loopback but TRACERY_AUTH=none was set explicitly -- ` +
+        'the hub is running with no authentication of its own. Make sure something in front of it ' +
+        '(reverse proxy, service mesh, network policy) actually authenticates requests.',
+    };
+  }
+  throw new Error(
+    'TRACERY_HOST is not loopback and no API keys are configured; set TRACERY_API_KEYS (see README) ' +
+      'or TRACERY_AUTH=none if something in front of the hub already authenticates',
+  );
 }
 
 interface RawApiKey {
@@ -158,13 +234,22 @@ function loadPostgresUrl(env: NodeJS.ProcessEnv, store: StoreKind): string | und
 /** Reads every hub environment variable, applying defaults. Never touches `process.env` directly (pass it in). */
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const store = parseStoreKind(env.TRACERY_STORE);
+  // Task ("local mode"): `npx @atriarch/tracery-hub` with no env at all must
+  // bind loopback-only and run with auth off, never mint or print a key --
+  // see resolveAuthMode below. Containers (Dockerfile) set TRACERY_HOST=
+  // 0.0.0.0 explicitly.
+  const host = env.TRACERY_HOST ?? '127.0.0.1';
+  const apiKeys = loadApiKeys(env);
+  const { mode: authMode, warning: authWarning } = resolveAuthMode(env, host, apiKeys);
   return {
     port: parseNumber(env.TRACERY_PORT, 8971, 'TRACERY_PORT', { min: 1, max: 65_535, integer: true }),
-    host: env.TRACERY_HOST ?? '0.0.0.0',
+    host,
     store,
     sqlitePath: env.TRACERY_SQLITE_PATH ?? '/data/tracery.db',
     postgresUrl: loadPostgresUrl(env, store),
-    apiKeys: loadApiKeys(env),
+    apiKeys,
+    authMode,
+    authWarning,
     // `min: Number.MIN_VALUE` reads oddly but says exactly what's meant: retention
     // must be strictly positive (a zero or negative window makes every flow
     // instantly over-retention -- SPEC.md's "the oldest complete flows first, never

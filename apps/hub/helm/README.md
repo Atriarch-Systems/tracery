@@ -63,12 +63,14 @@ PVC and volume mount, and flips the Deployment's update `strategy` from
 ## API keys
 
 Leaving `apiKeys.keys` and `apiKeys.existingSecret` both empty deploys the
-hub with **no** `TRACERY_API_KEYS_FILE` at all, so it falls back to a
-generated dev key logged once at boot (apps/hub/README.md "Environment
-variables") -- fine for kicking the tyres, never for a real deployment.
-Prefer `apiKeys.existingSecret` provisioned out of band (OpenBao +
-ExternalSecret) over the inline `apiKeys.keys` list, which lands real key
-material in your values / release history.
+hub with **no** `TRACERY_API_KEYS_FILE` at all. There is no dev-key fallback
+(apps/hub/README.md "Auth mode"): the hub fails at boot with "TRACERY_HOST is
+not loopback and no API keys are configured" unless `config.authNone` is also
+set to `true` (only for a hub deliberately run behind something that already
+authenticates -- a reverse proxy, service mesh, or network policy). Prefer
+`apiKeys.existingSecret` provisioned out of band (OpenBao + ExternalSecret)
+over the inline `apiKeys.keys` list, which lands real key material in your
+values / release history.
 
 ```yaml
 apiKeys:

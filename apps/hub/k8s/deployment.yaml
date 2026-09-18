@@ -34,6 +34,11 @@ spec:
           env:
             - name: TRACERY_PORT
               value: "8971"
+            # Non-loopback: apps/hub/README.md "Auth mode" -- a non-loopback
+            # TRACERY_HOST requires either TRACERY_API_KEYS(_FILE) (set below)
+            # or an explicit TRACERY_AUTH=none opt-out, or the hub fails at
+            # boot. This manifest always configures real keys, so that rule
+            # never bites here.
             - name: TRACERY_HOST
               value: "0.0.0.0"
             - name: TRACERY_STORE

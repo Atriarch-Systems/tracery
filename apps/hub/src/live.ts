@@ -7,8 +7,8 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { WebSocket } from 'ws';
 import type { ActivityFrame, StoredEvent } from '@atriarch/tracery-core/contract';
-import { authenticate, AuthError, type AuthContext } from './auth.js';
-import type { ApiKeyConfig } from './config.js';
+import { authenticate, localModeAuth, AuthError, type AuthContext } from './auth.js';
+import type { ApiKeyConfig, AuthMode } from './config.js';
 import type { EventStore } from './store/types.js';
 import type { MetricsRegistry } from './metrics.js';
 import type { HubExtensions } from './server-context.js';
@@ -23,6 +23,8 @@ export interface LiveDeps {
   readonly metrics: MetricsRegistry;
   /** Optional enterprise extensions (SPEC.md §7). Only `onLiveFrame` is used here. */
   readonly extensions?: HubExtensions;
+  /** Task ("local mode"): `'none'` bypasses key lookup, same as `server.ts`'s `requireAuth`. */
+  readonly authMode: AuthMode;
 }
 
 interface LiveQuery {
@@ -63,10 +65,19 @@ export function registerLive(app: FastifyInstance, deps: LiveDeps): void {
 
     let auth: AuthContext;
     try {
-      auth = authenticate(deps.keys, request.headers as Record<string, string | string[] | undefined>, query.token, 'read', query.workspace);
+      auth =
+        deps.authMode === 'none'
+          ? localModeAuth(query.workspace)
+          : authenticate(deps.keys, request.headers as Record<string, string | string[] | undefined>, query.token, 'read', query.workspace);
     } catch (err) {
       const message = err instanceof AuthError ? err.message : 'unauthorized';
-      socket.close(4401, message);
+      // hub-5-style precision: a local-mode workspace rejection is a 400
+      // (bad request -- "you asked for a workspace this hub can't serve"),
+      // not a 401/403 (credential problem); distinguish the WS close code so
+      // a client can tell the two apart the way an HTTP caller would from
+      // the status code.
+      const closeCode = err instanceof AuthError && err.status === 400 ? 4400 : 4401;
+      socket.close(closeCode, message);
       return;
     }
 

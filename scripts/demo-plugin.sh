@@ -8,6 +8,14 @@
 #
 # Usage: scripts/demo-plugin.sh
 # Env overrides: TRACERY_HUB_URL, TRACERY_API_KEY, TRACERY_WORKSPACE
+#
+# TRACERY_API_KEY defaults to the demo hub's fixed key (tdk_a7f3c9e2b1d4).
+# Task ("local mode"): to target a local-mode hub instead (one started with
+# `npx @atriarch/tracery-hub` and no TRACERY_API_KEYS -- auth off), set
+# TRACERY_API_KEY explicitly to an empty string: `TRACERY_API_KEY= scripts/demo-plugin.sh`.
+# (Note the `-` with no `:`, not `:-`, below -- only a truly *unset*
+# TRACERY_API_KEY falls back to the demo key; an explicitly empty one opts
+# into the no-key path.)
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -16,7 +24,7 @@ PLUGIN_DIR="$REPO_ROOT/plugins/claude-code"
 FIXTURES_DIR="$PLUGIN_DIR/tests/fixtures"
 
 HUB_URL="${TRACERY_HUB_URL:-http://127.0.0.1:8971}"
-API_KEY="${TRACERY_API_KEY:-tdk_a7f3c9e2b1d4}"
+API_KEY="${TRACERY_API_KEY-tdk_a7f3c9e2b1d4}"
 WORKSPACE="${TRACERY_WORKSPACE:-default}"
 SESSION_ID="demo-plugin-smoke"
 
@@ -51,7 +59,11 @@ emit "post-tool-use-bash.json"
 
 # --- 3. confirm it landed on the hub -----------------------------------------
 FLOW_URL="$HUB_URL/v1/flows/$SESSION_ID"
-HTTP_STATUS="$(curl -sS -o /tmp/demo-plugin-flow.json -w '%{http_code}' -H "authorization: Bearer $API_KEY" "$FLOW_URL")"
+AUTH_HEADER=()
+if [ -n "$API_KEY" ]; then
+  AUTH_HEADER=(-H "authorization: Bearer $API_KEY")
+fi
+HTTP_STATUS="$(curl -sS -o /tmp/demo-plugin-flow.json -w '%{http_code}' "${AUTH_HEADER[@]}" "$FLOW_URL")"
 if [ "$HTTP_STATUS" != "200" ]; then
   echo "[demo-plugin] ERROR: GET $FLOW_URL returned $HTTP_STATUS, expected 200. Body:" >&2
   cat /tmp/demo-plugin-flow.json >&2
@@ -73,4 +85,8 @@ echo ""
 echo "[demo-plugin] launch command for a new Claude Code session with the plugin"
 echo "[demo-plugin] pointed at the demo hub:"
 echo ""
-echo "TRACERY_HUB_URL=$HUB_URL TRACERY_API_KEY=$API_KEY TRACERY_WORKSPACE=$WORKSPACE claude --plugin-dir \"$PLUGIN_DIR\""
+if [ -n "$API_KEY" ]; then
+  echo "TRACERY_HUB_URL=$HUB_URL TRACERY_API_KEY=$API_KEY TRACERY_WORKSPACE=$WORKSPACE claude --plugin-dir \"$PLUGIN_DIR\""
+else
+  echo "TRACERY_HUB_URL=$HUB_URL TRACERY_WORKSPACE=$WORKSPACE claude --plugin-dir \"$PLUGIN_DIR\"   # no TRACERY_API_KEY needed against a local-mode hub"
+fi

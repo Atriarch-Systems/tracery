@@ -9,11 +9,51 @@ commercial layer this guide doesn't need.
 
 ## 1. Run the hub
 
+### `npx` (no install, no Docker, no keys)
+
+```sh
+npx @atriarch/tracery-hub
+```
+
+Binds `127.0.0.1:8971`, in-memory store, hosted UI at
+`http://127.0.0.1:8971/ui/` -- and runs with auth off ("local mode",
+[`apps/hub/README.md`](../apps/hub/README.md#auth-mode)): a single
+`default` workspace, no key to generate or paste anywhere. This is the
+fastest way to try the hub or point the Claude Code plugin at one (§4
+below); reach for Docker once more than one machine or process needs to
+reach it.
+
+### Plain `docker run`
+
+```sh
+docker build -f apps/hub/Dockerfile -t atriarch/tracery-hub:dev .   # from the repo root
+docker run --rm -p 8971:8971 atriarch/tracery-hub:dev
+```
+
+A bare `docker run` with no other env still starts: the image binds
+`0.0.0.0` and defaults `TRACERY_AUTH=none`, so this is also local mode --
+just reachable from outside the container this time (`apps/hub/README.md`
+"Auth mode" explains why a non-loopback host normally *requires*
+`TRACERY_API_KEYS`, and why the image opts out of that by default). Set
+`TRACERY_API_KEYS`/`_FILE` for anything a second person or process should
+reach:
+
+```sh
+docker run --rm -p 8971:8971 \
+  -e TRACERY_API_KEYS='[{"id":"me","key":"CHANGE_ME","workspace":"default","roles":["ingest","read","admin"]}]' \
+  atriarch/tracery-hub:dev
+```
+
+This mode keeps everything in memory (`TRACERY_STORE=memory`, the default);
+nothing survives a restart. Full environment variable reference:
+[`apps/hub/README.md`](../apps/hub/README.md).
+
 ### With Docker Compose (recommended for anything beyond a laptop demo)
 
 `apps/hub/docker-compose.yaml` builds from the repository root (the image
 needs `packages/core` and, optionally, the hosted UI in `apps/hub/web`) and
-mounts a keys file instead of relying on the auto-generated dev key:
+mounts a real keys file rather than relying on the image's `TRACERY_AUTH=none`
+default:
 
 ```sh
 cd apps/hub
@@ -47,27 +87,21 @@ except `GET /v1/workspaces`. `roles` controls what the key may do: `ingest`
 `/v1/traces*`, plus `WS /v1/live`), `admin` (`DELETE /v1/flows/:id`,
 `GET /v1/workspaces`).
 
-### Plain `docker run` (quickest way to try it)
+### Running on a cluster
 
-```sh
-docker build -f apps/hub/Dockerfile -t atriarch/tracery-hub:dev .   # from the repo root
-docker run --rm -p 8971:8971 atriarch/tracery-hub:dev
-```
+Plain manifests in `apps/hub/k8s/` (both configure real
+`TRACERY_API_KEYS_FILE`), or the Helm chart at
+[`apps/hub/helm/`](../apps/hub/helm/README.md) (`config.authNone: true` is
+the equivalent opt-out there, off by default -- see its README's "API keys"
+section).
 
-With no `TRACERY_API_KEYS`/`TRACERY_API_KEYS_FILE` set, the hub generates
-one dev key at boot with every role on workspace `default`, and logs it
-once — read it from the container's stdout. This mode keeps everything in
-memory (`TRACERY_STORE=memory`, the default); nothing survives a restart.
-Full environment variable reference: [`apps/hub/README.md`](../apps/hub/README.md).
-Running on a cluster instead: plain manifests in `apps/hub/k8s/`, or the
-Helm chart at [`apps/hub/helm/`](../apps/hub/helm/README.md).
-
-Either way, confirm it's up:
+Whichever way you started it, confirm it's up:
 
 ```sh
 curl http://127.0.0.1:8971/healthz          # {"status":"ok"}
+curl http://127.0.0.1:8971/v1/info           # { "auth": "none", "workspace": "default", ... } in local mode
 curl http://127.0.0.1:8971/v1/license        # community edition unless TRACERY_LICENSE_KEY is set
-open http://127.0.0.1:8971/ui/               # hosted explorer (asks for an API key on first load)
+open http://127.0.0.1:8971/ui/               # hosted explorer -- opens straight in for a local-mode hub
 ```
 
 ## 2. Emit events
@@ -82,7 +116,9 @@ npm install @atriarch/tracery-client
 import { ActivityTracer, httpTransport } from '@atriarch/tracery-client';
 
 const tracer = new ActivityTracer({
-  transport: httpTransport({ baseUrl: 'http://127.0.0.1:8971', apiKey: process.env.TRACERY_API_KEY! }),
+  // apiKey is optional against a local-mode hub (§1 above); pass one with
+  // the `ingest` role against a hub configured with TRACERY_API_KEYS.
+  transport: httpTransport({ baseUrl: 'http://127.0.0.1:8971', apiKey: process.env.TRACERY_API_KEY }),
   actor: { id: 'agent:saga', kind: 'agent' },
 });
 
@@ -105,7 +141,7 @@ link it was handed (env var, IPC message, CLI argument — whatever fits):
 
 ```ts
 const subTracer = new ActivityTracer({
-  transport: httpTransport({ baseUrl: 'http://127.0.0.1:8971', apiKey: process.env.TRACERY_API_KEY! }),
+  transport: httpTransport({ baseUrl: 'http://127.0.0.1:8971', apiKey: process.env.TRACERY_API_KEY }),
   actor: { id: 'agent:saga/subagent:research-7', kind: 'subagent' },
 });
 const subFlow = subTracer.startFlow({ label: 'Research CVE-2026-1234', link });
@@ -129,7 +165,8 @@ import os
 from atriarch.tracery import ActivityTracer, HttpTransport
 
 tracer = ActivityTracer(
-    transport=HttpTransport(base_url="http://127.0.0.1:8971", api_key=os.environ["TRACERY_API_KEY"]),
+    # api_key is optional against a local-mode hub (§1 above).
+    transport=HttpTransport(base_url="http://127.0.0.1:8971", api_key=os.environ.get("TRACERY_API_KEY")),
     actor={"id": "agent:saga", "kind": "agent"},
 )
 
@@ -166,6 +203,8 @@ import { ActivityExplorer, useHubSource } from '@atriarch/tracery-react';
 function ActivityPage() {
   const source = useHubSource({
     baseUrl: 'http://127.0.0.1:8971',
+    // Omit apiKey entirely against a local-mode hub (§1 above); otherwise a
+    // read-role key for your workspace.
     apiKey: 'a read-role key for your workspace',
     workspace: 'saga', // or the workspace your key is bound to
   });
@@ -191,10 +230,15 @@ quick start in the root README, or
 
 Streams a running Claude Code session — tool calls, subagent spawns — to a
 hub as its own live flow graph, so you can watch a session the same way you'd
-watch any other producer's activity.
+watch any other producer's activity. One command each, no key needed against
+the local-mode hub from §1:
 
 ```sh
-claude --plugin-dir ./plugins/claude-code
+npx @atriarch/tracery-hub
+```
+
+```sh
+TRACERY_HUB_URL=http://127.0.0.1:8971 claude --plugin-dir ./plugins/claude-code
 ```
 
 (or `/plugin install tracery@<marketplace>` once published to
@@ -203,16 +247,16 @@ shows when the plugin is enabled:
 
 | Env var | Required | Default |
 | --- | --- | --- |
-| `TRACERY_HUB_URL` | yes | — |
-| `TRACERY_API_KEY` | yes (needs the `ingest` role) | — |
+| `TRACERY_HUB_URL` | yes | `http://127.0.0.1:8971` |
+| `TRACERY_API_KEY` | no — only against a hub configured with `TRACERY_API_KEYS` (needs the `ingest` role) | — |
 | `TRACERY_WORKSPACE` | no | `default` |
 | `TRACERY_INCLUDE_PROMPTS` | no | `false` |
 
-With neither `TRACERY_HUB_URL` nor `TRACERY_API_KEY` set, every hook is a
-silent no-op — installing the plugin without configuring it does nothing. A
-session becomes one flow; each subagent becomes its own child flow linked
-back to the `Agent` tool call that spawned it. Full hook-to-event mapping,
-the redaction rules (what never leaves the machine), and troubleshooting:
+With no `TRACERY_HUB_URL` at all, every hook is a silent no-op — installing
+the plugin without configuring it does nothing. A session becomes one flow;
+each subagent becomes its own child flow linked back to the `Agent` tool
+call that spawned it. Full hook-to-event mapping, the redaction rules (what
+never leaves the machine), and troubleshooting:
 [`docs/CLAUDE-CODE-PLUGIN.md`](CLAUDE-CODE-PLUGIN.md).
 
 ## Next steps

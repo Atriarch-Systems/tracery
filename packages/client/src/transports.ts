@@ -12,7 +12,8 @@ function sleep(ms: number): Promise<void> {
 
 export interface HttpTransportOptions {
   readonly baseUrl: string;
-  readonly apiKey: string;
+  /** Omit against a hub running in local mode (`authMode: 'none'`, task: "local mode") -- no `Authorization` header is sent at all. */
+  readonly apiKey?: string;
   readonly workspace?: string;
   readonly fetch?: typeof fetch;
   /** Additional attempts after the first on network error or 5xx. Default 5. */
@@ -44,14 +45,13 @@ export function httpTransport(options: HttpTransportOptions): ActivityTransport 
     async send(events: readonly ActivityEvent[]): Promise<void> {
       const batch: ActivityBatch = { v: ACTIVITY_CONTRACT_VERSION, workspace: options.workspace, events };
       const body = JSON.stringify(batch);
+      const headers: Record<string, string> = { 'content-type': 'application/json' };
+      if (options.apiKey) headers.authorization = `Bearer ${options.apiKey}`;
       for (let attempt = 0; attempt <= retries; attempt++) {
         try {
           const res = await fetchImpl(url, {
             method: 'POST',
-            headers: {
-              'content-type': 'application/json',
-              authorization: `Bearer ${options.apiKey}`,
-            },
+            headers,
             body,
             signal: AbortSignal.timeout(timeoutMs),
           });

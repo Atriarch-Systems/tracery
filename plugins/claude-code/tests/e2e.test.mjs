@@ -172,3 +172,64 @@ test('a session with a subagent produces two flows in the hub, linked parent to 
     await rm(dataDir, { recursive: true, force: true });
   }
 });
+
+// Task ("local mode"): the one-command quick start is `npx @atriarch/tracery-hub`
+// (no env at all -- loopback-only, auth off) then the plugin with only
+// TRACERY_HUB_URL set. No TRACERY_API_KEYS on the hub side, no api_key on the
+// plugin side, and it still lands a real flow.
+test('a session against a local-mode hub (no TRACERY_API_KEYS, no plugin api_key) still produces a flow', async (t) => {
+  const port = await freePort();
+  // Explicit `delete`, not `KEY: undefined` -- child_process.spawn stringifies
+  // env values, so `undefined` would otherwise become the literal string
+  // "undefined" instead of leaving the variable unset.
+  const hubEnv = { ...process.env };
+  delete hubEnv.TRACERY_API_KEYS;
+  delete hubEnv.TRACERY_API_KEYS_FILE;
+  delete hubEnv.TRACERY_AUTH;
+  hubEnv.TRACERY_PORT = String(port);
+  hubEnv.TRACERY_HOST = '127.0.0.1';
+  hubEnv.TRACERY_STORE = 'memory';
+  hubEnv.TRACERY_LOG_LEVEL = 'silent';
+  const hub = spawn(process.execPath, [hubBin], {
+    env: hubEnv,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+
+  t.after(async () => {
+    hub.kill('SIGTERM');
+    await new Promise((resolve) => hub.once('close', resolve));
+  });
+
+  const baseUrl = `http://127.0.0.1:${port}`;
+  await waitForHealth(baseUrl, 10_000);
+
+  const dataDir = await mkdtemp(join(tmpdir(), 'tracery-e2e-local-'));
+  // Explicitly empty, not just absent -- deterministic even if the outer
+  // shell happens to export one of these (see `firstNonEmpty` in emit.mjs).
+  const env = { CLAUDE_PLUGIN_OPTION_HUB_URL: baseUrl, CLAUDE_PLUGIN_OPTION_API_KEY: '', TRACERY_API_KEY: '' };
+  const sessionId = 'e2e-local-mode-session';
+
+  try {
+    const steps = [
+      { session_id: sessionId, cwd: '/home/user/my-project', hook_event_name: 'SessionStart', start_reason: 'startup', model: 'claude-opus-4' },
+      { session_id: sessionId, cwd: '/home/user/my-project', hook_event_name: 'Stop', last_assistant_message: 'All done.', stop_hook_active: false },
+      { session_id: sessionId, cwd: '/home/user/my-project', hook_event_name: 'SessionEnd', end_reason: 'other' },
+    ];
+    for (const payload of steps) {
+      const { code, stdout, stderr } = await runEmit(payload, env, dataDir);
+      assert.equal(code, 0, `emit.mjs must always exit 0 (hook ${payload.hook_event_name}); stderr: ${stderr}`);
+      assert.equal(stdout, '', `emit.mjs must print nothing to stdout (hook ${payload.hook_event_name})`);
+    }
+
+    // No Authorization header at all -- the hub is in local mode.
+    const res = await fetch(`${baseUrl}/v1/flows/${sessionId}`);
+    if (res.status !== 200) {
+      assert.fail(`GET /v1/flows/${sessionId} failed with ${res.status}: ${await res.text()}`);
+    }
+    const flow = await res.json();
+    assert.equal(flow.id, sessionId);
+    assert.equal(flow.status, 'complete');
+  } finally {
+    await rm(dataDir, { recursive: true, force: true });
+  }
+});

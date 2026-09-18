@@ -41,11 +41,24 @@ FROM node:22-alpine
 WORKDIR /app
 RUN addgroup -S tracery && adduser -S tracery -G tracery
 
+# TRACERY_HOST=0.0.0.0: config.ts's local-mode default (127.0.0.1) is a
+# Node-process convenience (`npx @atriarch/tracery-hub`), not a container one
+# -- a container needs to accept connections from outside its network
+# namespace, so this image binds all interfaces explicitly.
+#
+# TRACERY_AUTH=none: a bare `docker run -p 8971:8971 image` with no other env
+# would otherwise fail to boot (config.ts: non-loopback host + no
+# TRACERY_API_KEYS = a startup error, on purpose -- see apps/hub/README.md
+# "Auth mode"). This default assumes whatever you're doing with a bare
+# `docker run` already trusts the network it's exposed on; a real deployment
+# should instead set TRACERY_API_KEYS/_FILE (docker-compose.yaml, k8s/, and
+# helm/ all do) and drop this back to unset.
 ENV NODE_ENV=production \
     TRACERY_HOST=0.0.0.0 \
     TRACERY_PORT=8971 \
     TRACERY_STORE=memory \
-    TRACERY_SQLITE_PATH=/data/tracery.db
+    TRACERY_SQLITE_PATH=/data/tracery.db \
+    TRACERY_AUTH=none
 
 COPY --from=build /repo/node_modules ./node_modules
 COPY --from=build /repo/package.json ./package.json

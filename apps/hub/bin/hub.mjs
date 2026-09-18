@@ -34,20 +34,24 @@ try {
 
 const address = await created.app.listen({ port: config.port, host: config.host });
 
-created.app.log.info(`Tracery Hub listening on ${address}`);
+// Task ("local mode"): exactly one banner line naming the auth mode -- never
+// a minted/printed key. `authMode: 'none'` (the `npx @atriarch/tracery-hub`
+// default on a loopback host) reads "local mode, no auth"; `'keys'` says so
+// plainly instead.
+const authNote =
+  config.authMode === 'none'
+    ? '(local mode, no auth; set TRACERY_API_KEYS or bind a non-loopback host to require keys)'
+    : '(auth: TRACERY_API_KEYS configured)';
+created.app.log.info(`Tracery hub: ${address}  ${authNote}`);
+if (config.authWarning) {
+  created.app.log.warn(config.authWarning);
+}
 created.app.log.info(`store: ${config.store}${config.store === 'sqlite' ? ` (${config.sqlitePath})` : ''}`);
 if (extensions) {
   created.app.log.info(`enterprise layer: ${extensions.license.valid ? `licensed (${extensions.license.features.join(', ') || 'no features'})` : 'community edition'}`);
 }
 if (!(extensions?.isLicensed?.() ?? false)) {
   created.app.log.info('Tracery is open source (Apache-2.0). Docs: https://github.com/atriarch-systems/tracery · Support: https://ko-fi.com/demonslyr');
-}
-if (created.devKey) {
-  created.app.log.warn(
-    `No TRACERY_API_KEYS configured. Generated a dev key with all roles on workspace "default":\n` +
-      `  ${created.devKey}\n` +
-      `Set TRACERY_API_KEYS or TRACERY_API_KEYS_FILE for anything beyond local development.`,
-  );
 }
 
 const shutdown = async (signal) => {

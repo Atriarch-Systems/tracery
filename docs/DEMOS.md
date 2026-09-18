@@ -59,7 +59,18 @@ TRACERY_HUB_URL=http://127.0.0.1:8971 TRACERY_API_KEY=tdk_a7f3c9e2b1d4 TRACERY_W
 
 Opening either deep link in a browser shows that flow in the same hosted
 explorer the standalone hub demo below uses — a running Claude Code session
-renders exactly like any other producer's activity:
+renders exactly like any other producer's activity.
+
+**No-key alternative**: the commands above target the fixed-key demo hub
+used for these screenshots. Against a hub you start yourself with
+`npx @atriarch/tracery-hub` (local mode, no `TRACERY_API_KEYS`, task: "local
+mode"), the whole quick start drops the key entirely:
+
+```sh
+npx @atriarch/tracery-hub
+TRACERY_HUB_URL=http://127.0.0.1:8971 scripts/demo-plugin.sh   # or: TRACERY_API_KEY= scripts/demo-plugin.sh
+TRACERY_HUB_URL=http://127.0.0.1:8971 claude --plugin-dir plugins/claude-code
+```
 
 ![A flow in the hosted explorer, with a node selected and its context in the inspector](images/hub-flow.png)
 
@@ -159,6 +170,6 @@ history and merged context in the inspector.
 | Replicas | single-replica only — `replicas: 1`, `strategy: Recreate`; no Postgres-backed store or multi-replica HA yet (roadmap) |
 | Flow index | in-memory, rebuilt from the store on every boot |
 | Live feed | `WS /v1/live`, reconnects with backoff; the React source falls back to polling after two consecutive failures |
-| Auth | static API keys (`TRACERY_API_KEYS`/`_FILE`), each bound to one workspace + roles, or a `*` operator key naming a workspace per request; no OIDC/SSO yet (roadmap) |
+| Auth | `npx @atriarch/tracery-hub` (or any loopback-bound hub) with no `TRACERY_API_KEYS` runs "local mode" -- no key, single `default` workspace, full access; otherwise static API keys (`TRACERY_API_KEYS`/`_FILE`), each bound to one workspace + roles, or a `*` operator key naming a workspace per request; no OIDC/SSO yet (roadmap) |
 | Enterprise layer (`apps/hub/ee`) | audit log + RBAC scopes, active only with a valid `TRACERY_LICENSE_KEY`; the community hub is fully functional — ingest, storage, retention, live feed, hosted UI — with no license at all |
 | Retention / export | bounded by `TRACERY_RETENTION_HOURS`; no workspace-level data export beyond the audit log's own NDJSON export (roadmap) |

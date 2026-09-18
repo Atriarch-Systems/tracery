@@ -98,12 +98,28 @@ test('key entry is skipped once a session is stored, and the flow list shows the
 
 // Funding: the hosted UI's static footer (apps/hub/web/src/Footer.tsx) must
 // always render, with the Ko-fi tip-jar link shown since this preview server
-// has no /v1/license route at all (fetch fails -> treated as community).
+// has no /v1/info route at all (fetch fails -> treated as community).
 test('the static footer is present with the product name and a Ko-fi link', async ({ page }) => {
   await primeMockedHub(page);
   await expect(page.getByTestId('hub-footer')).toBeVisible();
   await expect(page.getByTestId('hub-footer')).toContainText('Tracery by Atriarch Systems');
   await expect(page.getByTestId('hub-footer-kofi')).toHaveAttribute('href', 'https://ko-fi.com/demonslyr');
+});
+
+// Footer now reads `edition` from GET /v1/info (task: "local mode") instead
+// of its own separate GET /v1/license call -- a licensed hub gets the
+// white-label footer, no Ko-fi link.
+test('the footer is white-label (no Ko-fi link) when GET /v1/info reports edition "licensed"', async ({ page }) => {
+  await page.route('**/v1/info', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ product: 'tracery', version: '0.1.0', edition: 'licensed', auth: 'keys' }),
+    }),
+  );
+  await primeMockedHub(page);
+  await expect(page.getByTestId('hub-footer')).toContainText('Tracery by Atriarch Systems');
+  await expect(page.getByTestId('hub-footer-kofi')).toHaveCount(0);
 });
 
 test('choosing trace scope shows three groups in the legend', async ({ page }) => {
@@ -309,4 +325,53 @@ test('key entry is skipped when GET /v1/auth/me reports an already-authenticated
   const storedSession = await page.evaluate(() => window.sessionStorage.getItem('atriarch-tracery-hub-session'));
   expect(storedSession).not.toBeNull();
   expect(JSON.parse(storedSession!).apiKey).toBe(''); // no API key -- the cookie alone authenticates every request
+});
+
+// Task ("local mode"): GET /v1/info reporting `auth: 'none'` must skip
+// KeyEntry entirely and connect with no API key -- checked ahead of, and
+// independent of, the SSO check above. No sessionStorage session is primed:
+// KeyEntry must never even flash before the auto-connect happens.
+test('GET /v1/info reporting auth "none" skips key entry, connects with no API key, and shows the local-mode badge', async ({ page }) => {
+  await page.route('**/v1/info', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ product: 'tracery', version: '0.1.0', edition: 'community', auth: 'none', workspace: 'default' }),
+    }),
+  );
+  await page.addInitScript(({ frame }) => {
+    class MockWebSocket extends EventTarget {
+      static readonly CONNECTING = 0;
+      static readonly OPEN = 1;
+      static readonly CLOSING = 2;
+      static readonly CLOSED = 3;
+      readyState = 0;
+      constructor(_url: string) {
+        super();
+        setTimeout(() => {
+          this.readyState = 1;
+          this.dispatchEvent(new Event('open'));
+          this.dispatchEvent(new MessageEvent('message', { data: JSON.stringify(frame) }));
+        }, 0);
+      }
+      send(): void {}
+      close(): void {
+        this.readyState = 3;
+        this.dispatchEvent(new Event('close'));
+      }
+    }
+    (window as unknown as { WebSocket: unknown }).WebSocket = MockWebSocket;
+  }, { frame: snapshotFrame });
+  await page.goto(`${BASE_URL}/ui/`);
+
+  await expect(page.getByTestId('key-entry-form')).toHaveCount(0);
+  await expect(page.getByTestId('flow-picker-item')).toHaveCount(3);
+  await expect(page.getByTestId('local-mode-badge')).toBeVisible();
+
+  const storedSession = await page.evaluate(() => window.sessionStorage.getItem('atriarch-tracery-hub-session'));
+  expect(storedSession).not.toBeNull();
+  const parsed = JSON.parse(storedSession!);
+  expect(parsed.apiKey).toBe('');
+  expect(parsed.local).toBe(true);
+  expect(parsed.workspace).toBe('default');
 });

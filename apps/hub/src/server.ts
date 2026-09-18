@@ -8,8 +8,8 @@ import Fastify, { type FastifyError, type FastifyInstance, type FastifyRequest }
 import websocketPlugin from '@fastify/websocket';
 import swaggerPlugin from '@fastify/swagger';
 import { ACTIVITY_LIMITS } from '@atriarch/tracery-core/contract';
-import { authenticate, AuthError, generateDevKey, type AuthContext } from './auth.js';
-import type { ApiKeyConfig, Config, Role } from './config.js';
+import { authenticate, localModeAuth, AuthError, type AuthContext } from './auth.js';
+import { hubVersion, type ApiKeyConfig, type Config, type Role } from './config.js';
 import { MemoryStore } from './store/memory.js';
 import { SqliteStore } from './store/sqlite.js';
 import { PostgresStore } from './store/postgres.js';
@@ -22,6 +22,7 @@ import { registerFlowsRoutes } from './routes/flows.js';
 import { registerTracesRoutes } from './routes/traces.js';
 import { registerWorkspacesRoutes } from './routes/workspaces.js';
 import { registerHealthRoutes } from './routes/health.js';
+import { registerInfoRoutes } from './routes/info.js';
 import { registerUiRoutes } from './routes/ui.js';
 import type { HubContext, HubExtensions } from './server-context.js';
 
@@ -32,8 +33,6 @@ export interface CreatedServer {
   readonly store: EventStore;
   readonly metrics: MetricsRegistry;
   readonly keys: readonly ApiKeyConfig[];
-  /** The generated dev key, when no `TRACERY_API_KEYS*` was configured. Log it; it is never persisted. */
-  readonly devKey: string | undefined;
   readonly retention: RetentionHandle;
   close(): Promise<void>;
 }
@@ -85,24 +84,19 @@ export async function createServer(config: Config, extensions?: HubExtensions): 
   const store = await openStore(config);
   const metrics = new MetricsRegistry();
 
-  // hub-15: `config.apiKeys === undefined` means "nothing configured" (dev key
-  // mode); `[]` means an operator explicitly set TRACERY_API_KEYS='[]' to mean
-  // "no access". Collapsing both to "generate an all-roles dev key" (the old
-  // `config.apiKeys ?? []` then `keys.length === 0` check) silently handed out
-  // full access on workspace "default" in the second case, with only a log line
-  // to notice.
+  // hub-15: `config.apiKeys === undefined` means "nothing configured" (local
+  // mode on a loopback host, or the hub already failed to boot -- see
+  // `config.ts`'s `resolveAuthMode`); `[]` means an operator explicitly set
+  // TRACERY_API_KEYS='[]', which -- now that there is no dev-key fallback to
+  // silently collapse onto -- would otherwise boot into a `'keys'` authMode
+  // that can never authenticate anyone, including its own operator. Caught
+  // here with a clear message rather than left as a locked-out deployment.
   if (config.apiKeys !== undefined && config.apiKeys.length === 0) {
     throw new Error(
-      'TRACERY_API_KEYS is explicitly empty ([]), which means "no access" -- remove the variable entirely to fall back to a generated dev key instead',
+      'TRACERY_API_KEYS is explicitly empty ([]), which means no request could ever authenticate -- remove the variable entirely (a loopback TRACERY_HOST gets local mode automatically) or provide at least one key',
     );
   }
-  let keys: readonly ApiKeyConfig[] = config.apiKeys ?? [];
-  let devKey: string | undefined;
-  if (config.apiKeys === undefined) {
-    const dev = generateDevKey();
-    keys = [dev.config];
-    devKey = dev.key;
-  }
+  const keys: readonly ApiKeyConfig[] = config.apiKeys ?? [];
 
   const app = Fastify({
     logger: {
@@ -164,29 +158,39 @@ export async function createServer(config: Config, extensions?: HubExtensions): 
   await app.register(swaggerPlugin, {
     openapi: {
       openapi: '3.1.0',
-      info: { title: 'Tracery Hub', version: '0.1.0', description: 'SPEC.md §6 HTTP API.' },
+      info: { title: 'Tracery Hub', version: hubVersion(), description: 'SPEC.md §6 HTTP API.' },
     },
   });
 
+  // Task ("local mode"): `authMode === 'none'` bypasses key lookup entirely --
+  // every request is a full-access principal on workspace "default" (see
+  // `auth.ts`'s `localModeAuth`). `authMode === 'keys'` is the unchanged
+  // SPEC.md §6 behavior.
   const requireAuth = async (
     request: FastifyRequest,
     role: Role,
     requestedWorkspace?: string,
     options?: { readonly operatorWorkspaceOptional?: boolean },
   ): Promise<AuthContext> => {
-    const auth = authenticate(keys, request.headers as Record<string, string | string[] | undefined>, undefined, role, requestedWorkspace, options);
+    const auth =
+      config.authMode === 'none'
+        ? localModeAuth(requestedWorkspace)
+        : authenticate(keys, request.headers as Record<string, string | string[] | undefined>, undefined, role, requestedWorkspace, options);
     await extensions?.onRequestAuthed?.({ request, auth });
     return auth;
   };
 
-  const ctx: HubContext = { config, store, metrics, keys, requireAuth };
+  const isLicensed = (): boolean => extensions?.isLicensed?.() ?? false;
+
+  const ctx: HubContext = { config, store, metrics, keys, requireAuth, isLicensed };
 
   registerHealthRoutes(app, ctx);
+  registerInfoRoutes(app, ctx);
   registerEventsRoutes(app, ctx);
   registerFlowsRoutes(app, ctx);
   registerTracesRoutes(app, ctx);
   registerWorkspacesRoutes(app, ctx);
-  registerLive(app, { store, keys, metrics, extensions });
+  registerLive(app, { store, keys, metrics, extensions, authMode: config.authMode });
 
   app.get('/v1/openapi.json', { schema: { hide: true } }, async () => app.swagger());
 
@@ -208,7 +212,6 @@ export async function createServer(config: Config, extensions?: HubExtensions): 
     store,
     metrics,
     keys,
-    devKey,
     retention,
     close: async () => {
       retention.stop();

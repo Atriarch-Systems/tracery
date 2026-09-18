@@ -156,6 +156,55 @@ test('hub up: spool drains, batch shape is correct, Authorization header present
   }
 });
 
+// Task ("local mode"): hub_url alone is valid configuration -- a local hub
+// with no TRACERY_API_KEYS runs with auth off, so api_key must be optional.
+test('hub up, no api_key configured: spool drains with no Authorization header at all', async () => {
+  const received = [];
+  const server = createServer((req, res) => {
+    const chunks = [];
+    req.on('data', (c) => chunks.push(c));
+    req.on('end', () => {
+      received.push({
+        method: req.method,
+        url: req.url,
+        authorization: req.headers['authorization'],
+        contentType: req.headers['content-type'],
+        body: JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}'),
+      });
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ accepted: 1, duplicates: 0, rejected: [], cursor: 1 }));
+    });
+  });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const port = server.address().port;
+
+  const dataDir = await makeDataDir();
+  try {
+    const env = {
+      CLAUDE_PLUGIN_OPTION_HUB_URL: `http://127.0.0.1:${port}`,
+      CLAUDE_PLUGIN_OPTION_API_KEY: '',
+      CLAUDE_PLUGIN_OPTION_WORKSPACE: 'default',
+    };
+    const { code, stdout, stderr } = await runEmit(sessionStartPayload('sess-nokey'), env, dataDir);
+    assert.equal(code, 0);
+    assert.equal(stdout, '');
+    assert.equal(stderr, '', 'no-api_key configuration must not warn -- it is valid, not partial');
+
+    assert.equal(received.length, 1);
+    const req = received[0];
+    assert.equal(req.method, 'POST');
+    assert.equal(req.url, '/v1/events');
+    assert.equal(req.authorization, undefined, 'no Authorization header at all, not "Bearer undefined"/"Bearer "');
+    assert.equal(req.contentType, 'application/json');
+
+    const lines = await spoolLines(dataDir, { hubUrl: `http://127.0.0.1:${port}`, apiKey: '', workspace: 'default' });
+    assert.equal(lines.length, 0, 'spool should be drained after a successful post');
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+    await rm(dataDir, { recursive: true, force: true });
+  }
+});
+
 // Regression for plugin-1: two hook processes for the same session, firing
 // concurrently (Claude Code runs hooks in parallel for overlapping tool
 // calls), must both survive -- distinct ids, and both tool_use_ids recorded

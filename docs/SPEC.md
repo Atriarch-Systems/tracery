@@ -264,7 +264,8 @@ Type hints, `py.typed`, PEP-420 namespace (no `atriarch/__init__.py`).
 
 Fastify 5 on Node 22. Configuration by environment variables (documented in
 `apps/hub/README.md`), all with defaults so `docker run -p 8971:8971 image`
-works with an in-memory store and a printed dev API key.
+works with an in-memory store and no authentication of its own ("local
+mode" -- see "Auth" below; no key is ever minted or printed).
 
 ### HTTP API (all under `/v1`, JSON, OpenAPI 3.1 served at `/v1/openapi.json`)
 
@@ -278,6 +279,7 @@ works with an in-memory store and a printed dev API key.
 | GET | `/traces/:id/events` | read | all events for the trace |
 | GET | `/workspaces` | admin | list workspaces and their stats |
 | DELETE | `/flows/:id` | admin | delete a flow and its events |
+| GET | `/v1/info` | none | hub identity: `{ product, version, edition, auth, workspace? }` |
 | GET | `/healthz`, `/readyz` | none | liveness / readiness |
 | GET | `/metrics` | none or metrics token | Prometheus text: events ingested, rejected, duplicates, flows, store size, ws clients |
 | WS | `/v1/live?workspace=&flow=&trace=&after=` | read (query `?token=` or header) | `ActivityFrame`s: snapshot then events, heartbeat every 15 s |
@@ -287,13 +289,32 @@ Errors are `{ error: { code, message } }`. Every request gets `x-request-id`.
 
 ### Auth
 
-API keys. `TRACERY_API_KEYS` is a JSON array: `[{ "id": "saga", "key": "...", "workspace": "default", "roles": ["ingest","read"] }]`;
-or `TRACERY_API_KEYS_FILE` path. A key with `workspace: "*"` and role `admin`
-is the operator key. With no keys configured the hub generates one dev key at
-boot, logs it, and grants all roles on workspace `default`. Keys are compared in
-constant time. `Authorization: Bearer <key>` or `x-api-key`. The workspace of a
-request is the key's workspace, or the batch/query `workspace` when the key is
-`*`. Requests never see another workspace's data.
+Two modes, resolved once at boot into `authMode: 'none' | 'keys'`:
+
+- **`'keys'`** (`TRACERY_API_KEYS` or `TRACERY_API_KEYS_FILE` set, any host):
+  the original API-key behavior. `TRACERY_API_KEYS` is a JSON array:
+  `[{ "id": "saga", "key": "...", "workspace": "default", "roles": ["ingest","read"] }]`;
+  or `TRACERY_API_KEYS_FILE` path. A key with `workspace: "*"` and role
+  `admin` is the operator key. Keys are compared in constant time.
+  `Authorization: Bearer <key>` or `x-api-key`. The workspace of a request is
+  the key's workspace, or the batch/query `workspace` when the key is `*`.
+  Requests never see another workspace's data.
+- **`'none'`** ("local mode" -- no keys configured, and `TRACERY_HOST`
+  resolves to a loopback address: `127.0.0.1`, `::1`, `localhost`; this is
+  the default, so `npx @atriarch/tracery-hub`/`node bin/hub.mjs` with no env
+  at all lands here): every request and WS connection is a full-access
+  principal on the single `default` workspace, no key ever checked or
+  printed. A batch/query naming any other workspace is rejected with 400.
+  `TRACERY_AUTH=none` opts into the same mode on a non-loopback host (a
+  container behind its own auth/proxy/mesh); the hub logs a warning once at
+  boot when this applies. With no keys configured on a non-loopback host and
+  no `TRACERY_AUTH=none`, the hub fails to start with a clear error rather
+  than falling back to a generated key -- there is no dev-key mode any more.
+
+`GET /v1/info` (public, no auth) reports `{ product, version, edition, auth,
+workspace? }` -- `workspace` present only in `'none'` mode -- so a client
+(the hosted UI, the demo script, the Claude Code plugin) can discover which
+mode a hub is running in with one unauthenticated call.
 
 ### Storage
 
@@ -367,7 +388,8 @@ repo, executed by the integration workstream:
 1. `npm ci && npm run build && npm test` green at the root on Node 22.
 2. `python -m pytest clients/python` green on 3.11 (3.13 acceptable locally).
 3. `docker build -f apps/hub/Dockerfile .` succeeds; `docker run` with no env
-   prints a dev key and serves `/healthz`, `/v1/openapi.json`, `/ui/`.
+   starts in local mode (no key minted or printed) and serves `/healthz`,
+   `/v1/info`, `/v1/openapi.json`, `/ui/`.
 4. A demo script (`scripts/demo.mjs`) drives the TS client to emit a parent flow
    that spawns two child flows (one via the Python client), then asserts through
    the hub API that: the trace has three flows; the child trace ids equal the

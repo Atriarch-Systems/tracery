@@ -19,11 +19,12 @@
  *
  * Usage: `node scripts/demo.mjs [--key <api-key>]`, or `npm run demo`.
  * Env: TRACERY_HUB_URL (default http://127.0.0.1:8971), TRACERY_API_KEY
- * (falls back to --key, then to parsing the dev key out of
- * `docker logs tracery-accept`, the container SPEC.md §8 acceptance 3
- * leaves running).
+ * (falls back to --key). Task ("local mode"): both are optional against a
+ * hub running with no TRACERY_API_KEYS configured (`authMode: 'none'`, e.g.
+ * `npx @atriarch/tracery-hub` with no env) -- there is no dev key to look
+ * for any more, so omitting both simply runs unauthenticated.
  */
-import { execFileSync, spawnSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import WebSocket from 'ws';
@@ -45,31 +46,17 @@ function argValue(name) {
 
 const HUB_URL = process.env.TRACERY_HUB_URL || 'http://127.0.0.1:8971';
 
-function devKeyFromDockerLogs() {
-  try {
-    // `docker logs` prints the hub's structured JSON log lines verbatim, so a
-    // literal newline inside the message survives only as the two characters
-    // `\` `n` (JSON-escaped), not an actual line break -- match the dev key
-    // token itself rather than relying on surrounding whitespace.
-    const out = execFileSync('docker', ['logs', 'tracery-accept'], { encoding: 'utf8' });
-    const match = out.match(/dev_[0-9a-f]+/);
-    return match?.[0];
-  } catch {
-    return undefined; // docker not available, or the container isn't running -- fine, just no fallback
-  }
+// Task ("local mode"): no dev key to fall back to any more -- a hub with
+// `authMode: 'none'` (no TRACERY_API_KEYS configured) needs no key at all,
+// so an empty API_KEY is a legitimate, expected value, not an error.
+const API_KEY = process.env.TRACERY_API_KEY || argValue('key') || '';
+
+console.log(`[demo] hub: ${HUB_URL}${API_KEY ? '' : ' (no API key -- assuming a local-mode hub with auth off)'}`);
+
+/** `{ authorization: 'Bearer <key>' }` when a key is configured, `{}` (no header at all) against a local-mode hub. */
+function authHeaders() {
+  return API_KEY ? { authorization: `Bearer ${API_KEY}` } : {};
 }
-
-const API_KEY = process.env.TRACERY_API_KEY || argValue('key') || devKeyFromDockerLogs();
-
-if (!API_KEY) {
-  console.error(
-    'demo: no API key. Set TRACERY_API_KEY, pass --key <key>, or leave the container from ' +
-      'SPEC.md §8 acceptance step 3 (`docker run ... --name tracery-accept ...`) running so its dev key can be read from `docker logs`.',
-  );
-  process.exit(1);
-}
-
-console.log(`[demo] hub: ${HUB_URL}`);
 
 // ---------------------------------------------------------------------------
 // PASS/FAIL bookkeeping
@@ -257,7 +244,7 @@ const firstBatch = parentTransport.batches[0];
 if (check('the parent tracer sent exactly one batch to resend', Array.isArray(firstBatch) && firstBatch.length > 0, `batches: ${parentTransport.batches.length}`)) {
   const resendRes = await fetch(`${HUB_URL}/v1/events`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json', authorization: `Bearer ${API_KEY}` },
+    headers: { 'content-type': 'application/json', ...authHeaders() },
     body: JSON.stringify({ v: ACTIVITY_CONTRACT_VERSION, events: firstBatch }),
   });
   const resendBody = await resendRes.json();

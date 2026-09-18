@@ -94,6 +94,29 @@ def test_http_transport_gives_up_after_exhausting_retries_without_raising():
         stop_fake_hub(server, thread)
 
 
+def test_http_transport_with_no_api_key_sends_no_authorization_header_at_all():
+    """Task ("local mode"): a hub running with authMode 'none' needs no
+    credential at all -- HttpTransport must not send an Authorization header
+    (or "Bearer None") when api_key is omitted.
+    """
+
+    def responder(record, n):
+        return 200, {"accepted": 1, "duplicates": 0, "rejected": [], "cursor": 1}
+
+    server, thread, base_url, requests = start_fake_hub(responder)
+    try:
+        transport = HttpTransport(base_url=base_url, retries=0)
+        transport.send(SAMPLE_EVENTS)
+        transport.flush()
+
+        assert len(requests) == 1
+        assert "authorization" not in requests[0]["headers"]
+        assert requests[0]["headers"]["content-type"] == "application/json"
+        transport.close()
+    finally:
+        stop_fake_hub(server, thread)
+
+
 def test_http_transport_does_not_retry_4xx():
     def responder(record, n):
         return 400, {"error": {"code": "bad", "message": "no"}}

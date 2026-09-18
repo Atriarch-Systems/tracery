@@ -11,14 +11,15 @@
       "type": "string",
       "title": "Tracery hub URL",
       "description": "Base URL of the Tracery hub, e.g. https://tracery.example.com (no trailing slash needed).",
+      "default": "http://127.0.0.1:8971",
       "required": true
     },
     "api_key": {
       "type": "string",
       "title": "Ingest API key",
-      "description": "Tracery hub API key with the ingest role, sent as an Authorization: Bearer header.",
+      "description": "Tracery hub API key with the ingest role, sent as an Authorization: Bearer header. Leave empty for a local hub (one started with `npx @atriarch/tracery-hub` and no TRACERY_API_KEYS -- it runs with auth off).",
       "sensitive": true,
-      "required": true
+      "required": false
     },
     "workspace": {
       "type": "string",

@@ -3,7 +3,8 @@ import type { FlowSummary, ListFlowsQuery, ListFlowsResult, Trace } from './hub-
 
 export interface HubClientOptions {
   readonly baseUrl: string;
-  readonly apiKey: string;
+  /** Omit (or pass `''`) against a hub running in local mode (`authMode: 'none'`, task: "local mode") -- no `Authorization` header or `?token=` is sent at all. */
+  readonly apiKey?: string;
   readonly workspace?: string;
   readonly fetch?: typeof fetch;
   readonly WebSocket?: typeof WebSocket;
@@ -52,7 +53,7 @@ export class HubClient {
 
   constructor(options: HubClientOptions) {
     this.baseUrl = options.baseUrl.replace(/\/+$/, '');
-    this.apiKey = options.apiKey;
+    this.apiKey = options.apiKey ?? '';
     this.workspace = options.workspace;
     this.fetchImpl = options.fetch ?? globalThis.fetch;
     this.WebSocketImpl = options.WebSocket ?? (globalThis as { WebSocket?: typeof WebSocket }).WebSocket;
@@ -73,9 +74,12 @@ export class HubClient {
   }
 
   private async getJson<T>(path: string, query?: Readonly<Record<string, QueryValue>>): Promise<T> {
-    const res = await this.fetchImpl(this.buildUrl(path, query), {
-      headers: { authorization: `Bearer ${this.apiKey}` },
-    });
+    // Local mode (task: "local mode", `authMode: 'none'`) needs no
+    // credential at all -- omit the header entirely rather than send an
+    // empty `Bearer `, which some HTTP stacks strip anyway but a fetch
+    // proxy/logger might otherwise capture as if it were a real key attempt.
+    const headers: Record<string, string> = this.apiKey ? { authorization: `Bearer ${this.apiKey}` } : {};
+    const res = await this.fetchImpl(this.buildUrl(path, query), { headers });
     if (!res.ok) {
       let message = `${res.status} ${res.statusText}`;
       try {
@@ -153,7 +157,9 @@ export class HubClient {
         flow: filter.flow,
         trace: filter.trace,
         after: cursor,
-        token: this.apiKey,
+        // Omitted entirely (not sent as `token=`) in local mode -- `buildUrl`
+        // already skips `undefined` query values.
+        token: this.apiKey || undefined,
       });
       return url.toString().replace(/^http/, 'ws');
     };

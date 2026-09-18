@@ -7,6 +7,7 @@ import { ExplorerErrorBoundary } from './ErrorBoundary.js';
 import { Footer } from './Footer.js';
 import { loadSession, saveSession, clearSession, type HubSession } from './session.js';
 import { fetchAuthMe, logout } from './sso.js';
+import { fetchHubInfo } from './info.js';
 
 function scopeForRoute(route: Route): Scope | undefined {
   if (route.type === 'flow') return { mode: 'flow', flow: route.id };
@@ -24,25 +25,44 @@ export function App() {
   const [ssoAvailable, setSsoAvailable] = useState<boolean | undefined>(undefined);
 
   useEffect(() => {
-    if (session) return; // an existing (API-key or already-detected SSO) session skips the check entirely
+    if (session) return; // an existing (API-key, local-mode, or already-detected SSO) session skips the check entirely
     let cancelled = false;
 
-    void fetchAuthMe()
-      .then((me) => {
-        if (cancelled || !me) return;
-        if (me.authenticated) {
-          // A valid session cookie already exists (most commonly: the OIDC
-          // callback just redirected the browser back here). No API key is
-          // stored -- `apiKey: ''` makes `useHubSource`'s `HubClient` send an
-          // empty `Authorization`/`?token=` credential, which `apps/hub/src/
-          // auth.ts`'s `authenticate()` treats as "no key presented" and
-          // falls through to this same cookie.
-          const next: HubSession = { baseUrl: window.location.origin, apiKey: '', workspace: me.user?.workspace };
+    // Task ("local mode"): check GET /v1/info first. A hub reporting
+    // `auth: 'none'` needs no key at all -- connect straight away and never
+    // touch the SSO check or show KeyEntry. Anything else (auth: 'keys', or
+    // /v1/info itself failing -- e.g. a hub old enough not to have the
+    // route, or this mocked-preview test harness) falls through to the
+    // pre-existing SSO-then-KeyEntry flow, unchanged.
+    void fetchHubInfo()
+      .then((info) => {
+        if (cancelled) return;
+        if (info?.auth === 'none') {
+          const next: HubSession = { baseUrl: window.location.origin, apiKey: '', workspace: info.workspace ?? 'default', local: true };
           saveSession(next);
           setSession(next);
-          return;
+          return undefined;
         }
-        setSsoAvailable(me.sso.configured && me.sso.licensed);
+        return fetchAuthMe().then((me) => {
+          if (cancelled) return;
+          if (!me) {
+            setSsoAvailable(false);
+            return;
+          }
+          if (me.authenticated) {
+            // A valid session cookie already exists (most commonly: the OIDC
+            // callback just redirected the browser back here). No API key is
+            // stored -- `apiKey: ''` makes `useHubSource`'s `HubClient` send an
+            // empty `Authorization`/`?token=` credential, which `apps/hub/src/
+            // auth.ts`'s `authenticate()` treats as "no key presented" and
+            // falls through to this same cookie.
+            const next: HubSession = { baseUrl: window.location.origin, apiKey: '', workspace: me.user?.workspace };
+            saveSession(next);
+            setSession(next);
+            return;
+          }
+          setSsoAvailable(me.sso.configured && me.sso.licensed);
+        });
       })
       .catch(() => {
         if (!cancelled) setSsoAvailable(false);
@@ -112,6 +132,11 @@ function Explorer({ session, route, onSignOut }: { readonly session: HubSession;
         <span>
           status: <span data-testid="header-connection-status">{source.status}</span>
         </span>
+        {session.local && (
+          <span data-testid="local-mode-badge" title="No TRACERY_API_KEYS configured; every request is full access on this hub." style={{ color: '#8892a6' }}>
+            local mode
+          </span>
+        )}
         {route.type === 'not-found' && <span style={{ color: '#ff6b6b' }}>Unknown route: {route.path}</span>}
         <button
           type="button"

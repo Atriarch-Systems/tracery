@@ -24,7 +24,8 @@ import type { ActivitySource } from './source.js';
 
 export interface UseHubSourceOptions {
   readonly baseUrl: string;
-  readonly apiKey: string;
+  /** Omit against a hub running in local mode (`authMode: 'none'`, task: "local mode") -- no credential is sent at all. */
+  readonly apiKey?: string;
   readonly workspace?: string;
   /** Scope the live feed and polling fallback to one flow. */
   readonly flow?: string;
@@ -62,7 +63,11 @@ export function useHubSource(options: UseHubSourceOptions): ActivitySource {
 
     const engine = startHubFeed({
       baseUrl,
-      apiKey,
+      // `HubFeedEngineOptions.apiKey` stays a required string (untouched by
+      // this task's narrower "make apiKey optional" scope, which names only
+      // this file and `hub-client.ts`) -- `HubClient` itself already treats
+      // `''` as "no credential" (local mode, task: "local mode").
+      apiKey: apiKey ?? '',
       workspace,
       flow,
       trace,

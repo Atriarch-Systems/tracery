@@ -38,10 +38,20 @@ A local clone can be added as a marketplace the same way, with a path
 instead of a `owner/repo` shorthand: `/plugin marketplace add
 /path/to/this/repo`.
 
-Either install path needs the same configuration: set `hub_url` and
-`api_key` (`userConfig` prompt, or `TRACERY_HUB_URL` / `TRACERY_API_KEY`).
-Both unset is a silent no-op; only one set logs a single stderr line and
-stays a no-op. See the README for the full env var table.
+Either install path needs only `hub_url` (`userConfig` prompt, or
+`TRACERY_HUB_URL`) against a hub running in local mode -- one started with
+`npx @atriarch/tracery-hub` and no `TRACERY_API_KEYS` runs loopback-only with
+auth off, so there is no key to configure at all:
+
+```sh
+npx @atriarch/tracery-hub
+TRACERY_HUB_URL=http://127.0.0.1:8971 claude --plugin-dir ./plugins/claude-code
+```
+
+`api_key` (`TRACERY_API_KEY`) is only needed against a hub that requires
+keys (`TRACERY_API_KEYS`/`_FILE` configured -- needs the `ingest` role). With
+`hub_url` unset entirely, every hook is a silent no-op. See the README for
+the full env var table.
 
 ## Architecture
 

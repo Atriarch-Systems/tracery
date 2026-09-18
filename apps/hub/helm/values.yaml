@@ -92,6 +92,17 @@ config:
   logLevel: info
   # Overrides TRACERY_UI_DIR when set; leave empty to use the image default.
   uiDir: ""
+  # TRACERY_AUTH=none (apps/hub/README.md "Auth mode"): only for a hub
+  # deliberately run with NO authentication of its own, because something in
+  # front of it (reverse proxy, service mesh, network policy) already
+  # authenticates. Irrelevant -- and ignored -- whenever apiKeys.keys or
+  # apiKeys.existingSecret is set, since a configured key always wins. Leave
+  # this false and configure real keys instead unless you specifically mean
+  # to run open: with this false and no keys configured, the chart neutralizes
+  # the image's own default (its Dockerfile bakes in TRACERY_AUTH=none so a
+  # bare `docker run` still starts) and the hub fails at boot with a clear
+  # error instead of silently serving with no auth at all.
+  authNone: false
 
 # PersistentVolumeClaim for /data. Only rendered (and only mounted on the
 # Deployment) when config.store is "sqlite".
@@ -109,9 +120,9 @@ persistence:
 # TRACERY_API_KEYS_FILE (apps/hub/README.md "API key file format"). Provide
 # either inline `keys` (rendered into a Secret this chart manages) or point
 # at a Secret you already provisioned (e.g. via OpenBao/ExternalSecret).
-# Leaving both empty makes no Secret at all, so the hub falls back to its
-# generated dev key -- fine for a quick `helm template`/local try, never for
-# a real deployment.
+# Leaving both empty makes no Secret at all -- there is no dev-key fallback
+# (apps/hub/README.md "Auth mode"), so the hub then fails at boot unless
+# config.authNone above is set to true.
 apiKeys:
   existingSecret: ""
   existingSecretKey: keys.json

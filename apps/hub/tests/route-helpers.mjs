@@ -4,7 +4,13 @@ import os from 'node:os';
 import path from 'node:path';
 import { createServer } from '../dist/server.js';
 
-/** Builds a `Config` (SPEC.md §6) for tests, overriding only what a test cares about. */
+/**
+ * Builds a `Config` (SPEC.md §6) for tests, overriding only what a test
+ * cares about. `authMode` defaults to `'keys'` (every existing route test
+ * passes `apiKeys` explicitly) so tests are unaffected by "local mode";
+ * pass `{ authMode: 'none' }` explicitly (with `apiKeys` left `undefined`)
+ * to exercise that path instead.
+ */
 export function testConfig(overrides = {}) {
   const uiDir = overrides.uiDir ?? path.join(os.tmpdir(), 'tracery-hub-test-ui-missing');
   return {
@@ -13,6 +19,8 @@ export function testConfig(overrides = {}) {
     store: 'memory',
     sqlitePath: ':memory:',
     apiKeys: undefined,
+    authMode: 'keys',
+    authWarning: undefined,
     retentionHours: 72,
     maxEventsPerWorkspace: 500_000,
     metricsToken: undefined,

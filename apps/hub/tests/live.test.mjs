@@ -237,3 +237,51 @@ test('live: an unauthenticated connection is closed', async (t) => {
   });
   assert.equal(closeCode, 4401);
 });
+
+// ---------------------------------------------------------------------------
+// local mode (authMode 'none', task: "local mode")
+// ---------------------------------------------------------------------------
+
+test('live: local mode (authMode "none") connects with no token/header at all', async (t) => {
+  const created = await createTestServer({ apiKeys: undefined, authMode: 'none' });
+  const address = await created.app.listen({ port: 0, host: '127.0.0.1' });
+  t.after(async () => {
+    await created.close();
+  });
+
+  // No `bearer()` header, no `?token=` -- unlike every other test in this
+  // file, ingest here must not need `key-full` at all.
+  const ingestRes = await created.app.inject({
+    method: 'POST',
+    url: '/v1/events',
+    payload: { v: ACTIVITY_CONTRACT_VERSION, events: [oneEvent({ id: 'local-seed' })] },
+  });
+  assert.equal(ingestRes.statusCode, 200, ingestRes.body);
+
+  const ws = new WebSocket(`${address.replace('http', 'ws')}/v1/live?flow=f1`);
+  const frames = frameQueue(ws);
+  t.after(() => ws.close());
+  await waitOpen(ws);
+
+  const snapshot = await frames.next();
+  assert.equal(snapshot.type, 'snapshot');
+  assert.deepEqual(snapshot.events.map((e) => e.id), ['local-seed']);
+});
+
+test('live: local mode rejects a non-"default" workspace query with 4400, not 4401', async (t) => {
+  const created = await createTestServer({ apiKeys: undefined, authMode: 'none' });
+  const address = await created.app.listen({ port: 0, host: '127.0.0.1' });
+  t.after(async () => {
+    await created.close();
+  });
+
+  const ws = new WebSocket(`${address.replace('http', 'ws')}/v1/live?workspace=other`);
+  const closeCode = await new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('did not close')), 5000);
+    ws.once('close', (code) => {
+      clearTimeout(timer);
+      resolve(code);
+    });
+  });
+  assert.equal(closeCode, 4400);
+});

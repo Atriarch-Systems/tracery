@@ -549,6 +549,7 @@ test('openapi: /v1/openapi.json documents every route (no auth required)', async
     assert.equal(doc.openapi, '3.1.0');
     const paths = Object.keys(doc.paths);
     for (const expected of [
+      '/v1/info',
       '/v1/events',
       '/v1/flows',
       '/v1/flows/{id}',

@@ -20,3 +20,10 @@ data:
   {{- if include "tracery-hub.apiKeysSecretName" . }}
   TRACERY_API_KEYS_FILE: /etc/tracery/keys.json
   {{- end }}
+  # Always rendered (even as ""): the image's own Dockerfile bakes in
+  # TRACERY_AUTH=none as its `docker run`-with-no-env fallback, and Kubernetes
+  # env vars are set by name, not merged -- an empty string here overrides
+  # that default so an unconfigured chart install fails at boot with a clear
+  # error (apps/hub/README.md "Auth mode") instead of silently serving with
+  # no auth. Irrelevant, and ignored, once apiKeys.keys/existingSecret is set.
+  TRACERY_AUTH: {{ .Values.config.authNone | ternary "none" "" | quote }}

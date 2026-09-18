@@ -3,16 +3,22 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { loadConfig, parseApiKeys } from '../dist/config.js';
+import { loadConfig, parseApiKeys, isLoopbackHost, hubVersion } from '../dist/config.js';
 
 test('loadConfig: every documented default applies when the environment is empty', () => {
   const config = loadConfig({});
   assert.equal(config.port, 8971);
-  assert.equal(config.host, '0.0.0.0');
+  // Task ("local mode"): the default host is loopback-only, not 0.0.0.0 --
+  // `npx @atriarch/tracery-hub` with no env must bind 127.0.0.1 and run with
+  // auth off (authMode 'none'), never mint or print a key. The Dockerfile
+  // sets TRACERY_HOST=0.0.0.0 explicitly for the container case.
+  assert.equal(config.host, '127.0.0.1');
   assert.equal(config.store, 'memory');
   assert.equal(config.sqlitePath, '/data/tracery.db');
   assert.equal(config.postgresUrl, undefined);
   assert.equal(config.apiKeys, undefined);
+  assert.equal(config.authMode, 'none');
+  assert.equal(config.authWarning, undefined);
   assert.equal(config.retentionHours, 72);
   assert.equal(config.maxEventsPerWorkspace, 500_000);
   assert.equal(config.metricsToken, undefined);
@@ -23,7 +29,7 @@ test('loadConfig: every documented default applies when the environment is empty
 test('loadConfig: every documented env var overrides its default', () => {
   const config = loadConfig({
     TRACERY_PORT: '9000',
-    TRACERY_HOST: '127.0.0.1',
+    TRACERY_HOST: '0.0.0.0',
     TRACERY_STORE: 'sqlite',
     TRACERY_SQLITE_PATH: '/tmp/x.db',
     TRACERY_API_KEYS: JSON.stringify([{ key: 'k', workspace: 'w', roles: ['read'] }]),
@@ -34,15 +40,67 @@ test('loadConfig: every documented env var overrides its default', () => {
     TRACERY_UI_DIR: '/somewhere',
   });
   assert.equal(config.port, 9000);
-  assert.equal(config.host, '127.0.0.1');
+  assert.equal(config.host, '0.0.0.0');
   assert.equal(config.store, 'sqlite');
   assert.equal(config.sqlitePath, '/tmp/x.db');
   assert.deepEqual(config.apiKeys, [{ id: 'key-0', key: 'k', workspace: 'w', roles: ['read'] }]);
+  assert.equal(config.authMode, 'keys');
   assert.equal(config.retentionHours, 24);
   assert.equal(config.maxEventsPerWorkspace, 10);
   assert.equal(config.metricsToken, 'tok');
   assert.equal(config.logLevel, 'debug');
   assert.equal(config.uiDir, '/somewhere');
+});
+
+// ---------------------------------------------------------------------------
+// authMode ("local mode")
+// ---------------------------------------------------------------------------
+
+test('isLoopbackHost: exactly 127.0.0.1, ::1, localhost (case-insensitively); 0.0.0.0 and anything else is not', () => {
+  assert.equal(isLoopbackHost('127.0.0.1'), true);
+  assert.equal(isLoopbackHost('::1'), true);
+  assert.equal(isLoopbackHost('localhost'), true);
+  assert.equal(isLoopbackHost('LOCALHOST'), true);
+  assert.equal(isLoopbackHost('0.0.0.0'), false);
+  assert.equal(isLoopbackHost('example.com'), false);
+  assert.equal(isLoopbackHost('127.0.0.2'), false);
+});
+
+test('loadConfig: TRACERY_API_KEYS(_FILE) set -> authMode "keys" regardless of host', () => {
+  const keysJson = JSON.stringify([{ key: 'k', workspace: 'w', roles: ['read'] }]);
+  assert.equal(loadConfig({ TRACERY_API_KEYS: keysJson }).authMode, 'keys');
+  assert.equal(loadConfig({ TRACERY_API_KEYS: keysJson, TRACERY_HOST: '127.0.0.1' }).authMode, 'keys');
+  assert.equal(loadConfig({ TRACERY_API_KEYS: keysJson, TRACERY_HOST: '0.0.0.0' }).authMode, 'keys');
+});
+
+test('loadConfig: no keys + loopback host -> authMode "none", no warning', () => {
+  for (const host of ['127.0.0.1', '::1', 'localhost', undefined]) {
+    const env = host === undefined ? {} : { TRACERY_HOST: host };
+    const config = loadConfig(env);
+    assert.equal(config.authMode, 'none', `host ${host}`);
+    assert.equal(config.authWarning, undefined, `host ${host}`);
+  }
+});
+
+test('loadConfig: no keys + non-loopback host + TRACERY_AUTH=none -> authMode "none" with a warning', () => {
+  const config = loadConfig({ TRACERY_HOST: '0.0.0.0', TRACERY_AUTH: 'none' });
+  assert.equal(config.authMode, 'none');
+  assert.match(config.authWarning, /not loopback/);
+  assert.match(config.authWarning, /TRACERY_AUTH=none/);
+});
+
+test('loadConfig: no keys + non-loopback host + no TRACERY_AUTH=none -> fails to boot with a clear error', () => {
+  assert.throws(() => loadConfig({ TRACERY_HOST: '0.0.0.0' }), /TRACERY_HOST is not loopback and no API keys are configured/);
+  assert.throws(() => loadConfig({ TRACERY_HOST: 'example.com' }), /TRACERY_HOST is not loopback/);
+  // A TRACERY_AUTH value other than exactly "none" does not count as the opt-out.
+  assert.throws(() => loadConfig({ TRACERY_HOST: '0.0.0.0', TRACERY_AUTH: 'yes' }), /TRACERY_HOST is not loopback/);
+});
+
+test('hubVersion: reads a non-empty version string from apps/hub/package.json', () => {
+  const version = hubVersion();
+  assert.equal(typeof version, 'string');
+  assert.ok(version.length > 0);
+  assert.match(version, /^\d+\.\d+\.\d+/);
 });
 
 test('loadConfig: an unparseable numeric env var throws with the variable name', () => {

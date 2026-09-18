@@ -7,6 +7,14 @@ export interface HubSession {
   readonly baseUrl: string;
   readonly apiKey: string;
   readonly workspace?: string;
+  /**
+   * Set when this session was established automatically from `GET /v1/info`
+   * reporting `auth: 'none'` (task: "local mode") rather than a key the user
+   * typed in, or an SSO cookie. Distinguishes the two no-`apiKey` cases for
+   * the header's "local mode" badge -- an SSO session also carries `apiKey:
+   * ''` (`App.tsx`) but is not local mode.
+   */
+  readonly local?: boolean;
 }
 
 const STORAGE_KEY = 'atriarch-tracery-hub-session';
@@ -17,7 +25,12 @@ export function loadSession(): HubSession | null {
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<HubSession>;
     if (typeof parsed.baseUrl !== 'string' || typeof parsed.apiKey !== 'string') return null;
-    return { baseUrl: parsed.baseUrl, apiKey: parsed.apiKey, workspace: typeof parsed.workspace === 'string' ? parsed.workspace : undefined };
+    return {
+      baseUrl: parsed.baseUrl,
+      apiKey: parsed.apiKey,
+      workspace: typeof parsed.workspace === 'string' ? parsed.workspace : undefined,
+      local: parsed.local === true,
+    };
   } catch {
     return null;
   }
