@@ -1,6 +1,10 @@
 # Tracery
 
 <p align="center">
+  <a href="https://github.com/Atriarch-Systems/tracery/actions/workflows/ci.yaml"><img src="https://github.com/Atriarch-Systems/tracery/actions/workflows/ci.yaml/badge.svg?branch=main" alt="CI status"></a>
+</p>
+
+<p align="center">
   <img src="docs/images/hero.gif" alt="Tracery drawing a live trace: an orchestrator plans and searches, spawns two subagents (one succeeds, one errors), while a guard check and a human approval run concurrently — all rendered live as the graph grows" width="900">
 </p>
 
@@ -230,57 +234,31 @@ enterprise is available on request. See [`docs/CLOUD.md`](docs/CLOUD.md).
 
 ## Status
 
-Workstream G (integration) executed SPEC.md §8 acceptance for real on this
-machine (Windows, Node 22.14, Python 3.13, Docker 29) on 2026-09-16. All six
-items passed. **Note:** this record predates the split of the (then
-in-repo) enterprise layer into the private `tracery-cloud` repository
-(`docs/CLOUD.md`); test counts and behavior below reflect the repository as
-it stood that day, with `apps/hub/ee` still present.
+CI (`.github/workflows/ci.yaml`) runs the full suite on every push to `main`,
+on the project's own self-hosted runners — that live result is the source of
+truth, not a point-in-time note in this file. As of this writing all three
+jobs are green: `node` (build + every workspace's tests, including Playwright
+against a real hub, plus the Claude Code plugin's tests), `python` (3.11),
+and `docker` (the hub image builds from a clean checkout). Current test
+counts: 36 visualizer + 131 core + 45 client + 50 react + 172 hub + 21
+Playwright + 45 plugin + 28 Python, 0 failures.
 
-1. **`npm ci && npm run build && npm test` (root, all workspaces) and
-   `npm run test:plugin`** — PASSED. 119 core + 26 visualizer + 26 client +
-   29 react + 51 hub + 39 hub/ee + 8 hub-web Playwright + 20 plugin tests,
-   0 failures. `git status --short` after a full build shows no files
-   emitted outside each package's own `dist/`.
-2. **`python -m pip install -e "clients/python[dev]"` and
-   `python -m pytest -q clients/python`** — PASSED. 24 tests, 0 failures
-   (Python 3.13; the package also targets 3.11).
-3. **`docker build -f apps/hub/Dockerfile .` and `docker run`** — PASSED.
-   The image builds from the repo root and (as of the "local mode" change
-   superseding this run's original dev-key-printing behavior) boots with
-   `TRACERY_AUTH=none` by default and serves `/healthz`, `/v1/info`
-   (`{"auth":"none",...}`), and `/v1/openapi.json` -- with no key minted or
-   printed anywhere. (At the time of this run the image also shipped
-   `apps/hub/ee/dist` and served `/v1/license`; both are now Tracery Cloud
-   concerns, not part of this image.)
-4. **`scripts/demo.mjs`** — PASSED. All 9 checks: three flows in one trace,
-   both children's resolved trace equals the parent flow id, `project()`
-   yields exactly two `spawn` edges and three groups, a WS live subscription
-   opened before emission received every event with monotonic cursors, and
-   re-sending the first batch reports `duplicates > 0` / `accepted: 0`.
-   `npm run demo` runs it against `TRACERY_HUB_URL`
-   (default `http://127.0.0.1:8971`).
-5. **Playwright (`apps/hub/web/tests`) against the running container** —
-   PASSED. `explorer.real-hub.spec.ts` now accepts `TRACERY_HUB_URL` /
-   `TRACERY_API_KEY` to target an already-running hub instead of always
-   spawning its own; run that way against a freshly-started container, all
-   4 tests passed (flow list shows three flows, trace scope shows three
-   groups, inspector context, drill-in on double-click).
-6. **Visualizer SSR / reduced-motion tests in the root run** — PASSED, as
-   part of item 1: `packages/visualizer/tests/model.test.mjs` ("package
-   imports and server-renders without a window or document"; "active cards
-   pulse; idle, completed, gray and reduced-motion cards stay still") and
-   `packages/react/tests/explorer-ssr.test.mjs`.
-
-Four integration defects found during this workstream were fixed as part of
-this run: the enterprise build leaking compiled `.js`/`.d.ts` files into
-`apps/hub/src` (now uses TypeScript project references, `tsc -b`); the
-Docker image not shipping `apps/hub/ee/dist`; `apps/hub/package.json`
-`"files"` omitting `ee/`; and the live feed (`WS /v1/live`) not being
-RBAC-filterable (`HubExtensions.onLiveFrame`, then implemented in
-`apps/hub/ee/src/rbac.ts`, now Tracery Cloud's concern in the private repo,
-tested with a real WebSocket client). Nothing found during acceptance itself
-failed and was left unfixed.
+The first real push to GitHub caught three defects that nothing running on a
+developer machine with a pre-built working tree ever could, because a clean
+checkout has none of that leftover state: `plugin.json`'s `author` field must
+be an object, not a bare string, or Claude Code silently refuses to load the
+plugin — only surfaced by installing through the actual
+`/plugin marketplace add` + `/plugin install` flow; the Playwright job needed
+`npx playwright install --with-deps chromium` on the runner, and the plugin's
+own test suite wasn't wired into CI at all; and the Docker build only
+explicitly compiled three of the five packages it depends on, silently
+relying on leftover `dist/` output from prior local builds to satisfy a
+type-only import — invisible on a dirty working tree, and it broke outright
+on a truly clean clone with a properly scoped `.dockerignore`. All three are
+fixed, verified against fresh clones, and covered by the CI run itself going
+forward. See `docs/VALIDATION.md` for the full cold-start checklist (three
+usage tracks, exact commands, a report-back template) if you want to
+reproduce any of this on another machine.
 
 ## Support
 
