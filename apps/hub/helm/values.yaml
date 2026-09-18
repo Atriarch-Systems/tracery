@@ -137,14 +137,6 @@ apiKeys:
   #     workspace: "*"
   #     roles: ["ingest", "read", "admin"]
 
-# TRACERY_LICENSE_KEY (SPEC.md §7). Optional; the community edition runs
-# fine without it.
-license:
-  enabled: false
-  key: ""
-  existingSecret: ""
-  existingSecretKey: license
-
 # TRACERY_POSTGRES_URL, required when config.store is "postgres". Prefer
 # existingSecret (provisioned via OpenBao/ExternalSecret, SPEC.md §6); `url`
 # is provided for convenience and renders into a Secret this chart manages,

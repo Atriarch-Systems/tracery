@@ -91,18 +91,19 @@ deployment should instead configure real keys and leave that unset.
   SHA-256 hash of each candidate), so a wrong key never leaks how much of it
   matched.
 
-### Enterprise SSO (OIDC)
+### SSO (OIDC)
 
-With the `apps/hub/ee` enterprise layer built in and a license carrying the
-`sso` feature (see [`../../docs/ENTERPRISE.md`](../../docs/ENTERPRISE.md)),
-the hosted UI can authenticate a browser session via an OIDC identity
-provider instead of an API key: `TRACERY_OIDC_*` + `TRACERY_SESSION_SECRET`
-configure it, `GET /v1/auth/oidc/login` starts the redirect, and a signed,
-httpOnly session cookie the browser then holds is accepted anywhere a `read`
-role API key would be -- including `GET /v1/flows` and `WS /v1/live` above,
-with no `Authorization` header or `?token=` at all. See
-`docs/ENTERPRISE.md`'s "SSO (OIDC) for the hosted UI" section for the full
-flow, every route, and every environment variable.
+This package ships no SSO implementation of its own. An extensions module
+(see "Extending (extensions)" below) can add one -- Tracery Cloud does, as a
+private `HubExtensions` module loaded via `TRACERY_EXTENSIONS_MODULE` -- by
+registering its own `/v1/auth/*` routes and, via `apps/hub/src/auth.ts`'s
+`setSessionAuthResolver` seam, letting a signed session cookie stand in for
+an API key on requests that present no credential at all. A configured
+module's session cookie is then accepted anywhere a `read` role API key
+would be -- including `GET /v1/flows` and `WS /v1/live` above -- with no
+`Authorization` header or `?token=` at all. See
+[`../../docs/CLOUD.md`](../../docs/CLOUD.md) for what Tracery Cloud's SSO
+offers.
 
 ## HTTP API
 
@@ -116,7 +117,7 @@ spec at `GET /v1/openapi.json` (OpenAPI 3.1). Errors are always
 | Header | When | Meaning |
 | --- | --- | --- |
 | `x-request-id` | Every response. | Echoes the incoming `x-request-id`, or a generated one when absent/invalid. |
-| `x-ko-fi` | Every response, community edition only. | `https://ko-fi.com/demonslyr` -- a friendly tip-jar link, no protocol meaning; absent in licensed deployments (see `docs/ENTERPRISE.md`). |
+| `x-ko-fi` | Every response, community edition only. | `https://ko-fi.com/demonslyr` -- a friendly tip-jar link, no protocol meaning; absent when an extensions module reports a valid license (see `docs/CLOUD.md`). |
 
 | Method | Path | Role | Purpose |
 | --- | --- | --- | --- |
@@ -319,16 +320,18 @@ at an existing Postgres (via a Secret; OpenBao/ExternalSecret is the
 preferred way to provision it) and drop the `data` PVC/volume/mount, then
 raise `replicas` and switch `strategy` back to `RollingUpdate`.
 
-## Extending (enterprise layer)
+## Extensions
 
-`createServer(config, extensions?)` (`src/server.ts`) is the only seam
-`apps/hub/ee` (SPEC.md §7) needs:
+`createServer(config, extensions?)` (`src/server.ts`) is the only seam this
+package exposes for anything beyond what ships here (SPEC.md §7 "Extensions
+and Tracery Cloud"):
 
 ```ts
 export interface HubExtensions {
   onRequestAuthed?(ctx: { request: FastifyRequest; auth: AuthContext }): void | Promise<void>;
   registerRoutes?(app: FastifyInstance, ctx: HubContext): void | Promise<void>;
   onLiveFrame?(ctx: { auth: AuthContext; frame: ActivityFrame }): ActivityFrame | null;
+  isLicensed?(): boolean;
 }
 ```
 
@@ -338,15 +341,59 @@ export interface HubExtensions {
   same `HubContext` every built-in route uses (`config`, `store`, `metrics`,
   `keys`, `requireAuth`), for adding routes like `/v1/license` or RBAC
   filtering hooks. It runs after every built-in route is registered and
-  before the UI's catch-all 404 handler, so ee's routes are never shadowed.
+  before the UI's catch-all 404 handler, so an extensions module's routes
+  are never shadowed.
 - `onLiveFrame` runs from `live.ts`'s `send()` before every frame goes out
   over `WS /v1/live` -- the one send path `registerRoutes`'s Fastify `onSend`
   hook can't reach, since the live feed writes to the raw WebSocket outside
   Fastify's response pipeline. Return the frame (unchanged, or with a
   filtered `events` array) to send it, or `null` to drop it entirely.
+- `isLicensed` reports whether a currently-valid license is active, re-checked
+  on every call. `server.ts` uses it to decide whether to send the `x-ko-fi`
+  header; `bin/hub.mjs` uses it for the one-line startup banner. Absent, or
+  no extensions module at all, both mean "community".
 
-None of these hooks are invoked by anything in this package; ee (or a test)
-passes them into `createServer` directly.
+None of these hooks are invoked by anything in this package; an extensions
+module (or a test) passes them into `createServer` directly.
+
+### Loading an extensions module: `TRACERY_EXTENSIONS_MODULE`
+
+`bin/hub.mjs` reads `TRACERY_EXTENSIONS_MODULE` -- an npm package name
+(resolved the ordinary Node way) or an absolute/relative path to a built ESM
+module -- and, when set:
+
+1. Dynamically `import()`s it.
+2. Calls its exported `createExtensions(config)` (sync or `async`), passing
+   the hub's own `Config` (`./config` export, below).
+3. Passes the returned `HubExtensions` object into `createServer`.
+4. Logs one line naming the module that loaded.
+
+Unset (the default) means the plain community hub: no extra routes, no
+`onRequestAuthed`/`onLiveFrame` hooks, `GET /v1/info` reports
+`edition: "community"`. This is a **hard** dependency once configured: a bad
+module name/path, an import error, a missing `createExtensions` export, or a
+`createExtensions` that throws all abort startup with a clear error message
+-- an operator who set this env var meant for it to load, so this never
+falls back to the community edition silently.
+
+```sh
+TRACERY_EXTENSIONS_MODULE=@atriarch/tracery-cloud-ee node bin/hub.mjs   # npm package
+TRACERY_EXTENSIONS_MODULE=./local-extensions/index.js node bin/hub.mjs  # local path
+```
+
+Tracery Cloud's implementation of this seam (SSO, audit log, RBAC scopes;
+[`../../docs/CLOUD.md`](../../docs/CLOUD.md)) lives in the private
+`tracery-cloud` repository, not here -- `HubExtensions` and
+`TRACERY_EXTENSIONS_MODULE` are themselves generic and know nothing about
+Tracery Cloud specifically. Anything importing this package as a library
+(an extensions module included) can reach the pieces it needs via this
+package's subpath exports: `.` (`createServer`, `HubContext`,
+`HubExtensions`, `Config` types), `./auth` (`AuthContext`, `AuthError`,
+`setSessionAuthResolver`, ...), `./store` (`EventStore`, `FlowSummary`, ...),
+`./config` (`Config`, `loadConfig`, ...), and `./test-helpers`
+(`testConfig`, `createTestServer`, `bearer`, ... -- so an extensions
+package's own tests don't need to reach into this package's `tests/`
+directory, which ships source only, not `dist`).
 
 ## Development
 

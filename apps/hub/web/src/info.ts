@@ -1,10 +1,11 @@
 /**
  * Thin client for the public `GET /v1/info` route (task: "local mode").
  * `App.tsx` uses this to skip the key-entry screen entirely when the hub
- * reports `auth: 'none'`; `Footer.tsx` uses `edition` instead of the old
- * `GET /v1/license` check (that route stays -- `apps/hub/ee` still owns it --
- * but the hosted UI no longer depends on it for the footer). No auth
- * required -- same pattern as `sso.ts`'s `fetchAuthMe`.
+ * reports `auth: 'none'`; `Footer.tsx` uses `edition` to decide whether to
+ * show the Ko-fi tip-jar link, without depending on any extensions-module
+ * route (there is no `GET /v1/license` in this package at all -- see
+ * `docs/CLOUD.md`). No auth required -- same pattern as `sso.ts`'s
+ * `fetchAuthMe`.
  */
 
 export interface HubInfo {

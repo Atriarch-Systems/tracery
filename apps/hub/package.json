@@ -11,18 +11,20 @@
   "files": [
     "dist",
     "bin",
-    "ee/dist",
-    "ee/LICENSE",
-    "ee/scripts",
     "README.md",
     "LICENSE",
     "NOTICE"
   ],
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" },
+    "./auth": { "types": "./dist/auth.d.ts", "import": "./dist/auth.js" },
+    "./store": { "types": "./dist/store/types.d.ts", "import": "./dist/store/types.js" },
+    "./config": { "types": "./dist/config.d.ts", "import": "./dist/config.js" },
+    "./test-helpers": { "types": "./dist/test-helpers.d.ts", "import": "./dist/test-helpers.js" }
+  },
   "scripts": {
-    "build": "tsc -p tsconfig.json && npm run build:ee",
-    "build:ee": "tsc -b ee/tsconfig.json",
-    "test": "node --test tests/*.test.mjs && npm run test:ee",
-    "test:ee": "node --test ee/tests/*.test.mjs",
+    "build": "tsc -p tsconfig.json",
+    "test": "node --test tests/*.test.mjs",
     "start": "node bin/hub.mjs",
     "prepack": "npm run build"
   },

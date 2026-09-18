@@ -91,33 +91,34 @@ function extractPresentedKey(headers: Record<string, string | string[] | undefin
 }
 
 /**
- * ee-sso seam: lets the enterprise layer's OIDC session cookie stand in for
- * an API key on requests carrying no credential at all. `authenticate` is a
- * pure function called from two places outside this package's control --
- * `server.ts`'s `requireAuth` closure and `live.ts`'s WS upgrade handler --
- * neither of which this task may edit, so there is no call site to thread a
- * new "also check ee's session cookie" parameter through. Both call sites
- * already pass this function the request's raw headers (which carry any
- * `Cookie` header verbatim), so a settable resolver here is the smallest
- * seam that lets ee (`apps/hub/ee/src/sso.ts`) participate in authentication
- * itself, not just observe it after the fact the way `HubExtensions.
- * onRequestAuthed` does (that hook only runs *after* `authenticate` has
- * already returned an `AuthContext`, so it cannot manufacture one when no
- * API key was presented at all).
+ * Extensions-SSO seam: lets an extensions module's own session cookie stand
+ * in for an API key on requests carrying no credential at all (SPEC.md §7
+ * "Extensions and Tracery Cloud" -- Tracery Cloud's OIDC SSO is one such
+ * module). `authenticate` is a pure function called from two places outside
+ * this package's control -- `server.ts`'s `requireAuth` closure and
+ * `live.ts`'s WS upgrade handler -- neither of which this task may edit, so
+ * there is no call site to thread a new "also check the module's session
+ * cookie" parameter through. Both call sites already pass this function the
+ * request's raw headers (which carry any `Cookie` header verbatim), so a
+ * settable resolver here is the smallest seam that lets an extensions module
+ * participate in authentication itself, not just observe it after the fact
+ * the way `HubExtensions.onRequestAuthed` does (that hook only runs *after*
+ * `authenticate` has already returned an `AuthContext`, so it cannot
+ * manufacture one when no API key was presented at all).
  *
  * `resolver` gets the same header record `authenticate` was called with and
  * returns a ready-made `AuthContext` (or `undefined` -- no session, an
- * invalid/expired one, or the `sso` feature isn't currently licensed; ee
- * decides all of that itself) synchronously, since verifying a self-
- * contained, HMAC-signed session cookie needs no I/O. `createEnterpriseExtensions`
- * installs its resolver once at construction and clears it (passes
- * `undefined`) from its `close()`, so a closed-out ee instance never keeps
- * authenticating requests for a server that no longer exists -- important in
- * tests, which construct many short-lived servers in one process. At most
- * one resolver is active at a time, matching every other piece of
- * process-wide hub state (there is exactly one hub per process). The
- * community edition (no `ee`) never calls this, so `authenticate` behaves
- * exactly as it always has when ee isn't installed or configured.
+ * invalid/expired one, or the feature isn't currently licensed; the
+ * extensions module decides all of that itself) synchronously, since
+ * verifying a self-contained, signed session cookie needs no I/O. An
+ * extensions module installs its resolver once at construction and clears
+ * it (passes `undefined`) when it shuts down, so a closed-out instance never
+ * keeps authenticating requests for a server that no longer exists --
+ * important in tests, which construct many short-lived servers in one
+ * process. At most one resolver is active at a time, matching every other
+ * piece of process-wide hub state (there is exactly one hub per process).
+ * The community edition (no extensions module configured) never calls this,
+ * so `authenticate` behaves exactly as it always has with nothing installed.
  */
 export type SessionAuthResolver = (headers: Record<string, string | string[] | undefined>) => AuthContext | undefined;
 

@@ -1,5 +1,11 @@
 # Hardening
 
+> **Note (2026-09-17 restructure):** this document is a historical record.
+> The "EE" section below reviews `apps/hub/ee` as it existed in this
+> repository at the time; that code has since moved to the private
+> `tracery-cloud` repository (see `docs/CLOUD.md`) and no longer lives here.
+> The findings and fixes are kept verbatim for reference.
+
 This document records a review/verify/fix/extend pass run against Tracery on
 2026-09-17. Every finding below was produced by an initial review, then run
 through two independent Opus refuters before any fix was written -- a finding

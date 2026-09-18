@@ -7,7 +7,7 @@ export interface KeyEntryProps {
   readonly ssoAvailable: boolean | undefined;
 }
 
-/** SPEC.md §6: "First load asks for a read key ... then shows the workspace's flows." Enterprise (SPEC.md §7): an SSO-configured, licensed hub also offers a "Sign in with SSO" redirect above the key form. */
+/** SPEC.md §6: "First load asks for a read key ... then shows the workspace's flows." SPEC.md §7 "Extensions and Tracery Cloud": a hub whose extensions module reports SSO configured and licensed also offers a "Sign in with SSO" redirect above the key form. */
 export function KeyEntry({ onReady, ssoAvailable }: KeyEntryProps) {
   const [baseUrl, setBaseUrl] = useState(() => window.location.origin);
   const [apiKey, setApiKey] = useState('');

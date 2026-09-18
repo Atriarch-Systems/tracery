@@ -23,16 +23,17 @@ helm install tracery-hub apps/hub/helm \
 - **Secret** for `TRACERY_API_KEYS_FILE` (`apiKeys.keys`, rendered inline, or
   `apiKeys.existingSecret` pointing at one you provisioned yourself --
   OpenBao/ExternalSecret is the preferred way for anything real).
-- **Secret** for `TRACERY_LICENSE_KEY` when `license.enabled` (SPEC.md §7);
-  the community edition doesn't need this at all.
 - **PVC** for `/data`, only when `config.store` is `sqlite`
   (`persistence.enabled`, or point at one you already made with
   `persistence.existingClaim`).
 - **ServiceMonitor** (optional, `serviceMonitor.enabled`) scraping
   `GET /metrics`.
 
-Nothing here is EE-specific; `apps/hub/ee` (SPEC.md §7) is loaded by the same
-image and turned on purely by whether `TRACERY_LICENSE_KEY` verifies.
+This chart deploys the open-source community hub only. Tracery Cloud's
+extensions module (SPEC.md §7 "Extensions and Tracery Cloud") is a separate
+concern -- it plugs in at runtime via `TRACERY_EXTENSIONS_MODULE`, which this
+chart does not currently template; set it via `config` (a custom
+`extraEnv`-style override, or your own values patch) if you deploy it.
 
 ## Storage and `replicaCount`
 
@@ -122,8 +123,6 @@ apiKeys:
 | `persistence.existingClaim` | `""` | Use an existing PVC instead of creating one. |
 | `apiKeys.keys` | `[]` | Inline API keys (SPEC.md §6 "Auth"), rendered into a Secret. |
 | `apiKeys.existingSecret` / `.existingSecretKey` | `""` / `keys.json` | Use a Secret you already made instead. |
-| `license.enabled` / `.key` | `false` / `""` | `TRACERY_LICENSE_KEY` (SPEC.md §7), rendered into a Secret. |
-| `license.existingSecret` / `.existingSecretKey` | `""` / `license` | Use a Secret you already made instead. |
 | `postgres.url` | `""` | `TRACERY_POSTGRES_URL`, rendered into a Secret. Convenience only -- prefer `existingSecret`. |
 | `postgres.existingSecret` / `.existingSecretKey` | `""` / `url` | Use a Secret you already made instead. Required when `config.store: postgres`. |
 | `metrics.token` | `""` | `TRACERY_METRICS_TOKEN`, rendered into a Secret. Empty means `/metrics` is public. |

@@ -17,7 +17,12 @@ the wire contract; a change there is a versioned contract change with a golden t
 | `packages/client` | `@atriarch/tracery-client` | TS emitter SDK + hub read client. |
 | `clients/python` | `atriarch-tracery` | Python emitter SDK, stdlib only, `atriarch.tracery`. |
 | `apps/hub` | `@atriarch/tracery-hub` | Fastify server, stores, live feed, hosted UI, Docker, k8s. |
-| `apps/hub/ee` | commercial | license gate, audit log, RBAC. |
+
+Tracery Cloud (accounts, SSO, audit log, RBAC, managed retention/backups) is
+a private `tracery-cloud` repository, not part of this checkout. It plugs
+into `apps/hub` via the `HubExtensions` seam (`apps/hub/src/server-context.ts`,
+loaded through `TRACERY_EXTENSIONS_MODULE`) -- see `docs/SPEC.md` §7 and
+`docs/CLOUD.md`.
 
 ## Conventions
 
@@ -26,7 +31,7 @@ the wire contract; a change there is a versioned contract change with a golden t
 - Consumer inputs are `readonly` and never mutated. No `any` in exports.
 - Node >= 22.13 (`node:sqlite`). Python 3.11 is the supported interpreter.
 - CI runs on self-hosted runners only. Never `runs-on: ubuntu-latest`.
-- Licensing is open core: Apache-2.0 everywhere except `apps/hub/ee`.
+- Licensing: 100% Apache-2.0. No commercial code, license gate, or feature flag lives in this repository.
 
 ## Commands
 

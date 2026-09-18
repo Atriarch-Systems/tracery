@@ -244,88 +244,18 @@ test('a malformed deep link (stray "%") reached via client-side navigation does 
   await expect(page.getByTestId('flow-picker-item')).toHaveCount(3);
 });
 
-// SPEC.md §7 "SSO (OIDC) for the hosted UI": "the key-entry screen shows a
-// 'Sign in with SSO' button when GET /v1/auth/me reports sso is configured".
-// No sessionStorage session is primed for either test below -- KeyEntry must
-// render on its own, exactly like a first-ever visit.
-
-test('key entry shows a "Sign in with SSO" button when GET /v1/auth/me reports sso configured and licensed', async ({ page }) => {
-  await page.route('**/v1/auth/me', (route) =>
-    route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({ sso: { configured: true, licensed: true }, authenticated: false }),
-    }),
-  );
-  await page.goto(`${BASE_URL}/ui/`);
-
-  await expect(page.getByTestId('key-entry-form')).toBeVisible();
-  const ssoButton = page.getByTestId('sso-login-button');
-  await expect(ssoButton).toBeVisible();
-  await expect(ssoButton).toHaveAttribute('href', /^\/v1\/auth\/oidc\/login\?returnTo=/);
-});
-
-test('key entry has no SSO button when GET /v1/auth/me reports sso not configured', async ({ page }) => {
-  await page.route('**/v1/auth/me', (route) =>
-    route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({ sso: { configured: false, licensed: false }, authenticated: false }),
-    }),
-  );
-  await page.goto(`${BASE_URL}/ui/`);
-
-  await expect(page.getByTestId('key-entry-form')).toBeVisible();
-  await expect(page.getByTestId('sso-login-button')).toHaveCount(0);
-});
-
-// A valid session cookie already existing on first load (the common case
-// right after the OIDC callback redirects the browser back to `/ui/`) must
-// skip KeyEntry entirely, with no API key ever touching sessionStorage.
-test('key entry is skipped when GET /v1/auth/me reports an already-authenticated SSO session', async ({ page }) => {
-  await page.route('**/v1/auth/me', (route) =>
-    route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        sso: { configured: true, licensed: true },
-        authenticated: true,
-        user: { sub: 'user-1', email: 'user1@example.com', workspace: 'default', role: 'read' },
-      }),
-    }),
-  );
-  await page.addInitScript(({ frame }) => {
-    class MockWebSocket extends EventTarget {
-      static readonly CONNECTING = 0;
-      static readonly OPEN = 1;
-      static readonly CLOSING = 2;
-      static readonly CLOSED = 3;
-      readyState = 0;
-      constructor(_url: string) {
-        super();
-        setTimeout(() => {
-          this.readyState = 1;
-          this.dispatchEvent(new Event('open'));
-          this.dispatchEvent(new MessageEvent('message', { data: JSON.stringify(frame) }));
-        }, 0);
-      }
-      send(): void {}
-      close(): void {
-        this.readyState = 3;
-        this.dispatchEvent(new Event('close'));
-      }
-    }
-    (window as unknown as { WebSocket: unknown }).WebSocket = MockWebSocket;
-  }, { frame: snapshotFrame });
-  await page.goto(`${BASE_URL}/ui/`);
-
-  await expect(page.getByTestId('key-entry-form')).toHaveCount(0);
-  await expect(page.getByTestId('flow-picker-item')).toHaveCount(3);
-
-  const storedSession = await page.evaluate(() => window.sessionStorage.getItem('atriarch-tracery-hub-session'));
-  expect(storedSession).not.toBeNull();
-  expect(JSON.parse(storedSession!).apiKey).toBe(''); // no API key -- the cookie alone authenticates every request
-});
+// SPEC.md §7 "Extensions and Tracery Cloud": the SSO-button-seam Playwright
+// tests that used to live here (KeyEntry showing/hiding "Sign in with SSO"
+// per a mocked GET /v1/auth/me, and skipping KeyEntry for an
+// already-authenticated session) now live in the private `tracery-cloud`
+// repository, alongside the extensions module (Tracery Cloud's OIDC SSO)
+// that actually implements `/v1/auth/*` -- see
+// `tracery-cloud/hub-ee/web-tests/sso-button.spec.ts` and its README. This
+// package's own `KeyEntry`/`App.tsx` seam (rendering the button based on
+// whatever `GET /v1/auth/me` reports, or nothing when no extensions module
+// registers that route at all) is otherwise unchanged and untested by this
+// file on purpose, to keep this repository's test suite independent of any
+// particular extensions module's shape.
 
 // Task ("local mode"): GET /v1/info reporting `auth: 'none'` must skip
 // KeyEntry entirely and connect with no API key -- checked ahead of, and

@@ -67,7 +67,6 @@ COPY --from=build /repo/packages/core/dist ./packages/core/dist
 COPY --from=build /repo/apps/hub/package.json ./apps/hub/package.json
 COPY --from=build /repo/apps/hub/dist ./apps/hub/dist
 COPY --from=build /repo/apps/hub/bin ./apps/hub/bin
-COPY --from=build /repo/apps/hub/ee/dist ./apps/hub/ee/dist
 COPY --from=build /repo/apps/hub/web/dist ./apps/hub/web/dist
 
 RUN mkdir -p /data && chown -R tracery:tracery /data /app

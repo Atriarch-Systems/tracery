@@ -1,5 +1,5 @@
 /**
- * The context every route module (and the enterprise extension hooks) is
+ * The context every route module (and an extensions module's hooks) is
  * handed. Kept in its own module so `routes/*.ts` can import the type
  * without creating a cycle back through `server.ts`.
  */
@@ -39,9 +39,9 @@ export interface HubContext {
 }
 
 export interface HubExtensions {
-  /** Runs after every successful authentication, before the route handler. Lets ee append an audit log entry. */
+  /** Runs after every successful authentication, before the route handler. Lets an extensions module append an audit log entry. */
   onRequestAuthed?(ctx: { readonly request: FastifyRequest; readonly auth: AuthContext }): void | Promise<void>;
-  /** Runs once at boot with the live app and hub context, so ee can register its own routes (e.g. `/v1/license`) or add RBAC filtering via fastify hooks. */
+  /** Runs once at boot with the live app and hub context, so an extensions module can register its own routes (e.g. `/v1/license`) or add RBAC filtering via fastify hooks. */
   registerRoutes?(app: FastifyInstance, ctx: HubContext): void | Promise<void>;
   /**
    * Called from `live.ts`'s `send()` before every frame goes out over
@@ -57,12 +57,12 @@ export interface HubExtensions {
   onLiveFrame?(ctx: { readonly auth: AuthContext; readonly frame: ActivityFrame }): ActivityFrame | null;
   /**
    * Reports whether a currently-valid license is active. Re-checked on
-   * every call (same "no restart needed" pattern as the audit/RBAC feature
-   * checks in `apps/hub/ee/src/index.ts`), not cached at construction time.
-   * Absent (community edition with no `ee` layer at all) or returning
-   * `false` both mean "community" -- `server.ts` uses this to decide
-   * whether to send the `X-Ko-fi` tip-jar header, and `bin/hub.mjs` uses it
-   * for the one-line startup banner.
+   * every call (an extensions module is expected to make this "no restart
+   * needed", the way Tracery Cloud's feature checks do), not cached at
+   * construction time. Absent (community edition, no extensions module
+   * configured) or returning `false` both mean "community" -- `server.ts`
+   * uses this to decide whether to send the `X-Ko-fi` tip-jar header, and
+   * `bin/hub.mjs` uses it for the one-line startup banner.
    */
   isLicensed?(): boolean;
 }

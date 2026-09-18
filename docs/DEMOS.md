@@ -6,7 +6,7 @@ Three ways to see Tracery run, one per distribution mode from the root
 what it demonstrates, the exact commands, what you should see, a screenshot,
 and a short capabilities/limitations table for that version specifically
 (sourced from the root [README](../README.md) and
-[`ENTERPRISE.md`](ENTERPRISE.md)).
+[`CLOUD.md`](CLOUD.md)).
 
 All three assume a hub is already running. The commands below target the
 demo hub used to build these screenshots: a Docker container named
@@ -127,7 +127,7 @@ the whole thing ends and starts over with new flow ids.
 | Capacity | bounded by `maxEvents` (default 50,000 events); oldest events are evicted and the source's `partial` flag turns true |
 | Multi-viewer / cross-process | no — one `Journal` per page; nothing is shared between tabs, processes, or machines |
 | UI feature set | the full `ActivityExplorer` (flow picker, guided graph, inspector, scope switching) — the same component the hosted UI uses |
-| RBAC / audit / licensing | not applicable — those are hub-only (`apps/hub/ee`) concerns this mode never touches |
+| RBAC / audit / SSO | not applicable — those are Tracery Cloud concerns (`docs/CLOUD.md`) this mode never touches |
 
 ## 3. Standalone hub
 
@@ -162,7 +162,7 @@ history and merged context in the inspector.
 
 ![Whole-trace scope: three groups joined by spawn edges](images/hub-trace.png)
 
-**Capabilities / limitations** (this distribution, [README](../README.md) "Status", [`ENTERPRISE.md`](ENTERPRISE.md)):
+**Capabilities / limitations** (this distribution, [README](../README.md) "Status", [`CLOUD.md`](CLOUD.md)):
 
 | Capability | Detail |
 | --- | --- |
@@ -171,5 +171,5 @@ history and merged context in the inspector.
 | Flow index | in-memory, rebuilt from the store on every boot |
 | Live feed | `WS /v1/live`, reconnects with backoff; the React source falls back to polling after two consecutive failures |
 | Auth | `npx @atriarch/tracery-hub` (or any loopback-bound hub) with no `TRACERY_API_KEYS` runs "local mode" -- no key, single `default` workspace, full access; otherwise static API keys (`TRACERY_API_KEYS`/`_FILE`), each bound to one workspace + roles, or a `*` operator key naming a workspace per request; no OIDC/SSO yet (roadmap) |
-| Enterprise layer (`apps/hub/ee`) | audit log + RBAC scopes, active only with a valid `TRACERY_LICENSE_KEY`; the community hub is fully functional — ingest, storage, retention, live feed, hosted UI — with no license at all |
+| Tracery Cloud / self-hosted enterprise | audit log + RBAC scopes + SSO, offered by a separate `HubExtensions` module (`docs/CLOUD.md`), not part of this repository; the community hub is fully functional — ingest, storage, retention, live feed, hosted UI — with no extensions module at all |
 | Retention / export | bounded by `TRACERY_RETENTION_HOURS`; no workspace-level data export beyond the audit log's own NDJSON export (roadmap) |

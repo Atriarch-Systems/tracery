@@ -70,20 +70,6 @@ neither an existingSecret nor inline keys are configured.
 {{- end }}
 
 {{/*
-Name of the Secret holding TRACERY_LICENSE_KEY, or "" when license support
-is disabled.
-*/}}
-{{- define "tracery-hub.licenseSecretName" -}}
-{{- if .Values.license.enabled }}
-{{- if .Values.license.existingSecret }}
-{{- .Values.license.existingSecret }}
-{{- else }}
-{{- printf "%s-license" (include "tracery-hub.fullname" .) }}
-{{- end }}
-{{- end }}
-{{- end }}
-
-{{/*
 Name of the Secret holding TRACERY_POSTGRES_URL, or "" when neither an
 existingSecret nor an inline url are configured.
 */}}

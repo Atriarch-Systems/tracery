@@ -31,9 +31,13 @@ packages/react         @atriarch/tracery-react       ActivityExplorer composite 
 packages/client        @atriarch/tracery-client      TS emitter SDK (batching HTTP transport) + hub read client
 clients/python         atriarch-tracery               Python emitter SDK, stdlib only, namespace package atriarch.tracery
 apps/hub               @atriarch/tracery-hub         standalone server + hosted UI (apps/hub/web) + Dockerfile + k8s
-apps/hub/ee            enterprise layer (license gate, audit log, RBAC) under a commercial license
-docs/                  SPEC.md (this), PLAN.md (workstreams), ENTERPRISE.md
+docs/                  SPEC.md (this), PLAN.md (workstreams), CLOUD.md
 ```
+
+Tracery Cloud (accounts, SSO, audit log, RBAC, managed retention/backups --
+see [`docs/CLOUD.md`](CLOUD.md)) plugs into `apps/hub` via the `HubExtensions`
+seam (§7) from a private `tracery-cloud` repository; nothing in the layout
+above is a paid feature.
 
 npm workspaces, Node >= 22.13 (for `node:sqlite`), TypeScript 5, ESM only,
 `node --test` for tests. Python 3.11, stdlib only, pytest for tests. CI runs on
@@ -359,25 +363,38 @@ served by the hub as static files. First load asks for a read key (kept in
 - `apps/hub/k8s/`: Deployment, Service, PVC, example Secret; plain manifests (Kustomize-friendly).
 - `npx @atriarch/tracery-hub` starts the server (bin entry).
 
-## 7. Enterprise layer (`apps/hub/ee`)
+## 7. Extensions and Tracery Cloud
 
-Open core. Everything outside `apps/hub/ee` is Apache-2.0. `apps/hub/ee/LICENSE` is the
-Atriarch Commercial License (source-available, use requires a valid license key).
+This repository is **100% Apache-2.0**. There is no commercial layer, license
+gate, or feature flag anywhere in it. The hub exposes exactly one seam for
+anything beyond what ships here: `HubExtensions`
+(`apps/hub/src/server-context.ts`) --
 
-- **License key**: `TRACERY_LICENSE_KEY` is `base64url(payload).base64url(ed25519 signature)`;
-  payload `{ sub, org, features: string[], seats?, exp }`. Verified with an
-  embedded public key via `node:crypto` (`crypto.verify(null, data, publicKey, sig)` for ed25519).
-  A CLI `apps/hub/ee/scripts/mint-license.mjs` signs with a private key from a file
-  (never committed; a dev keypair is generated on demand into `.gitignore`d paths).
-  `GET /v1/license` reports status. Expired keys keep the hub running with ee
-  features disabled and a warning; the community edition never needs a key.
-- **Audit log** (`feature: audit`): every authenticated request records
-  `{ ts, keyId, workspace, method, path, status, flows touched }` to the store;
-  `GET /v1/audit?after=&limit=` (admin) and `GET /v1/audit/export` (NDJSON).
-- **RBAC** (`feature: rbac`): keys may carry `scope: { actors?: string[], tags?: string[] }`
-  constraints; reads and lists are filtered, ingests outside the constraint rejected.
-- **SSO (OIDC) for the hosted UI** is designed but deferred; `docs/ENTERPRISE.md`
-  lists it as roadmap with the intended flow.
+```ts
+export interface HubExtensions {
+  onRequestAuthed?(ctx: { request: FastifyRequest; auth: AuthContext }): void | Promise<void>;
+  registerRoutes?(app: FastifyInstance, ctx: HubContext): void | Promise<void>;
+  onLiveFrame?(ctx: { auth: AuthContext; frame: ActivityFrame }): ActivityFrame | null;
+  isLicensed?(): boolean;
+}
+```
+
+-- loaded at startup from an operator-supplied module named by
+`TRACERY_EXTENSIONS_MODULE` (`apps/hub/README.md` "Extensions", `apps/hub/bin/hub.mjs`):
+a package name or an absolute/relative path to a module exporting an
+async-or-sync `createExtensions(config)` that returns a `HubExtensions`
+object. Unset (the default, and what every test/CI run in this repository
+exercises) means the plain community hub: no extra routes, `GET /v1/info`
+reports `edition: "community"`, and there is no `/v1/license` route at all.
+
+**Tracery Cloud** is Atriarch Systems' managed service built on this seam --
+accounts, seats, SSO (OIDC), an audit log, RBAC scopes, managed retention and
+backups, and support. Its implementation (a `HubExtensions` module, a
+license-key format, and the future managed-service layer -- billing, quotas,
+metering, a status page) lives in a private repository (`tracery-cloud`), not
+here; see [`docs/CLOUD.md`](CLOUD.md) for what it offers and how self-hosted
+enterprise is available on request. `HubExtensions` itself is generic and
+Apache-2.0 -- anyone can write a different module against the same seam.
 
 ## 8. Testing and acceptance
 
@@ -404,6 +421,7 @@ repo, executed by the integration workstream:
 ## 9. Decisions owed to Dan
 
 - Product name and npm org. Working name "Tracery", scope `@atriarch/tracery-*`, hub image `atriarch/tracery-hub`.
-- Commercial license text for `apps/hub/ee` (a placeholder is included; legal wording is Dan's).
+- Commercial/license terms for Tracery Cloud and self-hosted enterprise -- now entirely
+  the private `tracery-cloud` repository's concern, not this one's.
 - Whether to publish to npmjs.com or only the internal Nexus.
 - Whether Virali's dashboard switches to the hub or keeps its embedded journal.

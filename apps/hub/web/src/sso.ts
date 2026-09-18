@@ -1,9 +1,14 @@
 /**
- * Thin client for the enterprise SSO routes (SPEC.md §7 `feature: sso`,
- * `apps/hub/ee/src/sso.ts`). `App.tsx` uses this both to decide whether to
- * show KeyEntry's "Sign in with SSO" button and to detect an
- * already-established session cookie (e.g. right after the OIDC callback
- * redirects the browser back to `/ui/`).
+ * Thin client for the `/v1/auth/*` SSO routes an extensions module may
+ * register (SPEC.md §7 "Extensions and Tracery Cloud" -- Tracery Cloud is
+ * one such module). This package ships no SSO implementation of its own;
+ * `GET /v1/auth/me` simply returns `{ sso: { configured: false, ... },
+ * authenticated: false }`-shaped data (or 404s) when no module registers it,
+ * which `fetchAuthMe`'s `null`-on-failure handling already treats as "no SSO
+ * session". `App.tsx` uses this both to decide whether to show KeyEntry's
+ * "Sign in with SSO" button and to detect an already-established session
+ * cookie (e.g. right after an OIDC callback redirects the browser back to
+ * `/ui/`).
  */
 
 export interface AuthMeResponse {

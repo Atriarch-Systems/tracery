@@ -151,7 +151,7 @@ With no `TRACERY_HUB_URL` at all, every hook is a silent no-op. See
 | `@atriarch/tracery-client` | `packages/client` | 0.1.0 | Apache-2.0 |
 | `@atriarch/tracery-react` | `packages/react` | 0.1.0 | Apache-2.0 |
 | `atriarch-tracery` (Python, `atriarch.tracery`) | `clients/python` | 0.1.0 | Apache-2.0 |
-| `@atriarch/tracery-hub` | `apps/hub` | 0.1.0 | Apache-2.0 (`apps/hub/ee` excluded, see below) |
+| `@atriarch/tracery-hub` | `apps/hub` | 0.1.0 | Apache-2.0 |
 | `@atriarch/tracery-hub-web` (hosted UI, not published) | `apps/hub/web` | 0.1.0 | Apache-2.0 |
 | `tracery` (Claude Code plugin) | `plugins/claude-code` | 0.1.0 | Apache-2.0 |
 
@@ -175,8 +175,8 @@ flow reachable that way resolves to one `trace`.
 
 ## Documentation
 
-- [`docs/SPEC.md`](docs/SPEC.md) — the full specification: contract, reducers, visualizer, client SDKs, hub HTTP API, enterprise layer, testing/acceptance.
-- [`docs/ENTERPRISE.md`](docs/ENTERPRISE.md) — what the commercial layer (`apps/hub/ee`) does, licensing operationally, and the open-core boundary.
+- [`docs/SPEC.md`](docs/SPEC.md) — the full specification: contract, reducers, visualizer, client SDKs, hub HTTP API, the extensions seam, testing/acceptance.
+- [`docs/CLOUD.md`](docs/CLOUD.md) — what Tracery Cloud (the managed service) offers, and how the open hub's extensions seam is what it plugs into.
 - [`docs/CLAUDE-CODE-PLUGIN.md`](docs/CLAUDE-CODE-PLUGIN.md) — the Claude Code plugin's hook mapping, privacy details, troubleshooting.
 - [`docs/GETTING-STARTED.md`](docs/GETTING-STARTED.md) — a longer walkthrough: hub via Docker Compose, a keys file, TS and Python emitters, embedding the explorer, the plugin.
 - [`docs/DEMOS.md`](docs/DEMOS.md) — the three demos (Claude Code plugin, npm library, standalone hub): commands, screenshots, and what each distribution can and can't do.
@@ -185,23 +185,30 @@ flow reachable that way resolves to one `trace`.
 
 ## Licensing
 
-Open core. Everything in this repository is **Apache License 2.0** except
-[`apps/hub/ee`](apps/hub/ee), which is source-available under the
-[Atriarch Commercial License](apps/hub/ee/LICENSE) (currently a
-**placeholder** pending Dan's counsel-approved text). The hub is fully
-functional with zero `ee` features: ingest, storage, retention, the live
-feed and the hosted UI all work unlicensed and unmodified — the community
-edition is the default runtime behavior, with or without `apps/hub/ee`
-built into the image. `apps/hub/ee` adds a license-key gate, an audit log,
-and RBAC scopes (including for the live feed); see
-[`docs/ENTERPRISE.md`](docs/ENTERPRISE.md) for how licensing works and what
-each feature requires. See [`NOTICE`](NOTICE) for third-party attributions.
+**100% Apache License 2.0.** Every package in this repository — ingest,
+storage, retention, the live feed, the hosted UI, the client SDKs, and the
+Claude Code plugin — works unlicensed and unmodified; there is no commercial
+layer, license key, or feature flag anywhere in this repository. See
+[`NOTICE`](NOTICE) for third-party attributions.
+
+## Tracery Cloud
+
+Tracery Cloud is Atriarch Systems' managed hub — accounts, seats, SSO (OIDC),
+an audit log, RBAC scopes, managed retention/backups, and support — with a
+14-day free trial. It plugs into the open hub through the same
+`HubExtensions` seam any self-hosted extensions module could use
+([`docs/SPEC.md` §7](docs/SPEC.md#7-extensions-and-tracery-cloud)); its
+implementation lives in a private repository, not here. Self-hosted
+enterprise is available on request. See [`docs/CLOUD.md`](docs/CLOUD.md).
 
 ## Status
 
 Workstream G (integration) executed SPEC.md §8 acceptance for real on this
 machine (Windows, Node 22.14, Python 3.13, Docker 29) on 2026-09-16. All six
-items passed:
+items passed. **Note:** this record predates the split of the (then
+in-repo) enterprise layer into the private `tracery-cloud` repository
+(`docs/CLOUD.md`); test counts and behavior below reflect the repository as
+it stood that day, with `apps/hub/ee` still present.
 
 1. **`npm ci && npm run build && npm test` (root, all workspaces) and
    `npm run test:plugin`** — PASSED. 119 core + 26 visualizer + 26 client +
@@ -212,12 +219,13 @@ items passed:
    `python -m pytest -q clients/python`** — PASSED. 24 tests, 0 failures
    (Python 3.13; the package also targets 3.11).
 3. **`docker build -f apps/hub/Dockerfile .` and `docker run`** — PASSED.
-   The image builds from the repo root, ships `apps/hub/ee/dist`, and (as of
-   the "local mode" change superseding this run's original dev-key-printing
-   behavior) boots with `TRACERY_AUTH=none` by default and serves
-   `/healthz`, `/v1/info` (`{"auth":"none",...}`), `/v1/openapi.json`,
-   `/v1/license` (`{"valid":false,"reason":"no_license"}`, the unmodified
-   community edition) and `/ui/` -- with no key minted or printed anywhere.
+   The image builds from the repo root and (as of the "local mode" change
+   superseding this run's original dev-key-printing behavior) boots with
+   `TRACERY_AUTH=none` by default and serves `/healthz`, `/v1/info`
+   (`{"auth":"none",...}`), and `/v1/openapi.json` -- with no key minted or
+   printed anywhere. (At the time of this run the image also shipped
+   `apps/hub/ee/dist` and served `/v1/license`; both are now Tracery Cloud
+   concerns, not part of this image.)
 4. **`scripts/demo.mjs`** — PASSED. All 9 checks: three flows in one trace,
    both children's resolved trace equals the parent flow id, `project()`
    yields exactly two `spawn` edges and three groups, a WS live subscription
@@ -242,9 +250,10 @@ this run: the enterprise build leaking compiled `.js`/`.d.ts` files into
 `apps/hub/src` (now uses TypeScript project references, `tsc -b`); the
 Docker image not shipping `apps/hub/ee/dist`; `apps/hub/package.json`
 `"files"` omitting `ee/`; and the live feed (`WS /v1/live`) not being
-RBAC-filterable (`HubExtensions.onLiveFrame`, implemented in
-`apps/hub/ee/src/rbac.ts`, tested with a real WebSocket client). Nothing
-found during acceptance itself failed and was left unfixed.
+RBAC-filterable (`HubExtensions.onLiveFrame`, then implemented in
+`apps/hub/ee/src/rbac.ts`, now Tracery Cloud's concern in the private repo,
+tested with a real WebSocket client). Nothing found during acceptance itself
+failed and was left unfixed.
 
 ## Support
 

@@ -1,7 +1,7 @@
 /**
- * Builds the Fastify app (SPEC.md §6 "Hub"). `createServer` is the seam the
- * enterprise layer (`apps/hub/ee`, SPEC.md §7) extends through: it never
- * edits this file, only passes `extensions` in.
+ * Builds the Fastify app (SPEC.md §6 "Hub"). `createServer` is the seam an
+ * extensions module (SPEC.md §7 "Extensions and Tracery Cloud") extends
+ * through: it never edits this file, only passes `extensions` in.
  */
 import { randomUUID } from 'node:crypto';
 import Fastify, { type FastifyError, type FastifyInstance, type FastifyRequest } from 'fastify';
@@ -194,8 +194,9 @@ export async function createServer(config: Config, extensions?: HubExtensions): 
 
   app.get('/v1/openapi.json', { schema: { hide: true } }, async () => app.swagger());
 
-  // Registered last so ee's routes (e.g. /v1/license) and the UI's SPA
-  // catch-all 404 handler see every built-in route already defined.
+  // Registered last so an extensions module's routes (e.g. Tracery Cloud's
+  // /v1/license) and the UI's SPA catch-all 404 handler see every built-in
+  // route already defined.
   await extensions?.registerRoutes?.(app, ctx);
   await registerUiRoutes(app, ctx);
 

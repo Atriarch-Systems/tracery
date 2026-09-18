@@ -21,7 +21,7 @@ export interface LiveDeps {
   readonly store: EventStore;
   readonly keys: readonly ApiKeyConfig[];
   readonly metrics: MetricsRegistry;
-  /** Optional enterprise extensions (SPEC.md §7). Only `onLiveFrame` is used here. */
+  /** Optional extensions module hooks (SPEC.md §7 "Extensions and Tracery Cloud"). Only `onLiveFrame` is used here. */
   readonly extensions?: HubExtensions;
   /** Task ("local mode"): `'none'` bypasses key lookup, same as `server.ts`'s `requireAuth`. */
   readonly authMode: AuthMode;

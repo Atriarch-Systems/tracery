@@ -7,7 +7,6 @@ __pycache__/
 *.egg-info/
 .playwright-mcp/
 apps/hub/data/
-apps/hub/ee/.dev-keys/
 .env
 test-results/
 playwright-report/

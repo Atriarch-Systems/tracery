@@ -4,8 +4,8 @@ A longer walkthrough than the root [`README.md`](../README.md)'s quick
 starts: running the hub with Docker Compose and a real keys file, emitting
 from TypeScript and Python, embedding the React explorer against that hub,
 and wiring up the Claude Code plugin. See [`docs/SPEC.md`](SPEC.md) for the
-full specification and [`docs/ENTERPRISE.md`](ENTERPRISE.md) for the
-commercial layer this guide doesn't need.
+full specification and [`docs/CLOUD.md`](CLOUD.md) for Tracery Cloud, the
+managed service this guide doesn't need.
 
 ## 1. Run the hub
 
@@ -99,8 +99,7 @@ Whichever way you started it, confirm it's up:
 
 ```sh
 curl http://127.0.0.1:8971/healthz          # {"status":"ok"}
-curl http://127.0.0.1:8971/v1/info           # { "auth": "none", "workspace": "default", ... } in local mode
-curl http://127.0.0.1:8971/v1/license        # community edition unless TRACERY_LICENSE_KEY is set
+curl http://127.0.0.1:8971/v1/info           # { "auth": "none", "edition": "community", "workspace": "default", ... } in local mode
 open http://127.0.0.1:8971/ui/               # hosted explorer -- opens straight in for a local-mode hub
 ```
 
@@ -263,8 +262,9 @@ never leaves the machine), and troubleshooting:
 
 - [`docs/SPEC.md`](SPEC.md) — the full contract, reducer semantics, hub HTTP
   API, and the projection rules the visualizer relies on.
-- [`docs/ENTERPRISE.md`](ENTERPRISE.md) — licensing, the audit log, and RBAC
-  scopes if you need to restrict what a key can see or ingest.
+- [`docs/CLOUD.md`](CLOUD.md) — Tracery Cloud (the managed service): SSO, an
+  audit log, and RBAC scopes if you need to restrict what a key can see or
+  ingest, plus how self-hosted enterprise works.
 - `node scripts/demo.mjs` — a scripted end-to-end run (a parent flow
   spawning one TypeScript and one Python child) against a hub you already
   have running, useful as a working example of everything on this page at

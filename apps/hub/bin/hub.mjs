@@ -2,25 +2,69 @@
 // Starts the hub from environment variables (SPEC.md §6). Plain ESM, not
 // compiled -- imports the built `dist/` output, same convention as the
 // other packages' bin scripts.
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { loadConfig } from '../dist/config.js';
 import { createServer } from '../dist/server.js';
 
 const config = loadConfig(process.env);
 
-// The enterprise layer (SPEC.md §7) is optional and built separately
-// (`npm run build:ee`); load it when present, fail soft (community
-// edition) when it isn't. Only a genuine load failure (not "the file
-// doesn't exist") is logged as an error.
+/**
+ * Resolves a `TRACERY_EXTENSIONS_MODULE` value into whatever `import()`
+ * needs. A bare npm package name (`@scope/name`, `name`) or an already
+ * fully-qualified URL (`file:`, `node:`, ...) is passed straight through --
+ * that is exactly what `import()`'s own module resolution expects. Anything
+ * else (a relative path like `./local-extensions/index.js`, or an absolute
+ * filesystem path) is resolved against `process.cwd()` and converted to a
+ * `file://` URL: `import()` accepts a bare relative/absolute path on POSIX,
+ * but on Windows an absolute path (`C:\...`) is not a valid URL on its own
+ * ("Only URLs with a scheme ... are supported"), so this conversion is
+ * required for `TRACERY_EXTENSIONS_MODULE=C:\path\to\index.js` to work at
+ * all on that platform.
+ */
+function resolveExtensionsSpecifier(spec) {
+  if (/^[a-z][a-z0-9+.-]*:/i.test(spec) && !/^[a-z]:[\\/]/i.test(spec)) return spec; // already a URL (file:, node:, https:, ...) -- not a Windows drive letter
+  if (!spec.startsWith('.') && !path.isAbsolute(spec)) return spec; // bare specifier: npm package name
+  return pathToFileURL(path.resolve(spec)).href;
+}
+
+// Extensions (SPEC.md §7 "Extensions and Tracery Cloud", `apps/hub/README.md`
+// "Extensions"): an optional module the operator names via
+// TRACERY_EXTENSIONS_MODULE -- an npm package name (resolved the ordinary
+// Node way) or an absolute/relative path to a built ESM module -- that
+// exports an async-or-sync `createExtensions(config)` returning a
+// `HubExtensions` object (`@atriarch/tracery-hub`'s `HubContext`/
+// `HubExtensions` types, from this package's own "." export). Nothing in
+// this package ships such a module; Tracery Cloud's `@atriarch/
+// tracery-cloud-ee` (private `tracery-cloud` repo) is one example. Unset by
+// default -- a checkout with no extensions configured just runs the
+// community edition.
+//
+// This is a hard dependency once configured: a bad module name/path, an
+// import error, or a `createExtensions` that throws all abort startup with a
+// clear message instead of silently falling back to the community edition --
+// an operator who set this env var meant for it to load.
 let extensions;
-try {
-  const ee = await import('../ee/dist/index.js');
-  extensions = ee.createEnterpriseExtensions(config);
-} catch (err) {
-  if (err && typeof err === 'object' && 'code' in err && err.code === 'ERR_MODULE_NOT_FOUND') {
-    console.log('tracery-hub: no enterprise layer found (ee not built); running the community edition.');
-  } else {
-    console.error(`tracery-hub: enterprise layer failed to load, running the community edition: ${err instanceof Error ? err.message : String(err)}`);
+const extensionsModule = process.env.TRACERY_EXTENSIONS_MODULE?.trim();
+if (extensionsModule) {
+  let mod;
+  try {
+    mod = await import(resolveExtensionsSpecifier(extensionsModule));
+  } catch (err) {
+    console.error(`tracery-hub: failed to load TRACERY_EXTENSIONS_MODULE "${extensionsModule}": ${err instanceof Error ? err.message : String(err)}`);
+    process.exit(1);
   }
+  if (typeof mod.createExtensions !== 'function') {
+    console.error(`tracery-hub: TRACERY_EXTENSIONS_MODULE "${extensionsModule}" has no exported "createExtensions" function`);
+    process.exit(1);
+  }
+  try {
+    extensions = await mod.createExtensions(config);
+  } catch (err) {
+    console.error(`tracery-hub: TRACERY_EXTENSIONS_MODULE "${extensionsModule}"'s createExtensions(config) threw: ${err instanceof Error ? err.message : String(err)}`);
+    process.exit(1);
+  }
+  console.log(`tracery-hub: loaded extensions module "${extensionsModule}"`);
 }
 
 let created;
@@ -47,9 +91,6 @@ if (config.authWarning) {
   created.app.log.warn(config.authWarning);
 }
 created.app.log.info(`store: ${config.store}${config.store === 'sqlite' ? ` (${config.sqlitePath})` : ''}`);
-if (extensions) {
-  created.app.log.info(`enterprise layer: ${extensions.license.valid ? `licensed (${extensions.license.features.join(', ') || 'no features'})` : 'community edition'}`);
-}
 if (!(extensions?.isLicensed?.() ?? false)) {
   created.app.log.info('Tracery is open source (Apache-2.0). Docs: https://github.com/atriarch-systems/tracery · Support: https://ko-fi.com/demonslyr');
 }

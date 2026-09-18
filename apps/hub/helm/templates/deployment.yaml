@@ -4,7 +4,6 @@
 {{- fail (printf "tracery-hub: replicaCount=%d requires config.store=postgres -- memory and sqlite are single-writer stores (SPEC.md §6 \"Storage\"), so replicaCount must stay 1 unless you switch config.store to postgres and provide TRACERY_POSTGRES_URL (postgres.url or postgres.existingSecret)." $replicas) }}
 {{- end }}
 {{- $apiKeysSecret := include "tracery-hub.apiKeysSecretName" . }}
-{{- $licenseSecret := include "tracery-hub.licenseSecretName" . }}
 {{- $postgresSecret := include "tracery-hub.postgresSecretName" . }}
 {{- $metricsSecret := include "tracery-hub.metricsSecretName" . }}
 apiVersion: apps/v1
@@ -54,7 +53,7 @@ spec:
           envFrom:
             - configMapRef:
                 name: {{ include "tracery-hub.fullname" . }}-config
-          {{- if or (and (eq $store "postgres") $postgresSecret) $licenseSecret $metricsSecret }}
+          {{- if or (and (eq $store "postgres") $postgresSecret) $metricsSecret }}
           env:
             {{- if and (eq $store "postgres") $postgresSecret }}
             - name: TRACERY_POSTGRES_URL
@@ -62,13 +61,6 @@ spec:
                 secretKeyRef:
                   name: {{ $postgresSecret }}
                   key: {{ .Values.postgres.existingSecretKey }}
-            {{- end }}
-            {{- if $licenseSecret }}
-            - name: TRACERY_LICENSE_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: {{ $licenseSecret }}
-                  key: {{ .Values.license.existingSecretKey }}
             {{- end }}
             {{- if $metricsSecret }}
             - name: TRACERY_METRICS_TOKEN

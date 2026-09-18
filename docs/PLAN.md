@@ -1,5 +1,10 @@
 # Build plan — workstreams
 
+> **Note (2026-09-17 restructure):** historical record of the original
+> workstream plan. Workstream F's `apps/hub/ee` has since moved to the
+> private `tracery-cloud` repository (see `docs/CLOUD.md`) and no longer
+> lives in this repository.
+
 Each workstream is one agent. Read `docs/SPEC.md` and `packages/core/src/contract.ts`
 before writing code. Rules for every workstream:
 
