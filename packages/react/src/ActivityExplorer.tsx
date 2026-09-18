@@ -14,14 +14,21 @@
  */
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityGraph, placeBranches } from '@atriarch/tracery-visualizer';
+import type { ActivityGraphHandle } from '@atriarch/tracery-visualizer';
 import type { ActivityNode, NodeData, NodePresentation, NodeRecord, Flow, Scope } from '@atriarch/tracery-core';
-import type { ReactNode, CSSProperties } from 'react';
+import type { ReactNode, CSSProperties, Ref } from 'react';
 import type { ActivitySource } from './source.js';
 import { useProjection } from './useProjection.js';
 import { computeScope, scopeModeForKey, activatedFlow, isScopeShortcutTarget, SCOPE_LABELS, type ScopeMode } from './scope.js';
 import { latestFlows, latestFlowId } from './flow-order.js';
 import { Inspector, type InspectorSelection } from './Inspector.js';
 import { rootStyle, styles, type ActivityThemeVars } from './style.js';
+
+/** A share's fixed target (docs/SHARING.md): pass `useShareSource`'s `{ type, id }` straight through. */
+export interface LockedTarget {
+  readonly type: 'flow' | 'trace';
+  readonly id: string;
+}
 
 export interface ActivityExplorerProps {
   readonly source: ActivitySource;
@@ -32,40 +39,105 @@ export interface ActivityExplorerProps {
   readonly className?: string;
   readonly style?: CSSProperties;
   readonly ariaLabel?: string;
+  /**
+   * Share-page mode (docs/SHARING.md): hides anything that implies write
+   * access or a picker over data the viewer was never given (there is no
+   * write action in this component today, but a host page uses this to
+   * decide whether to show its own "Share"/"Delete" affordances too) and
+   * renders a small "Shared from Tracery · Open in Tracery" footer line.
+   */
+  readonly readOnly?: boolean;
+  /**
+   * A share's fixed target (docs/SHARING.md): hides the flow picker
+   * sidebar entirely (there is nothing else to pick -- `source.flows` only
+   * ever holds this target's data) and limits the scope switch to what
+   * that target's data can actually answer -- just `flow` for a
+   * flow-target share (no ancestors/trace data was ever sent), or `flow`
+   * and `trace` for a trace-target share (every member flow's data is
+   * present, so drilling into one is still meaningful; `ancestors` is
+   * omitted since a share never carries a parent chain beyond the trace's
+   * own known members).
+   */
+  readonly lockedTarget?: LockedTarget;
+  /**
+   * Forwarded straight to the inner `ActivityGraph`'s `apiRef`, so a host
+   * page can call `.toImage()` (docs/SHARING.md "Image export") or
+   * `.fitView()` from outside this component -- e.g. a "Download image"
+   * button in a share dialog or the explorer's own header menu.
+   */
+  readonly graphRef?: Ref<ActivityGraphHandle>;
 }
 
 const SCOPE_MODES: readonly ScopeMode[] = ['flow', 'ancestors', 'trace'];
+const TRACERY_HOMEPAGE = 'https://github.com/atriarch-systems/tracery';
+
+function scopeModesFor(lockedTarget: LockedTarget | undefined): readonly ScopeMode[] {
+  if (!lockedTarget) return SCOPE_MODES;
+  return lockedTarget.type === 'trace' ? ['flow', 'trace'] : ['flow'];
+}
 
 export function ActivityExplorer(props: ActivityExplorerProps) {
-  const { source, initialScope, catalog, renderInspector, theme, className, style, ariaLabel } = props;
+  const { source, initialScope, catalog, renderInspector, theme, className, style, ariaLabel, readOnly, lockedTarget, graphRef } = props;
+  const availableScopeModes = useMemo(() => scopeModesFor(lockedTarget), [lockedTarget]);
 
-  const [activeFlow, setActiveFlow] = useState<string | undefined>(
-    initialScope ? (initialScope.mode === 'trace' ? undefined : initialScope.flow) : undefined,
-  );
-  const [mode, setMode] = useState<ScopeMode>(initialScope?.mode ?? 'flow');
-  const [followLatest, setFollowLatest] = useState(initialScope === undefined);
+  const [activeFlow, setActiveFlow] = useState<string | undefined>(() => {
+    if (lockedTarget) return lockedTarget.type === 'flow' ? lockedTarget.id : undefined;
+    return initialScope ? (initialScope.mode === 'trace' ? undefined : initialScope.flow) : undefined;
+  });
+  const [mode, setMode] = useState<ScopeMode>(() => {
+    if (lockedTarget) return lockedTarget.type === 'trace' ? 'trace' : 'flow';
+    return initialScope?.mode ?? 'flow';
+  });
+  const [followLatest, setFollowLatest] = useState(!lockedTarget && initialScope === undefined);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [placement, setPlacement] = useState(() => new Map());
 
   const ordered = useMemo(() => latestFlows(source.flows), [source.flows]);
 
+  // A share's target (docs/SHARING.md) routinely arrives AFTER this
+  // component's first render -- `useShareSource` only knows it once its own
+  // `GET .../meta` fetch resolves -- so the `useState` initializers above,
+  // which only ever run once, are not enough on their own: without this
+  // effect, a `lockedTarget` that shows up on a later render would leave
+  // `activeFlow`/`mode` stuck at their pre-share defaults (`undefined`/
+  // `'flow'`) forever, and the explorer would sit on "No flow selected".
+  // The trace case still needs the separate anchor-resolution effect below
+  // (there is no single id to set `activeFlow` to until member flows load).
+  useEffect(() => {
+    if (!lockedTarget) return;
+    setMode(lockedTarget.type === 'trace' ? 'trace' : 'flow');
+    if (lockedTarget.type === 'flow') setActiveFlow(lockedTarget.id);
+  }, [lockedTarget?.type, lockedTarget?.id]);
+
   // "follow latest" default: keep the active flow pinned to the newest/most
   // active flow until the user picks one explicitly (SPEC.md §4 flow picker).
+  // Never applies to a share's locked target -- there is nothing to "follow".
   useEffect(() => {
-    if (!followLatest) return;
+    if (!followLatest || lockedTarget) return;
     const latest = latestFlowId(source.flows);
     if (latest !== undefined && latest !== activeFlow) setActiveFlow(latest);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [followLatest, source.flows]);
+  }, [followLatest, source.flows, lockedTarget]);
 
   useEffect(() => {
-    if (initialScope?.mode === 'trace') {
+    if (initialScope?.mode === 'trace' && !lockedTarget) {
       const anchor = [...source.flows.values()].find((f) => f.trace === initialScope.trace);
       if (anchor) setActiveFlow(anchor.id);
     }
     // Runs once: only to resolve an initial trace scope's anchor flow once flows are known.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialScope, source.flows.size > 0]);
+  }, [initialScope, source.flows.size > 0, lockedTarget]);
+
+  // A trace-target share's data arrives as every member flow, but nothing
+  // names a specific one to anchor on the way `initialScope` does -- prefer
+  // the flow whose id equals the trace id (the trace root, when it happens
+  // to already be known), else whichever member flow shows up first.
+  useEffect(() => {
+    if (!lockedTarget || lockedTarget.type !== 'trace' || activeFlow !== undefined) return;
+    const anchor = source.flows.get(lockedTarget.id) ?? [...source.flows.values()].find((f) => f.trace === lockedTarget.id);
+    if (anchor) setActiveFlow(anchor.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lockedTarget, source.flows.size > 0, activeFlow]);
 
   const scope: Scope | undefined = activeFlow !== undefined ? computeScope(mode, activeFlow, source.flows) : undefined;
   const projection = useProjection(source, scope ?? { mode: 'flow', flow: '' }, { catalog });
@@ -90,6 +162,7 @@ export function ActivityExplorer(props: ActivityExplorerProps) {
   };
 
   const switchMode = (next: ScopeMode): void => {
+    if (!availableScopeModes.includes(next)) return;
     setMode(next);
     setSelectedNodeId(null);
   };
@@ -139,7 +212,7 @@ export function ActivityExplorer(props: ActivityExplorerProps) {
           </span>
         )}
         <div style={styles.scopeSwitch} role="tablist" aria-label="Scope">
-          {SCOPE_MODES.map((m) => (
+          {availableScopeModes.map((m) => (
             <button
               key={m}
               type="button"
@@ -178,28 +251,30 @@ export function ActivityExplorer(props: ActivityExplorerProps) {
       )}
 
       <div style={styles.body}>
-        <div style={styles.sidebar} data-testid="flow-picker">
-          <div style={styles.sidebarHeading}>Flows</div>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 8px', fontSize: 12 }}>
-            <input type="checkbox" checked={followLatest} onChange={(e) => setFollowLatest(e.target.checked)} />
-            Follow latest
-          </label>
-          {ordered.map((flow) => (
-            <button
-              key={flow.id}
-              type="button"
-              data-testid="flow-picker-item"
-              data-flow-id={flow.id}
-              data-flow-status={flow.status}
-              data-active={flow.id === activeFlow ? 'true' : 'false'}
-              style={styles.flowItem(flow.id === activeFlow)}
-              onClick={() => pickFlow(flow.id)}
-            >
-              {flow.label} <span style={styles.muted}>({flow.status})</span>
-            </button>
-          ))}
-          {ordered.length === 0 && <div style={{ ...styles.muted, padding: 8 }}>No flows yet.</div>}
-        </div>
+        {!lockedTarget && (
+          <div style={styles.sidebar} data-testid="flow-picker">
+            <div style={styles.sidebarHeading}>Flows</div>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 8px', fontSize: 12 }}>
+              <input type="checkbox" checked={followLatest} onChange={(e) => setFollowLatest(e.target.checked)} />
+              Follow latest
+            </label>
+            {ordered.map((flow) => (
+              <button
+                key={flow.id}
+                type="button"
+                data-testid="flow-picker-item"
+                data-flow-id={flow.id}
+                data-flow-status={flow.status}
+                data-active={flow.id === activeFlow ? 'true' : 'false'}
+                style={styles.flowItem(flow.id === activeFlow)}
+                onClick={() => pickFlow(flow.id)}
+              >
+                {flow.label} <span style={styles.muted}>({flow.status})</span>
+              </button>
+            ))}
+            {ordered.length === 0 && <div style={{ ...styles.muted, padding: 8 }}>No flows yet.</div>}
+          </div>
+        )}
 
         <div style={styles.graphArea}>
           {hasScope ? (
@@ -213,6 +288,7 @@ export function ActivityExplorer(props: ActivityExplorerProps) {
               onNodeSelect={(node) => setSelectedNodeId(node?.id ?? null)}
               onNodeActivate={(node) => activate(node as ActivityNode<NodeData>)}
               ariaLabel={ariaLabel}
+              apiRef={graphRef}
             />
           ) : (
             <div style={{ ...styles.muted, padding: 16 }}>No flow selected.</div>
@@ -251,6 +327,25 @@ export function ActivityExplorer(props: ActivityExplorerProps) {
           {renderInspector ? renderInspector(selectedNode) : <Inspector selection={selectedNode} />}
         </div>
       </div>
+
+      {readOnly && (
+        <div
+          data-testid="share-footer"
+          style={{
+            flex: '0 0 auto',
+            padding: '4px 12px',
+            fontSize: 11,
+            color: 'var(--tracery-muted, #8892a6)',
+            borderTop: '1px solid var(--tracery-border, #262a3a)',
+            textAlign: 'center',
+          }}
+        >
+          Shared from Tracery ·{' '}
+          <a href={TRACERY_HOMEPAGE} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--tracery-accent, #7c9cff)' }}>
+            Open in Tracery
+          </a>
+        </div>
+      )}
     </div>
   );
 }

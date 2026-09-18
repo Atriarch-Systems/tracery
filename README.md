@@ -142,6 +142,20 @@ With no `TRACERY_HUB_URL` at all, every hook is a silent no-op. See
 [`plugins/claude-code/README.md`](plugins/claude-code/README.md) and
 [`docs/CLAUDE-CODE-PLUGIN.md`](docs/CLAUDE-CODE-PLUGIN.md).
 
+## Sharing
+
+Sharing is the viral loop. From a flow or trace's deep link in the hosted
+UI, **Share** creates a link (`/s/<token>`) that needs no API key — frozen
+at the moment you shared it (`snapshot`, the default) or live-updating
+(`live`), with producer context hidden by default and revocable at any
+time. No hub reachable from outside your machine? **Export .html** gives
+you a single, fully self-contained file that renders the same explorer
+offline, straight from disk. Either way, **Download image** turns the
+current view into a PNG with a small "Tracery" mark, ready to paste
+anywhere. See [`docs/SHARING.md`](docs/SHARING.md) for the full picture —
+redaction rules, expiry/revocation, rate limits, Open Graph previews, and
+`TRACERY_PUBLIC_URL`.
+
 ## Packages
 
 | Package | Path | Version | License |
@@ -178,6 +192,7 @@ flow reachable that way resolves to one `trace`.
 - [`docs/SPEC.md`](docs/SPEC.md) — the full specification: contract, reducers, visualizer, client SDKs, hub HTTP API, the extensions seam, testing/acceptance.
 - [`docs/CLOUD.md`](docs/CLOUD.md) — what Tracery Cloud (the managed service) offers, and how the open hub's extensions seam is what it plugs into.
 - [`docs/CLAUDE-CODE-PLUGIN.md`](docs/CLAUDE-CODE-PLUGIN.md) — the Claude Code plugin's hook mapping, privacy details, troubleshooting.
+- [`docs/SHARING.md`](docs/SHARING.md) — share links, redaction, expiry/revocation, rate limits, OG previews, image export, standalone HTML export.
 - [`docs/GETTING-STARTED.md`](docs/GETTING-STARTED.md) — a longer walkthrough: hub via Docker Compose, a keys file, TS and Python emitters, embedding the explorer, the plugin.
 - [`docs/DEMOS.md`](docs/DEMOS.md) — the three demos (Claude Code plugin, npm library, standalone hub): commands, screenshots, and what each distribution can and can't do.
 - [`docs/HARDENING.md`](docs/HARDENING.md) — findings from a review/verify/fix pass (confirmed vs. refuted, with reasoning) and the roadmap items delivered alongside it.

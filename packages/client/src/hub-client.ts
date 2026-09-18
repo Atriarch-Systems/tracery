@@ -1,5 +1,7 @@
 import type { ActivityFrame, StoredEvent } from '@atriarch/tracery-core';
 import type { FlowSummary, ListFlowsQuery, ListFlowsResult, Trace } from './hub-types.stub.js';
+import { connectLive, type LiveConnectOptions, type LiveDisposer as LiveConnectDisposer, type LiveStatusEvent as LiveConnectStatusEvent } from './live-connect.js';
+import type { ShareMode, ShareTarget, ShareSummary, CreateShareOptions, CreateShareResult } from './share-types.js';
 
 export interface HubClientOptions {
   readonly baseUrl: string;
@@ -18,24 +20,12 @@ export interface LiveFilter {
 }
 
 /** Stops reconnecting and closes the live socket. */
-export type LiveDisposer = () => void;
+export type LiveDisposer = LiveConnectDisposer;
 
-export interface LiveStatusEvent {
-  readonly status: 'connecting' | 'open' | 'closed' | 'error';
-  /** Reconnect attempts made since the backoff last reset (0 on the very first connect). */
-  readonly attempt: number;
-}
+export type LiveStatusEvent = LiveConnectStatusEvent;
 
-export interface LiveOptions {
-  /** Called on every connecting/open/closed/error transition, so a caller can tell "connected and quiet" from "reconnect-looping on a bad key". */
-  readonly onStatus?: (event: LiveStatusEvent) => void;
-  /** Called with a malformed-frame parse error, or an error `onFrame` itself threw (frames are otherwise never re-delivered after a handler throws). */
-  readonly onError?: (error: unknown) => void;
-  /** Stop reconnecting after this many consecutive failed attempts. Default: unlimited. */
-  readonly maxAttempts?: number;
-  /** How long a connection must stay open before a later close resets the backoff to its floor, rather than continuing to climb. Default 1000ms. */
-  readonly stableAfterMs?: number;
-}
+/** Same shape as `./live-connect.js`'s `LiveConnectOptions` -- kept as its own exported name since it predates that extraction. */
+export type LiveOptions = LiveConnectOptions;
 
 interface ErrorBody {
   readonly error?: { readonly code?: string; readonly message?: string };
@@ -55,7 +45,7 @@ export class HubClient {
     this.baseUrl = options.baseUrl.replace(/\/+$/, '');
     this.apiKey = options.apiKey ?? '';
     this.workspace = options.workspace;
-    this.fetchImpl = options.fetch ?? globalThis.fetch;
+    this.fetchImpl = options.fetch ?? globalThis.fetch.bind(globalThis);
     this.WebSocketImpl = options.WebSocket ?? (globalThis as { WebSocket?: typeof WebSocket }).WebSocket;
     if (typeof this.fetchImpl !== 'function') {
       throw new Error('HubClient: no fetch implementation available; pass { fetch }');
@@ -140,99 +130,90 @@ export class HubClient {
     if (typeof this.WebSocketImpl !== 'function') {
       throw new Error('HubClient.live: no WebSocket implementation available; pass { WebSocket }');
     }
-    // Narrowed once here; captured as a definite (non-undefined) constructor
-    // so the nested `connect` function below does not need to re-check it.
-    const WebSocketImpl: typeof WebSocket = this.WebSocketImpl;
-    const { onStatus, onError, maxAttempts, stableAfterMs = 1000 } = liveOptions;
-
-    let disposed = false;
-    let socket: WebSocket | null = null;
-    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-    let stableTimer: ReturnType<typeof setTimeout> | null = null;
-    let attempt = 0;
-    let cursor = filter.after;
-
-    const socketUrl = (): string => {
-      const url = this.buildUrl('/v1/live', {
+    const urlFor = (cursor: number | undefined): string =>
+      this.buildUrl('/v1/live', {
         flow: filter.flow,
         trace: filter.trace,
         after: cursor,
         // Omitted entirely (not sent as `token=`) in local mode -- `buildUrl`
         // already skips `undefined` query values.
         token: this.apiKey || undefined,
-      });
-      return url.toString().replace(/^http/, 'ws');
-    };
-
-    const clearStableTimer = (): void => {
-      if (stableTimer !== null) {
-        clearTimeout(stableTimer);
-        stableTimer = null;
-      }
-    };
-
-    const scheduleReconnect = (): void => {
-      clearStableTimer();
-      onStatus?.({ status: 'closed', attempt });
-      if (disposed) return;
-      if (maxAttempts !== undefined && attempt >= maxAttempts) return;
-      const capped = Math.min(200 * 2 ** attempt, 10_000);
-      // Full jitter: many clients reconnecting after the same hub restart
-      // should not all retry in lockstep.
-      const delay = Math.random() * capped;
-      attempt++;
-      reconnectTimer = setTimeout(connect, delay);
-    };
-
-    function connect(): void {
-      if (disposed) return;
-      onStatus?.({ status: 'connecting', attempt });
-      const ws = new WebSocketImpl(socketUrl());
-      socket = ws;
-      ws.addEventListener('open', () => {
-        onStatus?.({ status: 'open', attempt });
-        // Reset the backoff only once the connection has proven itself by
-        // staying open a while, not immediately on `open` — see the doc
-        // comment above.
-        clearStableTimer();
-        stableTimer = setTimeout(() => {
-          attempt = 0;
-          stableTimer = null;
-        }, stableAfterMs);
-      });
-      ws.addEventListener('message', (event: MessageEvent) => {
-        let frame: ActivityFrame;
-        try {
-          frame = JSON.parse(String(event.data)) as ActivityFrame;
-        } catch (err) {
-          onError?.(err); // malformed frame; ignore and keep the connection open
-          return;
-        }
-        try {
-          // Advance the cursor only once the frame has actually been handed
-          // off: if the consumer's own handler throws, the frame is not
-          // marked seen, so a reconnect will replay it instead of leaving a
-          // silent, permanent gap in the feed.
-          onFrame(frame);
-          cursor = frame.cursor;
-        } catch (err) {
-          onError?.(err);
-        }
-      });
-      ws.addEventListener('error', (event) => {
-        onError?.(event);
-        // the 'close' event that follows drives reconnection
-      });
-      ws.addEventListener('close', scheduleReconnect);
-    }
-
-    connect();
-
-    return () => {
-      disposed = true;
-      clearStableTimer();
-      if (reconnectTimer !== null) clearTimeout(reconnectTimer);
-      socket?.close();
-    };
+      })
+        .toString()
+        .replace(/^http/, 'ws');
+    return connectLive(this.WebSocketImpl, urlFor, filter.after, onFrame, liveOptions);
   }
+
+  private async request(method: string, path: string, query?: Readonly<Record<string, QueryValue>>, jsonBody?: unknown): Promise<Response> {
+    const headers: Record<string, string> = this.apiKey ? { authorization: `Bearer ${this.apiKey}` } : {};
+    let body: string | undefined;
+    if (jsonBody !== undefined) {
+      headers['content-type'] = 'application/json';
+      body = JSON.stringify(jsonBody);
+    }
+    const res = await this.fetchImpl(this.buildUrl(path, query), { method, headers, body });
+    if (!res.ok) {
+      let message = `${res.status} ${res.statusText}`;
+      try {
+        const errBody = (await res.json()) as ErrorBody;
+        if (errBody.error?.message) message = errBody.error.message;
+      } catch {
+        // response body wasn't JSON; keep the status-line message
+      }
+      throw new Error(`HubClient request to ${path} failed: ${message}`);
+    }
+    return res;
+  }
+
+  /** `POST/GET/DELETE/PUT /v1/shares*` (docs/SHARING.md): create, list and revoke share links, and upload a preview image. */
+  readonly shares: HubClientShares = {
+    create: async (options: CreateShareOptions): Promise<CreateShareResult> => {
+      const res = await this.request('POST', '/v1/shares', undefined, {
+        target: options.target,
+        mode: options.mode,
+        includeContext: options.includeContext,
+        expiresInDays: options.expiresInDays,
+      });
+      return (await res.json()) as CreateShareResult;
+    },
+    list: async (): Promise<readonly ShareSummary[]> => {
+      const res = await this.request('GET', '/v1/shares');
+      const body = (await res.json()) as { shares: readonly ShareSummary[] };
+      return body.shares;
+    },
+    revoke: async (id: string): Promise<void> => {
+      await this.request('DELETE', `/v1/shares/${encodeURIComponent(id)}`);
+    },
+    uploadPreview: async (id: string, png: Uint8Array): Promise<void> => {
+      const headers: Record<string, string> = { 'content-type': 'image/png' };
+      if (this.apiKey) headers.authorization = `Bearer ${this.apiKey}`;
+      const res = await this.fetchImpl(this.buildUrl(`/v1/shares/${encodeURIComponent(id)}/preview`), {
+        method: 'PUT',
+        headers,
+        // Cast: @types/node's ambient `Uint8Array<ArrayBufferLike>` and lib.dom's
+        // `BodyInit` disagree structurally even though every runtime (browser
+        // fetch, undici) accepts a Uint8Array body just fine.
+        body: png as unknown as BodyInit,
+      });
+      if (!res.ok) {
+        let message = `${res.status} ${res.statusText}`;
+        try {
+          const errBody = (await res.json()) as ErrorBody;
+          if (errBody.error?.message) message = errBody.error.message;
+        } catch {
+          // ignore
+        }
+        throw new Error(`HubClient.shares.uploadPreview failed: ${message}`);
+      }
+    },
+  };
 }
+
+export interface HubClientShares {
+  create(options: CreateShareOptions): Promise<CreateShareResult>;
+  list(): Promise<readonly ShareSummary[]>;
+  revoke(id: string): Promise<void>;
+  uploadPreview(id: string, png: Uint8Array): Promise<void>;
+}
+
+export type { ShareMode, ShareTarget, ShareTargetType, ShareSummary, CreateShareOptions, CreateShareResult } from './share-types.js';

@@ -32,7 +32,7 @@ const MAX_BACKOFF_MS = 10_000;
  * responses are not retryable and are dropped. Never throws into the caller.
  */
 export function httpTransport(options: HttpTransportOptions): ActivityTransport {
-  const fetchImpl = options.fetch ?? globalThis.fetch;
+  const fetchImpl = options.fetch ?? globalThis.fetch.bind(globalThis);
   if (typeof fetchImpl !== 'function') {
     throw new Error('httpTransport: no fetch implementation available; pass { fetch }');
   }

@@ -55,6 +55,16 @@ import {
   type Unsubscribe,
   type WorkspaceStats,
 } from './types.js';
+import {
+  generateShareId,
+  generateShareToken,
+  type CreateShareInput,
+  type ListSharesQuery,
+  type ShareRecord,
+  type SharePreviewData,
+  type ShareStore,
+  type ShareTargetType,
+} from './share-types.js';
 
 // `pg` is CommonJS; under NodeNext + verbatimModuleSyntax the reliable way to
 // get its runtime value is a default import destructured after the fact --
@@ -122,7 +132,44 @@ export interface PostgresStoreOptions {
   readonly schema?: string;
 }
 
-export class PostgresStore implements EventStore {
+interface ShareRow {
+  id: string;
+  token: string;
+  workspace: string;
+  target_type: string;
+  target_id: string;
+  mode: string;
+  snapshot_cursor: string | null;
+  include_context: boolean;
+  created_by: string;
+  created_at: string;
+  expires_at: string | null;
+  revoked_at: string | null;
+  preview_content_type: string | null;
+  preview_bytes: string | null;
+}
+
+function shareRowToRecord(row: ShareRow): ShareRecord {
+  return {
+    id: row.id,
+    token: row.token,
+    workspace: row.workspace,
+    target: { type: row.target_type as ShareTargetType, id: row.target_id },
+    mode: row.mode as ShareRecord['mode'],
+    snapshotCursor: row.snapshot_cursor !== null ? Number(row.snapshot_cursor) : undefined,
+    includeContext: row.include_context,
+    createdBy: row.created_by,
+    createdAt: Number(row.created_at),
+    expiresAt: row.expires_at !== null ? Number(row.expires_at) : null,
+    revokedAt: row.revoked_at !== null ? Number(row.revoked_at) : null,
+    preview:
+      row.preview_content_type !== null && row.preview_bytes !== null
+        ? { contentType: 'image/png', bytes: Number(row.preview_bytes) }
+        : null,
+  };
+}
+
+export class PostgresStore implements EventStore, ShareStore {
   private readonly workspaces = new Map<string, WorkspaceState>();
   private readonly subscribers = new Set<StoreSubscriber>();
   private cursor = 0;
@@ -272,6 +319,36 @@ export class PostgresStore implements EventStore {
     await client.query(`CREATE INDEX IF NOT EXISTS idx_flows_workspace_status ON ${this.t('flows')} (workspace, status)`);
     await client.query(`CREATE INDEX IF NOT EXISTS idx_flows_workspace_actor ON ${this.t('flows')} (workspace, actor_id)`);
     await client.query(`CREATE INDEX IF NOT EXISTS idx_flows_workspace_trace ON ${this.t('flows')} (workspace, trace)`);
+
+    // Share links (docs/SHARING.md) -- a plain CRUD table, not part of the
+    // flows/events reduction; no in-memory index or rebuild-on-boot needed.
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS ${this.t('shares')} (
+        id TEXT PRIMARY KEY,
+        token TEXT NOT NULL UNIQUE,
+        workspace TEXT NOT NULL,
+        target_type TEXT NOT NULL,
+        target_id TEXT NOT NULL,
+        mode TEXT NOT NULL,
+        snapshot_cursor BIGINT,
+        include_context BOOLEAN NOT NULL,
+        created_by TEXT NOT NULL,
+        created_at BIGINT NOT NULL,
+        expires_at BIGINT,
+        revoked_at BIGINT,
+        preview_content_type TEXT,
+        preview_bytes BIGINT
+      )
+    `);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_shares_workspace ON ${this.t('shares')} (workspace)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_shares_workspace_created_by ON ${this.t('shares')} (workspace, created_by)`);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS ${this.t('share_previews')} (
+        id TEXT PRIMARY KEY,
+        data BYTEA NOT NULL
+      )
+    `);
 
     return needsFlowsRebuild;
   }
@@ -680,5 +757,110 @@ export class PostgresStore implements EventStore {
   async close(): Promise<void> {
     this.subscribers.clear();
     await this.pool.end();
+  }
+
+  // ---------------------------------------------------------------------
+  // ShareStore (docs/SHARING.md)
+  // ---------------------------------------------------------------------
+
+  async createShare(input: CreateShareInput): Promise<ShareRecord> {
+    const record: ShareRecord = {
+      id: generateShareId(),
+      token: generateShareToken(),
+      workspace: input.workspace,
+      target: input.target,
+      mode: input.mode,
+      snapshotCursor: input.snapshotCursor,
+      includeContext: input.includeContext,
+      createdBy: input.createdBy,
+      createdAt: Date.now(),
+      expiresAt: input.expiresAt,
+      revokedAt: null,
+      preview: null,
+    };
+    await this.pool.query(
+      `INSERT INTO ${this.t('shares')}
+         (id, token, workspace, target_type, target_id, mode, snapshot_cursor, include_context, created_by, created_at, expires_at, revoked_at, preview_content_type, preview_bytes)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
+      [
+        record.id,
+        record.token,
+        record.workspace,
+        record.target.type,
+        record.target.id,
+        record.mode,
+        record.snapshotCursor ?? null,
+        record.includeContext,
+        record.createdBy,
+        record.createdAt,
+        record.expiresAt,
+        record.revokedAt,
+        null,
+        null,
+      ],
+    );
+    return record;
+  }
+
+  async getShareByToken(token: string): Promise<ShareRecord | undefined> {
+    const { rows } = await this.pool.query<ShareRow>(`SELECT * FROM ${this.t('shares')} WHERE token = $1`, [token]);
+    return rows[0] ? shareRowToRecord(rows[0]) : undefined;
+  }
+
+  async getShareById(workspace: string, id: string): Promise<ShareRecord | undefined> {
+    const { rows } = await this.pool.query<ShareRow>(`SELECT * FROM ${this.t('shares')} WHERE workspace = $1 AND id = $2`, [workspace, id]);
+    return rows[0] ? shareRowToRecord(rows[0]) : undefined;
+  }
+
+  async listShares(workspace: string, query: ListSharesQuery = {}): Promise<readonly ShareRecord[]> {
+    const { rows } =
+      query.createdBy !== undefined
+        ? await this.pool.query<ShareRow>(
+            `SELECT * FROM ${this.t('shares')} WHERE workspace = $1 AND created_by = $2 ORDER BY created_at DESC`,
+            [workspace, query.createdBy],
+          )
+        : await this.pool.query<ShareRow>(`SELECT * FROM ${this.t('shares')} WHERE workspace = $1 ORDER BY created_at DESC`, [workspace]);
+    return rows.map(shareRowToRecord);
+  }
+
+  async revokeShare(workspace: string, id: string, revokedAt: number): Promise<boolean> {
+    const existing = await this.getShareById(workspace, id);
+    if (!existing) return false;
+    // no-op (0 rows updated) if already revoked -- idempotent by design
+    await this.pool.query(
+      `UPDATE ${this.t('shares')} SET revoked_at = $1 WHERE workspace = $2 AND id = $3 AND revoked_at IS NULL`,
+      [revokedAt, workspace, id],
+    );
+    return true;
+  }
+
+  async setSharePreview(workspace: string, id: string, preview: SharePreviewData | null): Promise<boolean> {
+    const existing = await this.getShareById(workspace, id);
+    if (!existing) return false;
+    if (preview === null) {
+      await this.pool.query(
+        `UPDATE ${this.t('shares')} SET preview_content_type = NULL, preview_bytes = NULL WHERE workspace = $1 AND id = $2`,
+        [workspace, id],
+      );
+      await this.pool.query(`DELETE FROM ${this.t('share_previews')} WHERE id = $1`, [id]);
+    } else {
+      await this.pool.query(
+        `UPDATE ${this.t('shares')} SET preview_content_type = $1, preview_bytes = $2 WHERE workspace = $3 AND id = $4`,
+        [preview.contentType, preview.data.byteLength, workspace, id],
+      );
+      await this.pool.query(
+        `INSERT INTO ${this.t('share_previews')} (id, data) VALUES ($1, $2) ON CONFLICT (id) DO UPDATE SET data = excluded.data`,
+        [id, Buffer.from(preview.data)],
+      );
+    }
+    return true;
+  }
+
+  async getSharePreview(workspace: string, id: string): Promise<SharePreviewData | undefined> {
+    const share = await this.getShareById(workspace, id);
+    if (!share || share.preview === null) return undefined;
+    const { rows } = await this.pool.query<{ data: Buffer }>(`SELECT data FROM ${this.t('share_previews')} WHERE id = $1`, [id]);
+    if (!rows[0]) return undefined;
+    return { contentType: 'image/png', data: new Uint8Array(rows[0].data) };
   }
 }

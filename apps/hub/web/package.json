@@ -7,11 +7,12 @@
   "description": "Hosted explorer for @atriarch/tracery-hub (SPEC.md §6 \"Hosted UI\"): key entry, flow/trace deep links, ActivityExplorer full-screen. Built to dist/ and served by the hub at /ui.",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -p tsconfig.json --noEmit && vite build",
+    "build": "tsc -p tsconfig.json --noEmit && vite build && vite build --config vite.viewer.config.ts",
     "preview": "vite preview --port 4311 --strictPort",
     "test": "playwright test"
   },
   "dependencies": {
+    "@atriarch/tracery-client": "*",
     "@atriarch/tracery-core": "*",
     "@atriarch/tracery-react": "*",
     "react": "^19.0.0",
@@ -23,6 +24,7 @@
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^4.3.0",
     "typescript": "^5.6.0",
-    "vite": "^6.0.0"
+    "vite": "^6.0.0",
+    "vite-plugin-singlefile": "file:vendor/vite-plugin-singlefile"
   }
 }

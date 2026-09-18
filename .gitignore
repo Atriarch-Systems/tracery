@@ -10,3 +10,10 @@ apps/hub/data/
 .env
 test-results/
 playwright-report/
+
+# Vendored third-party package (apps/hub/web/vendor/README.md explains why)
+# checked in whole, including its own build output -- the blanket `dist/`
+# rule above would otherwise silently drop the one directory that actually
+# makes it work for anyone who clones this repo fresh.
+!apps/hub/web/vendor/vite-plugin-singlefile/dist/
+!apps/hub/web/vendor/vite-plugin-singlefile/dist/**

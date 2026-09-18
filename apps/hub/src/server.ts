@@ -14,6 +14,7 @@ import { MemoryStore } from './store/memory.js';
 import { SqliteStore } from './store/sqlite.js';
 import { PostgresStore } from './store/postgres.js';
 import type { EventStore } from './store/types.js';
+import type { ShareStore } from './store/share-types.js';
 import { MetricsRegistry } from './metrics.js';
 import { startRetention, type RetentionHandle } from './retention.js';
 import { registerLive } from './live.js';
@@ -23,6 +24,9 @@ import { registerTracesRoutes } from './routes/traces.js';
 import { registerWorkspacesRoutes } from './routes/workspaces.js';
 import { registerHealthRoutes } from './routes/health.js';
 import { registerInfoRoutes } from './routes/info.js';
+import { registerSharesRoutes } from './routes/shares.js';
+import { registerSharePageRoutes } from './routes/share-page.js';
+import { registerExportRoutes } from './routes/export.js';
 import { registerUiRoutes } from './routes/ui.js';
 import type { HubContext, HubExtensions } from './server-context.js';
 
@@ -30,14 +34,14 @@ export type { HubContext, HubExtensions } from './server-context.js';
 
 export interface CreatedServer {
   readonly app: FastifyInstance;
-  readonly store: EventStore;
+  readonly store: EventStore & ShareStore;
   readonly metrics: MetricsRegistry;
   readonly keys: readonly ApiKeyConfig[];
   readonly retention: RetentionHandle;
   close(): Promise<void>;
 }
 
-async function openStore(config: Config): Promise<EventStore> {
+async function openStore(config: Config): Promise<EventStore & ShareStore> {
   if (config.store === 'postgres') {
     if (!config.postgresUrl) throw new Error('TRACERY_STORE=postgres requires TRACERY_POSTGRES_URL');
     return PostgresStore.connect(config.postgresUrl);
@@ -190,6 +194,9 @@ export async function createServer(config: Config, extensions?: HubExtensions): 
   registerFlowsRoutes(app, ctx);
   registerTracesRoutes(app, ctx);
   registerWorkspacesRoutes(app, ctx);
+  registerSharesRoutes(app, ctx);
+  registerSharePageRoutes(app, ctx);
+  registerExportRoutes(app, ctx);
   registerLive(app, { store, keys, metrics, extensions, authMode: config.authMode });
 
   app.get('/v1/openapi.json', { schema: { hide: true } }, async () => app.swagger());

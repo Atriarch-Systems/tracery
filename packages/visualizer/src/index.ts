@@ -4,3 +4,6 @@ export type { Activity, NodePresentation, ActivityNode, ActivityEdge, ActivityGr
 
 export { placeBranches } from './layout.js';
 export type { Placement, PlacementState } from './layout.js';
+
+export { renderCapture, captureToBlob, TRACERY_MARK_TEXT, TRACERY_MARK_COLOR } from './capture.js';
+export type { CaptureOptions, CaptureCanvasLike, CaptureContextLike, CaptureSourceLike } from './capture.js';

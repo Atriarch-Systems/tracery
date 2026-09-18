@@ -33,6 +33,15 @@ import {
   type Unsubscribe,
   type WorkspaceStats,
 } from './types.js';
+import {
+  generateShareId,
+  generateShareToken,
+  type CreateShareInput,
+  type ListSharesQuery,
+  type ShareRecord,
+  type SharePreviewData,
+  type ShareStore,
+} from './share-types.js';
 
 interface WorkspaceState {
   /** All currently retained events, ordered by cursor ascending. */
@@ -55,10 +64,14 @@ function matchesQuery(flow: Flow, query: ListFlowsQuery): boolean {
   return true;
 }
 
-export class MemoryStore implements EventStore {
+export class MemoryStore implements EventStore, ShareStore {
   private readonly workspaces = new Map<string, WorkspaceState>();
   private readonly subscribers = new Set<StoreSubscriber>();
   private cursor = 0;
+  /** Share records keyed by id; `sharesByToken` is a lookup index onto the same records (SPEC.md-analogous "materialised index" pattern used for flows). */
+  private readonly shares = new Map<string, ShareRecord>();
+  private readonly sharesByToken = new Map<string, string>();
+  private readonly sharePreviews = new Map<string, SharePreviewData>();
 
   private state(workspace: string): WorkspaceState {
     let state = this.workspaces.get(workspace);
@@ -272,5 +285,71 @@ export class MemoryStore implements EventStore {
 
   async close(): Promise<void> {
     this.subscribers.clear();
+  }
+
+  // ---------------------------------------------------------------------
+  // ShareStore (docs/SHARING.md)
+  // ---------------------------------------------------------------------
+
+  async createShare(input: CreateShareInput): Promise<ShareRecord> {
+    const record: ShareRecord = {
+      id: generateShareId(),
+      token: generateShareToken(),
+      workspace: input.workspace,
+      target: input.target,
+      mode: input.mode,
+      snapshotCursor: input.snapshotCursor,
+      includeContext: input.includeContext,
+      createdBy: input.createdBy,
+      createdAt: Date.now(),
+      expiresAt: input.expiresAt,
+      revokedAt: null,
+      preview: null,
+    };
+    this.shares.set(record.id, record);
+    this.sharesByToken.set(record.token, record.id);
+    return record;
+  }
+
+  async getShareByToken(token: string): Promise<ShareRecord | undefined> {
+    const id = this.sharesByToken.get(token);
+    return id ? this.shares.get(id) : undefined;
+  }
+
+  async getShareById(workspace: string, id: string): Promise<ShareRecord | undefined> {
+    const share = this.shares.get(id);
+    return share && share.workspace === workspace ? share : undefined;
+  }
+
+  async listShares(workspace: string, query: ListSharesQuery = {}): Promise<readonly ShareRecord[]> {
+    const all = [...this.shares.values()].filter((share) => share.workspace === workspace);
+    const filtered = query.createdBy !== undefined ? all.filter((share) => share.createdBy === query.createdBy) : all;
+    return filtered.sort((a, b) => b.createdAt - a.createdAt);
+  }
+
+  async revokeShare(workspace: string, id: string, revokedAt: number): Promise<boolean> {
+    const share = this.shares.get(id);
+    if (!share || share.workspace !== workspace) return false;
+    if (share.revokedAt === null) this.shares.set(id, { ...share, revokedAt });
+    return true;
+  }
+
+  async setSharePreview(workspace: string, id: string, preview: SharePreviewData | null): Promise<boolean> {
+    const share = this.shares.get(id);
+    if (!share || share.workspace !== workspace) return false;
+    if (preview === null) {
+      this.sharePreviews.delete(id);
+      this.shares.set(id, { ...share, preview: null });
+    } else {
+      this.sharePreviews.set(id, preview);
+      this.shares.set(id, { ...share, preview: { contentType: preview.contentType, bytes: preview.data.byteLength } });
+    }
+    return true;
+  }
+
+  async getSharePreview(workspace: string, id: string): Promise<SharePreviewData | undefined> {
+    const share = this.shares.get(id);
+    if (!share || share.workspace !== workspace) return undefined;
+    return this.sharePreviews.get(id);
   }
 }

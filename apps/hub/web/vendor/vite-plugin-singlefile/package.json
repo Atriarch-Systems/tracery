@@ -1,0 +1,31 @@
+{
+	"name": "vite-plugin-singlefile",
+	"version": "2.3.3",
+	"description": "Vite plugin for inlining all JavaScript and CSS resources (vendored, stripped of dev/peer metadata -- see apps/hub/web/vendor/README.md)",
+	"main": "dist/cjs/index.js",
+	"type": "module",
+	"module": "dist/esm/index.js",
+	"exports": {
+		".": {
+			"types": "./dist/esm/declarations/index.d.ts",
+			"import": "./dist/esm/index.js",
+			"require": "./dist/cjs/index.js"
+		}
+	},
+	"typings": "dist/esm/declarations/index.d.ts",
+	"files": [
+		"dist"
+	],
+	"engines": {
+		"node": ">18.0.0"
+	},
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/richardtallent/vite-plugin-singlefile"
+	},
+	"homepage": "https://github.com/richardtallent/vite-plugin-singlefile/tree/main/#readme",
+	"dependencies": {
+		"micromatch": "^4.0.8"
+	}
+}

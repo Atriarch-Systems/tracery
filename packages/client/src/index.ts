@@ -21,7 +21,7 @@ export { httpTransport, memoryTransport, journalTransport } from './transports.j
 export type { HttpTransportOptions, MemoryTransport } from './transports.js';
 
 export { HubClient } from './hub-client.js';
-export type { HubClientOptions, LiveFilter, LiveDisposer } from './hub-client.js';
+export type { HubClientOptions, LiveFilter, LiveDisposer, LiveOptions, LiveStatusEvent, HubClientShares } from './hub-client.js';
 export type {
   FlowSummary,
   FlowStatus,
@@ -34,6 +34,22 @@ export type {
   ListFlowsQuery,
   ListFlowsResult,
 } from './hub-types.stub.js';
+
+export { ShareClient } from './share-client.js';
+export type { ShareClientOptions } from './share-client.js';
+export type {
+  ShareTargetType,
+  ShareTarget,
+  ShareMode,
+  SharePreviewMeta,
+  ShareSummary,
+  CreateShareOptions,
+  CreateShareResult,
+  ShareMeta,
+} from './share-types.js';
+
+export { connectLive } from './live-connect.js';
+export type { LiveConnectOptions } from './live-connect.js';
 
 // Re-exported for convenience so consumers rarely need to import
 // '@atriarch/tracery-core' directly for everyday SDK use.

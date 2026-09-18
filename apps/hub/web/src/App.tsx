@@ -1,10 +1,13 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityExplorer, useHubSource } from '@atriarch/tracery-react';
+import type { ActivityGraphHandle } from '@atriarch/tracery-react';
 import type { Scope } from '@atriarch/tracery-core';
+import { ShareDialog, type ShareTargetRef } from './ShareDialog.js';
 import { useRoute, type Route } from './router.js';
 import { KeyEntry } from './KeyEntry.js';
 import { ExplorerErrorBoundary } from './ErrorBoundary.js';
 import { Footer } from './Footer.js';
+import { SharePage } from './SharePage.js';
 import { loadSession, saveSession, clearSession, type HubSession } from './session.js';
 import { fetchAuthMe, logout } from './sso.js';
 import { fetchHubInfo } from './info.js';
@@ -24,8 +27,14 @@ export function App() {
   // after the OIDC callback redirects back here -- is in flight.
   const [ssoAvailable, setSsoAvailable] = useState<boolean | undefined>(undefined);
 
+  const route = useRoute();
+
   useEffect(() => {
-    if (session) return; // an existing (API-key, local-mode, or already-detected SSO) session skips the check entirely
+    // A share-page visit (docs/SHARING.md) needs no key/session at all --
+    // `SharePage` reads straight from the token via `useShareSource`. Skip
+    // the info/SSO probe entirely so a public share viewer's browser never
+    // makes an authenticated-flavoured request on the hub's behalf.
+    if (session || route.type === 'share') return; // an existing (API-key, local-mode, or already-detected SSO) session skips the check entirely
     let cancelled = false;
 
     // Task ("local mode"): check GET /v1/info first. A hub reporting
@@ -71,9 +80,9 @@ export function App() {
     return () => {
       cancelled = true;
     };
-  }, [session]);
+  }, [session, route.type]);
 
-  const route = useRoute();
+  if (route.type === 'share') return <SharePage token={route.token} />;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -109,6 +118,15 @@ function Explorer({ session, route, onSignOut }: { readonly session: HubSession;
 
   const source = useHubSource({ baseUrl: session.baseUrl, apiKey: session.apiKey, workspace: session.workspace, flow, trace });
   const initialScope = useMemo(() => scopeForRoute(route), [route.type, flow, trace]);
+  const graphRef = useRef<ActivityGraphHandle>(null);
+  const [shareOpen, setShareOpen] = useState(false);
+
+  // The Share button targets exactly the flow/trace named by a deep link
+  // (docs/SHARING.md "Web"): `ActivityExplorer` owns its own flow-picker/
+  // scope state internally and does not expose it, so a specific-enough
+  // target to share is only ever known here from the route itself -- not
+  // from whatever the picker happens to be showing on the root "/ui/" view.
+  const shareTarget: ShareTargetRef | undefined = flow ? { type: 'flow', id: flow } : trace ? { type: 'trace', id: trace } : undefined;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -138,22 +156,54 @@ function Explorer({ session, route, onSignOut }: { readonly session: HubSession;
           </span>
         )}
         {route.type === 'not-found' && <span style={{ color: '#ff6b6b' }}>Unknown route: {route.path}</span>}
-        <button
-          type="button"
-          data-testid="sign-out"
-          onClick={onSignOut}
-          style={{ marginLeft: 'auto', background: 'transparent', color: 'inherit', border: '1px solid #262a3a', borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}
-        >
-          Sign out
-        </button>
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+          {shareTarget && (
+            <button
+              type="button"
+              data-testid="share-button"
+              onClick={() => setShareOpen(true)}
+              style={{ background: 'transparent', color: 'inherit', border: '1px solid #262a3a', borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}
+            >
+              Share
+            </button>
+          )}
+          <button
+            type="button"
+            data-testid="header-download-image"
+            onClick={() => {
+              void graphRef.current?.toImage({ background: '#12141c' }).then((blob) => {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `tracery-${flow ?? trace ?? 'view'}.png`;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                URL.revokeObjectURL(url);
+              });
+            }}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid #262a3a', borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}
+          >
+            Download image
+          </button>
+          <button
+            type="button"
+            data-testid="sign-out"
+            onClick={onSignOut}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid #262a3a', borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}
+          >
+            Sign out
+          </button>
+        </div>
       </header>
       <div style={{ flex: '1 1 auto', minHeight: 0 }}>
         {/* Backstop only (ui-1, ui-2 are fixed at their source): one bad
             event or projection must degrade this panel, not the whole page. */}
         <ExplorerErrorBoundary>
-          <ActivityExplorer source={source} initialScope={initialScope} ariaLabel="Tracery hosted explorer" />
+          <ActivityExplorer source={source} initialScope={initialScope} ariaLabel="Tracery hosted explorer" graphRef={graphRef} />
         </ExplorerErrorBoundary>
       </div>
+      {shareOpen && shareTarget && <ShareDialog session={session} target={shareTarget} graphRef={graphRef} onClose={() => setShareOpen(false)} />}
     </div>
   );
 }

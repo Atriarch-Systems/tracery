@@ -8,11 +8,13 @@ import type { ActivityFrame } from '@atriarch/tracery-core/contract';
 import type { AuthContext } from './auth.js';
 import type { ApiKeyConfig, Config, Role } from './config.js';
 import type { EventStore } from './store/types.js';
+import type { ShareStore } from './store/share-types.js';
 import type { MetricsRegistry } from './metrics.js';
 
 export interface HubContext {
   readonly config: Config;
-  readonly store: EventStore;
+  /** Every store engine implements both (docs/SHARING.md: `ShareStore` is a parallel interface every `EventStore` also implements). */
+  readonly store: EventStore & ShareStore;
   readonly metrics: MetricsRegistry;
   readonly keys: readonly ApiKeyConfig[];
   /**

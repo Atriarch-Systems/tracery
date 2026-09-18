@@ -12,6 +12,7 @@ export type Route =
   | { readonly type: 'root' }
   | { readonly type: 'flow'; readonly id: string }
   | { readonly type: 'trace'; readonly id: string }
+  | { readonly type: 'share'; readonly token: string }
   | { readonly type: 'not-found'; readonly path: string };
 
 /**
@@ -30,9 +31,18 @@ function safeDecode(segment: string): string {
   }
 }
 
-/** Parses a pathname served under the hub's `/ui` mount point into a Route. */
+/**
+ * Parses a pathname served under the hub's `/ui` mount point into a Route --
+ * except `/s/:token` (docs/SHARING.md "Share page"), which `GET /s/:token`
+ * (`routes/share-page.ts`) serves this SAME `index.html` from, outside `/ui`
+ * entirely, so it is matched against the raw pathname first.
+ */
 export function parseRoute(pathname: string): Route {
   const trimmed = pathname.length > 1 ? pathname.replace(/\/+$/, '') : pathname;
+
+  const shareMatch = /^\/s\/([^/]+)$/.exec(trimmed);
+  if (shareMatch) return { type: 'share', token: safeDecode(shareMatch[1]!) };
+
   const rel = trimmed === '/ui' || trimmed === '' ? '' : trimmed.startsWith('/ui/') ? trimmed.slice(3) : trimmed;
 
   if (rel === '' || rel === '/') return { type: 'root' };

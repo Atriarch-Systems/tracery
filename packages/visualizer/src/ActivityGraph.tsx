@@ -7,6 +7,14 @@ import { emptyGraph, reconcile, box, isNodeActive, type RuntimeGraph, type Runti
 import { drawNode, drawLink } from './drawing.js';
 import { drawGroups, groupAlpha } from './groups.js';
 import { detectDoubleClick, emptyDoubleClickState, type DoubleClickState } from './activate.js';
+import { renderCapture, captureToBlob, type CaptureOptions } from './capture.js';
+
+function waitOneFrame(): Promise<void> {
+  return new Promise((resolve) => {
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => resolve());
+    else setTimeout(resolve, 16);
+  });
+}
 
 /** No transports, agent catalogs, invocation reducers, or business data live here. */
 export function ActivityGraph<N = unknown, E = unknown>(props: ActivityGraphProps<N, E>) {
@@ -105,7 +113,20 @@ export function ActivityGraph<N = unknown, E = unknown>(props: ActivityGraphProp
     api.current?.resumeAnimation(); api.current?.zoomToFit(durationMs, 85);
     setInteraction(n => n + 1);
   };
-  useImperativeHandle(apiRef, () => ({ fitView }), [reduced]);
+  const toImage = async (options?: CaptureOptions): Promise<Blob> => {
+    fitView(0);
+    await waitOneFrame();
+    const source = host.current?.querySelector('canvas');
+    if (!source) throw new Error('ActivityGraph.toImage: no canvas to capture (the renderer has not mounted one yet)');
+    const captured = renderCapture(source, (width, height) => {
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      return canvas;
+    }, options);
+    return captureToBlob(captured);
+  };
+  useImperativeHandle(apiRef, () => ({ fitView, toImage }), [reduced]);
   const select = (node: ActivityNode | null) => {
     setLocalSelected(node?.id ?? null);
     onNodeSelect?.(node as ActivityNode<N> | null);

@@ -48,6 +48,7 @@ export function testConfig(overrides: Partial<Config> = {}): Config {
     metricsToken: undefined,
     logLevel: 'silent',
     uiDir,
+    publicUrl: undefined,
     ...overrides,
   };
 }
@@ -66,7 +67,7 @@ export function bearer(key: string): Record<string, string> {
 /** A built UI dist directory with a minimal `index.html`, for the SPA-fallback test. */
 export function makeUiDir(): string {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tracery-hub-test-ui-'));
-  fs.writeFileSync(path.join(dir, 'index.html'), '<!doctype html><html><body>ui-shell</body></html>');
+  fs.writeFileSync(path.join(dir, 'index.html'), '<!doctype html><html><head><title>Tracery</title></head><body>ui-shell</body></html>');
   fs.writeFileSync(path.join(dir, 'app.js'), 'console.log("ui");');
   return dir;
 }

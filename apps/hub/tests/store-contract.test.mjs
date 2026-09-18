@@ -12,10 +12,12 @@ import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { storeEngines } from './helpers.mjs';
 import { registerStoreContractSuite, startEvt, endEvt } from './store-contract-suite.mjs';
+import { registerShareStoreContractSuite } from './share-store-contract-suite.mjs';
 import { SqliteStore } from '../dist/store/sqlite.js';
 
 for (const { name, create } of storeEngines) {
   registerStoreContractSuite(name, create);
+  registerShareStoreContractSuite(name, create);
 }
 
 // hub-6: SqliteStore-only -- the eviction floor must survive a restart (a

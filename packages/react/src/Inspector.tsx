@@ -6,6 +6,7 @@
  */
 import type { ActivityNode, NodeData, OpRecord, TimelineEntry } from '@atriarch/tracery-core';
 import { styles } from './style.js';
+import { isRedactedContext } from './redacted.js';
 
 export type InspectorSelection = ActivityNode<NodeData>;
 
@@ -51,7 +52,15 @@ function OpCard({ op }: { op: OpRecord }) {
           ))}
         </div>
       )}
-      {Object.keys(op.context).length > 0 && (
+      {Object.keys(op.context).length > 0 && isRedactedContext(op.context) && (
+        <details data-testid="inspector-op-context" data-redacted="true" open>
+          <summary>Context</summary>
+          <p style={styles.muted} data-testid="context-redacted-notice">
+            Context hidden by the sharer{op.context.keys.length > 0 ? ` (keys: ${op.context.keys.join(', ')})` : ''}.
+          </p>
+        </details>
+      )}
+      {Object.keys(op.context).length > 0 && !isRedactedContext(op.context) && (
         <details data-testid="inspector-op-context" open>
           <summary>Context</summary>
           <pre style={styles.pre}>{JSON.stringify(op.context, null, 2)}</pre>

@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tracery — offline export</title>
+    <style>
+      html, body, #root { height: 100%; margin: 0; }
+      body { background: #12141c; }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <!-- Replaced verbatim by the hub's export routes
+         (apps/hub/src/routes/export.ts, docs/SHARING.md "HTML export") with
+         { meta, events } for the exported flow/trace. Left empty here so
+         `npm run dev`/a raw `vite preview` of this file still renders
+         something sane instead of throwing. -->
+    <script id="tracery-data" type="application/json">{"meta":null,"events":[]}</script>
+    <script type="module" src="/src/viewer-main.tsx"></script>
+  </body>
+</html>

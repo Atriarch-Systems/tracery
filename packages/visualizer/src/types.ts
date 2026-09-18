@@ -1,4 +1,5 @@
 import type { CSSProperties, Ref } from 'react';
+import type { CaptureOptions } from './capture.js';
 
 /** Presentation contract version, independent of agent transports. */
 export const VISUALIZER_CONTRACT_VERSION = 2 as const;
@@ -67,7 +68,19 @@ export interface ActivityGroup {
   /** Renders the hull and its member nodes at 45% alpha. */
   readonly dimmed?: boolean;
 }
-export interface ActivityGraphHandle { fitView(durationMs?: number): void }
+export interface ActivityGraphHandle {
+  fitView(durationMs?: number): void;
+  /**
+   * Renders the current view to a PNG `Blob` (docs/SHARING.md "Image
+   * export"): fits the graph, waits a frame, then captures the live canvas
+   * onto an offscreen one at `options.scale` (default 2), optionally over an
+   * `options.background` fill (the live canvas itself is transparent) and
+   * with a small "Tracery" mark in the accent colour (`options.mark`,
+   * default `true`). Rejects if the renderer hasn't mounted a canvas yet
+   * (nothing to capture) or the browser has no offscreen 2D canvas support.
+   */
+  toImage(options?: CaptureOptions): Promise<Blob>;
+}
 export interface ActivityGraphProps<NodeData = unknown, EdgeData = unknown> {
   readonly nodes: readonly ActivityNode<NodeData>[];
   readonly edges: readonly ActivityEdge<EdgeData>[];

@@ -59,6 +59,16 @@ export interface Config {
   readonly logLevel: string;
   readonly uiDir: string;
   /**
+   * Absolute origin (scheme + host, no trailing slash) used to build a share
+   * link's `url` and its `GET /s/:token` OG tags (docs/SHARING.md
+   * "TRACERY_PUBLIC_URL"). `undefined` means "use the inbound request's own
+   * origin" -- fine behind a single reverse proxy that already sets
+   * `Host`/`X-Forwarded-*` correctly, but set this explicitly whenever the
+   * hub is reachable at a different public hostname than requests arrive on
+   * (e.g. behind a CDN or a path-rewriting gateway).
+   */
+  readonly publicUrl: string | undefined;
+  /**
    * Fastify request body size cap, in bytes (hub-4). No env var: it always
    * defaults to `ACTIVITY_LIMITS.maxEventsPerBatch * ACTIVITY_LIMITS.maxEventBytes`
    * in `server.ts` so a spec-legal max-size batch is never rejected by
@@ -263,5 +273,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     metricsToken: env.TRACERY_METRICS_TOKEN && env.TRACERY_METRICS_TOKEN.length > 0 ? env.TRACERY_METRICS_TOKEN : undefined,
     logLevel: env.TRACERY_LOG_LEVEL ?? 'info',
     uiDir: env.TRACERY_UI_DIR ?? defaultUiDir(),
+    publicUrl: env.TRACERY_PUBLIC_URL && env.TRACERY_PUBLIC_URL.trim().length > 0 ? env.TRACERY_PUBLIC_URL.trim().replace(/\/+$/, '') : undefined,
   };
 }

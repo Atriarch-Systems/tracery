@@ -31,6 +31,7 @@ other setting below has a default, so this works entirely out of the box.
 | `TRACERY_METRICS_TOKEN` | unset | When set, `GET /metrics` requires it (`?token=`, `x-metrics-token`, or `Authorization: Bearer`). Unset means `/metrics` is public. |
 | `TRACERY_LOG_LEVEL` | `info` | Pino log level (`fatal`..`trace`, or `silent`). |
 | `TRACERY_UI_DIR` | `<package>/web/dist` | Directory to serve at `/ui`. When it (or its `index.html`) is missing, `/ui` serves a plain "not built" page instead. |
+| `TRACERY_PUBLIC_URL` | unset | Absolute origin (scheme + host) used to build a share link's `url` and its `GET /s/:token` Open Graph tags (`docs/SHARING.md`). Unset means "use the inbound request's own origin" -- set this explicitly whenever the hub is reachable at a different public hostname than requests arrive on (behind a CDN, a path-rewriting gateway, etc.). |
 
 ### Auth mode
 
@@ -130,11 +131,23 @@ spec at `GET /v1/openapi.json` (OpenAPI 3.1). Errors are always
 | `GET` | `/v1/traces/:id/events` | `read` | Every event for every flow in the trace, cursor-ordered. |
 | `GET` | `/v1/workspaces` | `admin` | Workspace stats. A non-operator admin key only ever sees its own workspace. |
 | `DELETE` | `/v1/flows/:id` | `admin` | Deletes a flow and its events. `404` when unknown. |
+| `POST` | `/v1/shares` | `read` | Create a share link (`docs/SHARING.md`). Body: `{ target: { type: "flow"\|"trace", id }, mode?, includeContext?, expiresInDays? }`. Returns `{ id, token, url }`. |
+| `GET` | `/v1/shares` | `read` | List the caller's own shares (or every share in the workspace, for an admin key); tokens are never included. |
+| `DELETE` | `/v1/shares/:id` | `read`, creator or `admin` | Revoke a share. Idempotent; `404` when unknown. |
+| `PUT` | `/v1/shares/:id/preview` | `read`, creator or `admin` | Upload a PNG preview image (raw body, `Content-Type: image/png`, max 2 MB). |
+| `GET` | `/v1/shares/:token/meta`, `/flow`, `/trace`, `/events` | none -- the token is the credential | Public, read-only, redacted-by-default reads through one share. Unknown/expired/revoked tokens all `404` identically. Rate-limited to 60 req/min/IP. |
+| `GET` | `/v1/shares/:token/preview.png` | none | The share's uploaded preview PNG, or `404` if it has none. |
+| `WS` | `/v1/shares/:token/live` | none | Same framing as `WS /v1/live`, scoped to one share's target; only serves a `mode: "live"` share (closes immediately otherwise). |
+| `GET` | `/s/:token` | none | The share page: the hosted UI with Open Graph tags injected for this share, then the SPA's own share-mode view. |
+| `GET` | `/v1/flows/:id/export.html`, `/v1/traces/:id/export.html` | `read` | A single, fully self-contained downloadable `.html` file (no network dependency) rendering the flow/trace offline. `?context=false` redacts. `404` if `apps/hub/web`'s `viewer.html` hasn't been built. |
 | `GET` | `/healthz` | none | Liveness. |
 | `GET` | `/readyz` | none | Readiness (the store answered `stats()`). |
 | `GET` | `/metrics` | none, or `TRACERY_METRICS_TOKEN` | Prometheus text exposition. |
 | `WS` | `/v1/live?workspace=&flow=&trace=&after=&token=` | `read` | Live feed: a `snapshot` frame, then `events` frames as they're ingested, then a `heartbeat` frame every 15s. Reconnect with `after=<cursor>`; a stale cursor gets a fresh `truncated: true` snapshot instead of a gap. A client that can't keep up (2s send deadline) is disconnected. |
 | `GET` | `/`, `/ui/*` | none (the UI does its own key entry) | Hosted explorer, when `apps/hub/web` was built into `TRACERY_UI_DIR`; otherwise a plain placeholder page. |
+
+See [`../../docs/SHARING.md`](../../docs/SHARING.md) for what a share is,
+snapshot vs. live, redaction rules, rate limits, and `TRACERY_PUBLIC_URL`.
 
 `workspace` is resolved from the API key, except for the `*` operator key,
 which must be given one explicitly (`?workspace=` on every read/WS route,

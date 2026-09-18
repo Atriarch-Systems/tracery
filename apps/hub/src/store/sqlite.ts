@@ -52,6 +52,16 @@ import {
   type Unsubscribe,
   type WorkspaceStats,
 } from './types.js';
+import {
+  generateShareId,
+  generateShareToken,
+  type CreateShareInput,
+  type ListSharesQuery,
+  type ShareRecord,
+  type SharePreviewData,
+  type ShareStore,
+  type ShareTargetType,
+} from './share-types.js';
 
 /** Bump when the `flows` table's columns or `data_json` shape change; `load()` rebuilds from events on a mismatch. */
 const FLOWS_SCHEMA_VERSION = 1;
@@ -96,7 +106,44 @@ function escapeLikePattern(input: string): string {
   return input.replace(/[\\%_]/g, (ch) => `\\${ch}`);
 }
 
-export class SqliteStore implements EventStore {
+interface ShareRow {
+  id: string;
+  token: string;
+  workspace: string;
+  target_type: string;
+  target_id: string;
+  mode: string;
+  snapshot_cursor: number | null;
+  include_context: number;
+  created_by: string;
+  created_at: number;
+  expires_at: number | null;
+  revoked_at: number | null;
+  preview_content_type: string | null;
+  preview_bytes: number | null;
+}
+
+function shareRowToRecord(row: ShareRow): ShareRecord {
+  return {
+    id: row.id,
+    token: row.token,
+    workspace: row.workspace,
+    target: { type: row.target_type as ShareTargetType, id: row.target_id },
+    mode: row.mode as ShareRecord['mode'],
+    snapshotCursor: row.snapshot_cursor ?? undefined,
+    includeContext: row.include_context === 1,
+    createdBy: row.created_by,
+    createdAt: row.created_at,
+    expiresAt: row.expires_at,
+    revokedAt: row.revoked_at,
+    preview:
+      row.preview_content_type !== null && row.preview_bytes !== null
+        ? { contentType: 'image/png', bytes: row.preview_bytes }
+        : null,
+  };
+}
+
+export class SqliteStore implements EventStore, ShareStore {
   private readonly workspaces = new Map<string, WorkspaceState>();
   private readonly subscribers = new Set<StoreSubscriber>();
   private cursor = 0;
@@ -106,6 +153,15 @@ export class SqliteStore implements EventStore {
   private readonly upsertFlowStmt;
   private readonly deleteFlowRowStmt;
   private readonly flowSummaryStmt;
+  private readonly insertShareStmt;
+  private readonly shareByTokenStmt;
+  private readonly shareByIdStmt;
+  private readonly revokeShareStmt;
+  private readonly setSharePreviewMetaStmt;
+  private readonly clearSharePreviewMetaStmt;
+  private readonly upsertPreviewBlobStmt;
+  private readonly deletePreviewBlobStmt;
+  private readonly previewBlobStmt;
 
   constructor(filePath: string) {
     const dir = path.dirname(filePath);
@@ -182,6 +238,36 @@ export class SqliteStore implements EventStore {
       );
     `);
 
+    // Share links (docs/SHARING.md). Not part of the flows/events reduction --
+    // a plain CRUD table, no in-memory index or rebuild-on-boot needed.
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS shares (
+        id TEXT PRIMARY KEY,
+        token TEXT NOT NULL UNIQUE,
+        workspace TEXT NOT NULL,
+        target_type TEXT NOT NULL,
+        target_id TEXT NOT NULL,
+        mode TEXT NOT NULL,
+        snapshot_cursor INTEGER,
+        include_context INTEGER NOT NULL,
+        created_by TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        expires_at INTEGER,
+        revoked_at INTEGER,
+        preview_content_type TEXT,
+        preview_bytes INTEGER
+      );
+    `);
+    this.db.exec('CREATE INDEX IF NOT EXISTS idx_shares_workspace ON shares(workspace);');
+    this.db.exec('CREATE INDEX IF NOT EXISTS idx_shares_workspace_created_by ON shares(workspace, created_by);');
+
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS share_previews (
+        id TEXT PRIMARY KEY,
+        data BLOB NOT NULL
+      );
+    `);
+
     this.insertEventStmt = this.db.prepare('INSERT INTO events (cursor, workspace, id, flow, json) VALUES (?, ?, ?, ?, ?)');
     this.upsertFlowStmt = this.db.prepare(`
       INSERT INTO flows (workspace, id, trace, label, actor_id, actor_kind, status, partial, started_at, ended_at, first_cursor, last_cursor, tags_json, root_node, data_json)
@@ -194,6 +280,21 @@ export class SqliteStore implements EventStore {
     `);
     this.deleteFlowRowStmt = this.db.prepare('DELETE FROM flows WHERE workspace = ? AND id = ?');
     this.flowSummaryStmt = this.db.prepare('SELECT data_json FROM flows WHERE workspace = ? AND id = ?');
+
+    this.insertShareStmt = this.db.prepare(`
+      INSERT INTO shares (id, token, workspace, target_type, target_id, mode, snapshot_cursor, include_context, created_by, created_at, expires_at, revoked_at, preview_content_type, preview_bytes)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    this.shareByTokenStmt = this.db.prepare('SELECT * FROM shares WHERE token = ?');
+    this.shareByIdStmt = this.db.prepare('SELECT * FROM shares WHERE workspace = ? AND id = ?');
+    this.revokeShareStmt = this.db.prepare('UPDATE shares SET revoked_at = ? WHERE workspace = ? AND id = ? AND revoked_at IS NULL');
+    this.setSharePreviewMetaStmt = this.db.prepare('UPDATE shares SET preview_content_type = ?, preview_bytes = ? WHERE workspace = ? AND id = ?');
+    this.clearSharePreviewMetaStmt = this.db.prepare('UPDATE shares SET preview_content_type = NULL, preview_bytes = NULL WHERE workspace = ? AND id = ?');
+    this.upsertPreviewBlobStmt = this.db.prepare(
+      'INSERT INTO share_previews (id, data) VALUES (?, ?) ON CONFLICT(id) DO UPDATE SET data = excluded.data',
+    );
+    this.deletePreviewBlobStmt = this.db.prepare('DELETE FROM share_previews WHERE id = ?');
+    this.previewBlobStmt = this.db.prepare('SELECT data FROM share_previews WHERE id = ?');
 
     this.load(needsFlowsRebuild);
   }
@@ -554,5 +655,91 @@ export class SqliteStore implements EventStore {
   async close(): Promise<void> {
     this.subscribers.clear();
     this.db.close();
+  }
+
+  // ---------------------------------------------------------------------
+  // ShareStore (docs/SHARING.md)
+  // ---------------------------------------------------------------------
+
+  async createShare(input: CreateShareInput): Promise<ShareRecord> {
+    const record: ShareRecord = {
+      id: generateShareId(),
+      token: generateShareToken(),
+      workspace: input.workspace,
+      target: input.target,
+      mode: input.mode,
+      snapshotCursor: input.snapshotCursor,
+      includeContext: input.includeContext,
+      createdBy: input.createdBy,
+      createdAt: Date.now(),
+      expiresAt: input.expiresAt,
+      revokedAt: null,
+      preview: null,
+    };
+    this.insertShareStmt.run(
+      record.id,
+      record.token,
+      record.workspace,
+      record.target.type,
+      record.target.id,
+      record.mode,
+      record.snapshotCursor ?? null,
+      record.includeContext ? 1 : 0,
+      record.createdBy,
+      record.createdAt,
+      record.expiresAt,
+      record.revokedAt,
+      null,
+      null,
+    );
+    return record;
+  }
+
+  async getShareByToken(token: string): Promise<ShareRecord | undefined> {
+    const row = this.shareByTokenStmt.get(token) as unknown as ShareRow | undefined;
+    return row ? shareRowToRecord(row) : undefined;
+  }
+
+  async getShareById(workspace: string, id: string): Promise<ShareRecord | undefined> {
+    const row = this.shareByIdStmt.get(workspace, id) as unknown as ShareRow | undefined;
+    return row ? shareRowToRecord(row) : undefined;
+  }
+
+  async listShares(workspace: string, query: ListSharesQuery = {}): Promise<readonly ShareRecord[]> {
+    const rows =
+      query.createdBy !== undefined
+        ? (this.db
+            .prepare('SELECT * FROM shares WHERE workspace = ? AND created_by = ? ORDER BY created_at DESC')
+            .all(workspace, query.createdBy) as unknown as ShareRow[])
+        : (this.db.prepare('SELECT * FROM shares WHERE workspace = ? ORDER BY created_at DESC').all(workspace) as unknown as ShareRow[]);
+    return rows.map(shareRowToRecord);
+  }
+
+  async revokeShare(workspace: string, id: string, revokedAt: number): Promise<boolean> {
+    const existing = this.shareByIdStmt.get(workspace, id) as unknown as ShareRow | undefined;
+    if (!existing) return false;
+    this.revokeShareStmt.run(revokedAt, workspace, id); // no-op (0 rows) if already revoked -- idempotent by design
+    return true;
+  }
+
+  async setSharePreview(workspace: string, id: string, preview: SharePreviewData | null): Promise<boolean> {
+    const existing = this.shareByIdStmt.get(workspace, id) as unknown as ShareRow | undefined;
+    if (!existing) return false;
+    if (preview === null) {
+      this.clearSharePreviewMetaStmt.run(workspace, id);
+      this.deletePreviewBlobStmt.run(id);
+    } else {
+      this.setSharePreviewMetaStmt.run(preview.contentType, preview.data.byteLength, workspace, id);
+      this.upsertPreviewBlobStmt.run(id, Buffer.from(preview.data));
+    }
+    return true;
+  }
+
+  async getSharePreview(workspace: string, id: string): Promise<SharePreviewData | undefined> {
+    const share = this.shareByIdStmt.get(workspace, id) as unknown as ShareRow | undefined;
+    if (!share || share.preview_content_type === null) return undefined;
+    const row = this.previewBlobStmt.get(id) as unknown as { data: Uint8Array } | undefined;
+    if (!row) return undefined;
+    return { contentType: 'image/png', data: new Uint8Array(row.data) };
   }
 }

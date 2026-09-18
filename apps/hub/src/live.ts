@@ -14,8 +14,8 @@ import type { MetricsRegistry } from './metrics.js';
 import type { HubExtensions } from './server-context.js';
 import { InvalidQueryError, parseCursor } from './routes/query.js';
 
-const HEARTBEAT_MS = 15_000;
-const SEND_DEADLINE_MS = 2_000;
+export const HEARTBEAT_MS = 15_000;
+export const SEND_DEADLINE_MS = 2_000;
 
 export interface LiveDeps {
   readonly store: EventStore;
@@ -35,8 +35,29 @@ interface LiveQuery {
   readonly token?: string;
 }
 
+export interface LiveFilter {
+  readonly flow?: string;
+  readonly trace?: string;
+}
+
+export interface AttachLiveSocketDeps {
+  readonly store: EventStore;
+  readonly metrics: MetricsRegistry;
+  readonly extensions?: HubExtensions;
+  /**
+   * Applied to every frame before `extensions.onLiveFrame`, and before the
+   * send-deadline write. `routes/shares.ts`'s `WS /v1/shares/:token/live`
+   * uses this to redact context on a share whose `includeContext` is
+   * `false` (docs/SHARING.md) -- the one thing that route needs which
+   * `WS /v1/live` (an authenticated, non-shared connection) never does, so
+   * `registerLive` below simply never sets it. Returning `null` drops the
+   * frame, same as an extension's `onLiveFrame`.
+   */
+  readonly transformFrame?: (frame: ActivityFrame) => ActivityFrame | null;
+}
+
 /** Sends a frame; if the client hasn't acked within `SEND_DEADLINE_MS` it is treated as slow and dropped. */
-function sendWithDeadline(socket: WebSocket, frame: ActivityFrame, onSlow: () => void): void {
+export function sendWithDeadline(socket: WebSocket, frame: ActivityFrame, onSlow: () => void): void {
   let settled = false;
   const timer = setTimeout(() => {
     if (settled) return;
@@ -57,6 +78,99 @@ function sendWithDeadline(socket: WebSocket, frame: ActivityFrame, onSlow: () =>
       onSlow();
     }
   }
+}
+
+/**
+ * Everything that happens once a `WS /v1/live`-shaped connection has an
+ * `AuthContext` and a `LiveFilter` in hand: initial frame, fan-out from
+ * `store.subscribe`, heartbeat, slow-client drop, cleanup. `registerLive`
+ * (below) is `WS /v1/live`'s own auth-from-headers-or-query wrapper around
+ * this; `routes/shares.ts`'s `WS /v1/shares/:token/live` (docs/SHARING.md)
+ * is the other -- it resolves `auth`/`filter` from a share token instead of
+ * an API key, then calls this directly so the two paths can never drift
+ * apart on frame delivery, heartbeats or the send-deadline drop rule.
+ */
+export function attachLiveSocket(
+  socket: WebSocket,
+  request: FastifyRequest,
+  deps: AttachLiveSocketDeps,
+  auth: AuthContext,
+  filter: LiveFilter,
+  initialAfter: number | undefined,
+): void {
+  deps.metrics.wsClientConnected();
+  let closed = false;
+
+  const frameFor = async (after: number | undefined): Promise<ActivityFrame> => {
+    if (filter.trace) return deps.store.traceFrame(auth.workspace, filter.trace, after);
+    if (filter.flow) return deps.store.flowEvents(auth.workspace, filter.flow, after);
+    return deps.store.workspaceFrame(auth.workspace, after);
+  };
+
+  const drop = (): void => {
+    if (closed) return;
+    closed = true;
+    request.log.warn({ keyId: auth.keyId }, 'tracery live: slow client dropped after 2s send deadline');
+    socket.terminate();
+  };
+
+  const send = (frame: ActivityFrame): void => {
+    if (closed || socket.readyState !== socket.OPEN) return;
+    const transformed = deps.transformFrame ? deps.transformFrame(frame) : frame;
+    if (transformed === null) return; // e.g. redacted-context share frame that ended up empty
+    const filtered = deps.extensions?.onLiveFrame ? deps.extensions.onLiveFrame({ auth, frame: transformed }) : transformed;
+    if (filtered === null) return; // dropped by an extension (e.g. rbac scope filtering)
+    sendWithDeadline(socket, filtered, drop);
+  };
+
+  // hub-9: a store failure here must close this one connection, not crash the
+  // process -- these `void promise.then(...)` calls had no `.catch` at all, so a
+  // rejection (e.g. sqlite hitting SQLITE_BUSY) was an unhandled rejection under
+  // Node's default `--unhandled-rejections=throw`.
+  const onStoreError = (err: unknown): void => {
+    request.log.error({ err, keyId: auth.keyId }, 'tracery live: store call failed');
+    if (!closed) {
+      closed = true;
+      socket.close(1011, 'internal error');
+    }
+  };
+
+  void frameFor(initialAfter).then(send).catch(onStoreError);
+
+  const belongsToFilter = async (event: StoredEvent): Promise<boolean> => {
+    if (event.workspace !== auth.workspace) return false;
+    if (filter.flow) return event.flow === filter.flow;
+    if (filter.trace) {
+      const summary = await deps.store.flowSummary(auth.workspace, event.flow);
+      return summary?.trace === filter.trace;
+    }
+    return true;
+  };
+
+  const unsubscribe = deps.store.subscribe((event) => {
+    void belongsToFilter(event)
+      .then((matches) => {
+        if (matches) send({ type: 'events', cursor: event.cursor, events: [event] });
+      })
+      .catch(onStoreError);
+  });
+
+  const heartbeat = setInterval(() => {
+    void frameFor(undefined)
+      .then((current) => send({ type: 'heartbeat', cursor: current.cursor }))
+      .catch(onStoreError);
+  }, HEARTBEAT_MS);
+  heartbeat.unref?.();
+
+  const cleanup = (): void => {
+    closed = true;
+    clearInterval(heartbeat);
+    unsubscribe();
+    deps.metrics.wsClientDisconnected();
+  };
+
+  socket.on('close', cleanup);
+  socket.on('error', cleanup);
 }
 
 export function registerLive(app: FastifyInstance, deps: LiveDeps): void {
@@ -89,78 +203,7 @@ export function registerLive(app: FastifyInstance, deps: LiveDeps): void {
       socket.close(4400, message);
       return;
     }
-    const filter = { flow: query.flow, trace: query.trace };
 
-    deps.metrics.wsClientConnected();
-    let closed = false;
-
-    const frameFor = async (after: number | undefined): Promise<ActivityFrame> => {
-      if (filter.trace) return deps.store.traceFrame(auth.workspace, filter.trace, after);
-      if (filter.flow) return deps.store.flowEvents(auth.workspace, filter.flow, after);
-      return deps.store.workspaceFrame(auth.workspace, after);
-    };
-
-    const drop = (): void => {
-      if (closed) return;
-      closed = true;
-      request.log.warn({ keyId: auth.keyId }, 'tracery live: slow client dropped after 2s send deadline');
-      socket.terminate();
-    };
-
-    const send = (frame: ActivityFrame): void => {
-      if (closed || socket.readyState !== socket.OPEN) return;
-      const filtered = deps.extensions?.onLiveFrame ? deps.extensions.onLiveFrame({ auth, frame }) : frame;
-      if (filtered === null) return; // dropped by an extension (e.g. rbac scope filtering)
-      sendWithDeadline(socket, filtered, drop);
-    };
-
-    // hub-9: a store failure here must close this one connection, not crash the
-    // process -- these `void promise.then(...)` calls had no `.catch` at all, so a
-    // rejection (e.g. sqlite hitting SQLITE_BUSY) was an unhandled rejection under
-    // Node's default `--unhandled-rejections=throw`.
-    const onStoreError = (err: unknown): void => {
-      request.log.error({ err, keyId: auth.keyId }, 'tracery live: store call failed');
-      if (!closed) {
-        closed = true;
-        socket.close(1011, 'internal error');
-      }
-    };
-
-    void frameFor(initialAfter).then(send).catch(onStoreError);
-
-    const belongsToFilter = async (event: StoredEvent): Promise<boolean> => {
-      if (event.workspace !== auth.workspace) return false;
-      if (filter.flow) return event.flow === filter.flow;
-      if (filter.trace) {
-        const summary = await deps.store.flowSummary(auth.workspace, event.flow);
-        return summary?.trace === filter.trace;
-      }
-      return true;
-    };
-
-    const unsubscribe = deps.store.subscribe((event) => {
-      void belongsToFilter(event)
-        .then((matches) => {
-          if (matches) send({ type: 'events', cursor: event.cursor, events: [event] });
-        })
-        .catch(onStoreError);
-    });
-
-    const heartbeat = setInterval(() => {
-      void frameFor(undefined)
-        .then((current) => send({ type: 'heartbeat', cursor: current.cursor }))
-        .catch(onStoreError);
-    }, HEARTBEAT_MS);
-    heartbeat.unref?.();
-
-    const cleanup = (): void => {
-      closed = true;
-      clearInterval(heartbeat);
-      unsubscribe();
-      deps.metrics.wsClientDisconnected();
-    };
-
-    socket.on('close', cleanup);
-    socket.on('error', cleanup);
+    attachLiveSocket(socket, request, deps, auth, { flow: query.flow, trace: query.trace }, initialAfter);
   });
 }

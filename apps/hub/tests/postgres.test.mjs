@@ -15,6 +15,7 @@ import { spawnSync } from 'node:child_process';
 import net from 'node:net';
 import pg from 'pg';
 import { registerStoreContractSuite, startEvt, endEvt } from './store-contract-suite.mjs';
+import { registerShareStoreContractSuite } from './share-store-contract-suite.mjs';
 import { PostgresStore } from '../dist/store/postgres.js';
 
 function dockerAvailable() {
@@ -101,7 +102,7 @@ if (!dockerAvailable()) {
     if (containerStarted) spawnSync('docker', ['rm', '-f', containerName], { stdio: 'ignore' });
   });
 
-  registerStoreContractSuite('PostgresStore', async () => {
+  const engineCreate = async () => {
     schemaCounter += 1;
     const schema = nextSchemaName(schemaCounter);
     const store = await PostgresStore.connect(url, { schema });
@@ -112,7 +113,10 @@ if (!dockerAvailable()) {
         await dropSchema(url, schema);
       },
     };
-  });
+  };
+
+  registerStoreContractSuite('PostgresStore', engineCreate);
+  registerShareStoreContractSuite('PostgresStore', engineCreate);
 
   // Postgres-specific coverage mirroring SqliteStore's own persistence/rebuild tests.
 

@@ -13,16 +13,27 @@
  *     the legend.
  *   - docs/images/embedded.png  -- the examples/embedded app (`vite
  *     preview`, screenshotted ~10s in so the scripted agent has animated).
+ *   - docs/images/share.png    -- a share page (docs/SHARING.md), captured
+ *     against a throwaway hub this script spawns and kills itself (its own
+ *     random port, `apps/hub/bin/hub.mjs`) -- deliberately independent of
+ *     `TRACERY_HUB_URL`/the `tracery-demo` container the other captures use,
+ *     since this one creates and revokes a share and must never touch
+ *     shared/production state.
  *
- * Usage: `node scripts/capture-screens.mjs`
+ * Usage: `node scripts/capture-screens.mjs` (all captures), or
+ * `CAPTURE_ONLY=share node scripts/capture-screens.mjs` for just the share
+ * screenshot (the only one that needs no already-running hub at all).
  * Env: TRACERY_HUB_URL (default http://127.0.0.1:8971), TRACERY_API_KEY
- * (default the demo hub's dev key, tdk_a7f3c9e2b1d4).
+ * (default the demo hub's dev key, tdk_a7f3c9e2b1d4); CAPTURE_ONLY
+ * (comma-separated subset of `hub`, `embedded`, `share`; default `all`).
  */
 import { chromium } from '@playwright/test';
 import { spawn, execFileSync } from 'node:child_process';
-import { mkdirSync } from 'node:fs';
+import { createServer as createNetServer } from 'node:net';
+import { mkdirSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { ACTIVITY_CONTRACT_VERSION } from '@atriarch/tracery-core/contract';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -134,6 +145,146 @@ async function captureEmbeddedScreen() {
   }
 }
 
-await captureHubScreens();
-await captureEmbeddedScreen();
+async function freePort() {
+  return new Promise((resolve, reject) => {
+    const srv = createNetServer();
+    srv.listen(0, '127.0.0.1', () => {
+      const port = srv.address().port;
+      srv.close((err) => (err ? reject(err) : resolve(port)));
+    });
+    srv.on('error', reject);
+  });
+}
+
+async function captureShareScreen() {
+  const hubBin = path.join(REPO_ROOT, 'apps', 'hub', 'bin', 'hub.mjs');
+  if (!existsSync(hubBin) || !existsSync(path.join(REPO_ROOT, 'apps', 'hub', 'dist'))) {
+    console.warn('[capture-screens] apps/hub is not built (no dist/ or bin/hub.mjs); skipping share.png');
+    return;
+  }
+
+  const port = await freePort();
+  const shareHubUrl = `http://127.0.0.1:${port}`;
+  const shareApiKey = 'capture-screens-share-key';
+  const hub = spawn(process.execPath, [hubBin], {
+    cwd: path.join(REPO_ROOT, 'apps', 'hub'),
+    env: {
+      ...process.env,
+      TRACERY_PORT: String(port),
+      TRACERY_API_KEYS: JSON.stringify([{ id: 'capture', key: shareApiKey, workspace: 'default', roles: ['ingest', 'read', 'admin'] }]),
+      TRACERY_LOG_LEVEL: 'silent',
+    },
+    stdio: 'pipe',
+  });
+
+  try {
+    await waitForHealthy(`${shareHubUrl}/healthz`);
+
+    const now = Date.now();
+    const seed = await fetch(`${shareHubUrl}/v1/events`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${shareApiKey}` },
+      body: JSON.stringify({
+        v: ACTIVITY_CONTRACT_VERSION,
+        workspace: 'default',
+        events: [
+          {
+            v: ACTIVITY_CONTRACT_VERSION,
+            id: 'share-shot-e1',
+            ts: now,
+            flow: 'triage-cve-2026-1234',
+            op: 'plan',
+            node: 'agent:saga',
+            type: 'start',
+            name: 'plan.investigation',
+            kind: 'agent',
+            label: 'Triage CVE-2026-1234',
+            root: true,
+            status: 'success',
+            context: { severity: 'high', cve: 'CVE-2026-1234' },
+          },
+          {
+            v: ACTIVITY_CONTRACT_VERSION,
+            id: 'share-shot-e2',
+            ts: now + 5,
+            flow: 'triage-cve-2026-1234',
+            op: 'search',
+            node: 'tool:search',
+            type: 'start',
+            name: 'tool.call',
+            kind: 'tool',
+            label: 'Search advisories',
+            parentOp: 'plan',
+            parentNode: 'agent:saga',
+            status: 'success',
+          },
+          {
+            v: ACTIVITY_CONTRACT_VERSION,
+            id: 'share-shot-e3',
+            ts: now + 40,
+            flow: 'triage-cve-2026-1234',
+            op: 'search',
+            node: 'tool:search',
+            type: 'end',
+            name: 'tool.call',
+            status: 'success',
+          },
+          {
+            v: ACTIVITY_CONTRACT_VERSION,
+            id: 'share-shot-e4',
+            ts: now + 45,
+            flow: 'triage-cve-2026-1234',
+            op: 'plan',
+            node: 'agent:saga',
+            type: 'end',
+            name: 'plan.investigation',
+            status: 'success',
+          },
+        ],
+      }),
+    });
+    if (!seed.ok) throw new Error(`seeding the share screenshot fixture failed: ${seed.status} ${await seed.text()}`);
+
+    const createRes = await fetch(`${shareHubUrl}/v1/shares`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${shareApiKey}` },
+      body: JSON.stringify({ target: { type: 'flow', id: 'triage-cve-2026-1234' }, mode: 'snapshot', includeContext: false }),
+    });
+    if (!createRes.ok) throw new Error(`creating the demo share failed: ${createRes.status} ${await createRes.text()}`);
+    const share = await createRes.json();
+
+    const browser = await chromium.launch();
+    const page = await (await browser.newContext({ viewport: VIEWPORT })).newPage();
+    await page.goto(share.url);
+    await page.getByTestId('node-item').first().waitFor();
+    await page.getByTestId('node-item').first().click();
+    await page.getByTestId('context-redacted-notice').waitFor();
+    await page.waitForTimeout(300); // let the graph settle after the click
+
+    const sharePath = path.join(IMAGES_DIR, 'share.png');
+    await page.screenshot({ path: sharePath });
+    console.log(`[capture-screens] wrote ${sharePath}`);
+    await browser.close();
+  } finally {
+    if (process.platform === 'win32' && hub.pid) {
+      try {
+        execFileSync('taskkill', ['/pid', String(hub.pid), '/T', '/F'], { stdio: 'ignore' });
+      } catch {
+        // already exited -- fine
+      }
+    } else {
+      hub.kill();
+    }
+  }
+}
+
+// CAPTURE_ONLY lets a caller run a subset -- in particular `share`, which
+// spawns its own throwaway hub and never touches `TRACERY_HUB_URL`/the
+// `tracery-demo` container the other two captures require already running.
+const only = (process.env.CAPTURE_ONLY || 'all').split(',').map((s) => s.trim());
+const wants = (name) => only.includes('all') || only.includes(name);
+
+if (wants('hub')) await captureHubScreens();
+if (wants('embedded')) await captureEmbeddedScreen();
+if (wants('share')) await captureShareScreen();
 console.log('[capture-screens] done');
