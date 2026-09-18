@@ -12,7 +12,7 @@
  * card, reachable by keyboard and by automated testing without canvas hit
  * testing (`data-testid="node-item"`).
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityGraph, placeBranches } from '@atriarch/tracery-visualizer';
 import type { ActivityGraphHandle } from '@atriarch/tracery-visualizer';
 import type { ActivityNode, NodeData, NodePresentation, NodeRecord, Flow, Scope } from '@atriarch/tracery-core';
@@ -155,6 +155,35 @@ export function ActivityExplorer(props: ActivityExplorerProps) {
     [guided.nodes, selectedNodeId],
   );
 
+  // Merges this component's own handle onto `graph` with whatever `apiRef`
+  // a host page passed in (e.g. App.tsx's "Download image" button), so both
+  // can call the same `ActivityGraph` instance's `fitView`/`toImage`.
+  const internalGraphRef = useRef<ActivityGraphHandle | null>(null);
+  const setGraphHandle = useCallback(
+    (instance: ActivityGraphHandle | null) => {
+      internalGraphRef.current = instance;
+      if (typeof graphRef === 'function') graphRef(instance);
+      else if (graphRef) (graphRef as { current: ActivityGraphHandle | null }).current = instance;
+    },
+    [graphRef],
+  );
+
+  // First-load framing (task: the graph used to load small and centred in a
+  // large empty canvas): once the first projection with any nodes arrives,
+  // fit the view exactly once -- never again on later updates, so panning/
+  // zooming the user has already done is never yanked out from under them
+  // when a flow streams in more nodes. `ActivityGraph` lazy-loads its canvas
+  // renderer (`react-force-graph-2d`), so the very first attempt can land
+  // before `fitView` has anything to act on yet; a couple of cheap, short
+  // retries cover that race without turning this into a recurring re-fit.
+  const firstFitRequested = useRef(false);
+  useEffect(() => {
+    if (firstFitRequested.current || !hasScope || guided.nodes.length === 0) return;
+    firstFitRequested.current = true;
+    const timers = [0, 200, 600].map((delay) => setTimeout(() => internalGraphRef.current?.fitView(), delay));
+    return () => timers.forEach((timer) => clearTimeout(timer));
+  }, [hasScope, guided.nodes.length]);
+
   const pickFlow = (id: string): void => {
     setFollowLatest(false);
     setActiveFlow(id);
@@ -277,25 +306,27 @@ export function ActivityExplorer(props: ActivityExplorerProps) {
         )}
 
         <div style={styles.graphArea}>
-          {hasScope ? (
-            <ActivityGraph
-              nodes={guided.nodes}
-              edges={projection.edges}
-              groups={projection.groups.map((g) => ({ id: g.id, label: g.label, dimmed: g.flow !== activeFlow }))}
-              layoutMode="guided"
-              layoutKey={scope ? (scope.mode === 'trace' ? `trace:${scope.trace}` : `${scope.mode}:${scope.flow}`) : 'none'}
-              selectedNodeId={selectedNodeId}
-              onNodeSelect={(node) => setSelectedNodeId(node?.id ?? null)}
-              onNodeActivate={(node) => activate(node as ActivityNode<NodeData>)}
-              ariaLabel={ariaLabel}
-              apiRef={graphRef}
-            />
-          ) : (
-            <div style={{ ...styles.muted, padding: 16 }}>No flow selected.</div>
-          )}
+          <div style={styles.graphCanvas}>
+            {hasScope ? (
+              <ActivityGraph
+                nodes={guided.nodes}
+                edges={projection.edges}
+                groups={projection.groups.map((g) => ({ id: g.id, label: g.label, dimmed: g.flow !== activeFlow }))}
+                layoutMode="guided"
+                layoutKey={scope ? (scope.mode === 'trace' ? `trace:${scope.trace}` : `${scope.mode}:${scope.flow}`) : 'none'}
+                selectedNodeId={selectedNodeId}
+                onNodeSelect={(node) => setSelectedNodeId(node?.id ?? null)}
+                onNodeActivate={(node) => activate(node as ActivityNode<NodeData>)}
+                ariaLabel={ariaLabel}
+                apiRef={setGraphHandle}
+              />
+            ) : (
+              <div style={{ ...styles.muted, padding: 16 }}>No flow selected.</div>
+            )}
+          </div>
 
           {hasScope && (
-            <div style={{ padding: '0 12px 8px' }}>
+            <div style={styles.nodeList} data-testid="node-list">
               {projection.groups.map((group) => (
                 <details key={group.id} open>
                   <summary style={styles.muted}>{group.label}</summary>

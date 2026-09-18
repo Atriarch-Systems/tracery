@@ -95,6 +95,25 @@ async function seedFlow(): Promise<void> {
   if (!res.ok) throw new Error(`seeding the fixture flow failed: ${res.status} ${await res.text()}`);
 }
 
+/** Creates a share directly against the hub API (bypassing the UI dialog), for tests that only need a link to open. */
+async function createShare(mode: 'snapshot' | 'live', includeContext = true): Promise<{ url: string }> {
+  const res = await fetch(`${BASE_URL}/v1/shares`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${API_KEY}` },
+    body: JSON.stringify({ target: { type: 'flow', id: FLOW_ID }, mode, includeContext }),
+  });
+  if (!res.ok) throw new Error(`creating a ${mode} share failed: ${res.status} ${await res.text()}`);
+  return res.json();
+}
+
+/** Whether two DOMRect-shaped boxes overlap at all (edge-touching does not count as overlap). */
+function boxesIntersect(
+  a: { x: number; y: number; width: number; height: number },
+  b: { x: number; y: number; width: number; height: number },
+): boolean {
+  return a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
+}
+
 async function primeSession(page: Page): Promise<void> {
   await page.addInitScript(
     (session) => window.sessionStorage.setItem('atriarch-tracery-hub-session', JSON.stringify(session)),
@@ -155,7 +174,13 @@ test.describe('sharing', () => {
     await viewerPage.goto(shareUrl);
 
     await expect(viewerPage.getByTestId('share-label')).toHaveText('Share E2E Flow');
-    await expect(viewerPage.getByTestId('header-connection-status')).toHaveText('live', { timeout: 10_000 });
+    // The seeded flow already completed (start+end), so ShareDialog defaults
+    // to a snapshot share -- it never streams once loaded, so the
+    // connection badge (distinct from the "snapshot"/"live" mode badge)
+    // must be gone entirely by now, not just relabeled.
+    await expect(viewerPage.getByTestId('share-mode')).toHaveText('snapshot');
+    await expect(viewerPage.getByTestId('node-item').first()).toBeVisible({ timeout: 10_000 });
+    await expect(viewerPage.getByTestId('header-connection-status')).toHaveCount(0);
     // No flow picker in share mode (docs/SHARING.md "no flow picker").
     await expect(viewerPage.getByTestId('flow-picker')).toHaveCount(0);
     // The read-only footer names Tracery and links back to it.
@@ -181,5 +206,59 @@ test.describe('sharing', () => {
     expect(revokedResponse.status()).toBe(404);
 
     await authedContext.close();
+  });
+
+  // Regression: the accessible node list used to sit in normal document
+  // flow below a full-height canvas, so it (and its highlighted selected
+  // row) spilled out of the explorer's own box and overlapped the page
+  // footer beneath it. It must now stay inside the explorer's own scroll
+  // area at every viewport this checks -- a short desktop height (the
+  // failure mode in docs/images/share.png) and a phone-width viewport.
+  test('the node list stays inside the explorer and never overlaps the page footer', async ({ page }) => {
+    const share = await createShare('live');
+
+    for (const viewport of [
+      { width: 1280, height: 700 },
+      { width: 390, height: 844 },
+    ]) {
+      await page.setViewportSize(viewport);
+      await page.goto(share.url);
+      await expect(page.getByTestId('node-item').first()).toBeVisible();
+
+      const nodeList = await page.getByTestId('node-list').boundingBox();
+      expect(nodeList).not.toBeNull();
+
+      // Both footers stacked at the bottom of the page: the explorer's own
+      // read-only "Shared from Tracery" line, and the hub's static footer.
+      const footers = page.locator('[data-testid="share-footer"], [data-testid="hub-footer"]');
+      const footerCount = await footers.count();
+      expect(footerCount).toBeGreaterThan(0);
+      for (let i = 0; i < footerCount; i += 1) {
+        const footerBox = await footers.nth(i).boundingBox();
+        expect(footerBox).not.toBeNull();
+        if (nodeList && footerBox) expect(boxesIntersect(nodeList, footerBox)).toBe(false);
+      }
+    }
+  });
+
+  // The header shows the share MODE ("snapshot"/"live") and, separately, the
+  // feed CONNECTION state -- they must never read as the same fact twice,
+  // and a snapshot (which never streams once loaded) must not show a
+  // connection badge at all once it has loaded.
+  test('the connection badge is distinct from the mode badge, and disappears once a snapshot has loaded', async ({ page }) => {
+    const liveShare = await createShare('live');
+    await page.goto(liveShare.url);
+    await expect(page.getByTestId('share-mode')).toHaveText('live');
+    await expect(page.getByTestId('header-connection-status')).toHaveText('connected', { timeout: 10_000 });
+    await expect(page.getByTestId('header-connection-status')).toHaveAttribute('title', 'feed connection');
+    await expect(page.locator('body')).not.toContainText('status:');
+
+    const snapshotShare = await createShare('snapshot');
+    await page.goto(snapshotShare.url);
+    await expect(page.getByTestId('share-mode')).toHaveText('snapshot');
+    await expect(page.getByTestId('node-item').first()).toBeVisible();
+    // Nothing streams after a snapshot has loaded -- the connection badge is gone, not just relabeled.
+    await expect(page.getByTestId('header-connection-status')).toHaveCount(0);
+    await expect(page.locator('body')).not.toContainText('status:');
   });
 });

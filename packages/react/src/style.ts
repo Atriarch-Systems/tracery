@@ -106,7 +106,17 @@ export const styles = {
     cursor: 'pointer',
     fontSize: 12,
   }),
-  graphArea: { flex: '1 1 auto', minWidth: 0, position: 'relative' } satisfies CSSProperties,
+  // A flex *column* (not the plain block the canvas host used to sit in
+  // alone): the canvas and the accessible node list below it are now two
+  // separately-sized flex children of a box whose own height is fixed by
+  // `.body`'s layout, so the node list can never grow past this area's
+  // bottom edge and overlap whatever a host page renders below the explorer
+  // (its own footer, e.g. `apps/hub/web/src/Footer.tsx`).
+  graphArea: { flex: '1 1 auto', minWidth: 0, minHeight: 0, position: 'relative', display: 'flex', flexDirection: 'column' } satisfies CSSProperties,
+  graphCanvas: { flex: '1 1 auto', minHeight: 0, position: 'relative' } satisfies CSSProperties,
+  // Capped and internally scrollable so a long node list shrinks the canvas
+  // rather than spilling out of `graphArea`'s bottom edge.
+  nodeList: { flex: '0 1 auto', minHeight: 0, maxHeight: '45%', overflowY: 'auto', padding: '0 12px 8px' } satisfies CSSProperties,
   inspector: {
     width: 320,
     flex: '0 0 auto',

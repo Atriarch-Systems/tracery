@@ -4,9 +4,24 @@
  * `index.html` (with its injected OG tags) loads in the browser. No key
  * entry, no session -- `useShareSource` needs only the token.
  */
-import { ActivityExplorer, useShareSource } from '@atriarch/tracery-react';
+import { ActivityExplorer, useShareSource, type ConnectionStatus } from '@atriarch/tracery-react';
 import { ExplorerErrorBoundary } from './ErrorBoundary.js';
 import { Footer } from './Footer.js';
+
+// The header shows two different things next to each other: the share's
+// MODE ("snapshot"/"live", `data-testid="share-mode"`) and the feed's
+// CONNECTION state (this badge). Both used to render as bare words ("live"
+// for either one), which reads as the same fact stated twice. Renaming the
+// connection badge to describe the connection itself -- and never the
+// stream direction ("live" is a mode, not a connection state) -- keeps the
+// two apart; a "feed connection" tooltip disambiguates further.
+const CONNECTION_LABELS: Record<ConnectionStatus, string> = {
+  connecting: 'connecting',
+  live: 'connected',
+  polling: 'connected',
+  reconnecting: 'reconnecting',
+  offline: 'offline',
+};
 
 export function SharePage({ token }: { readonly token: string }) {
   const source = useShareSource(window.location.origin, token);
@@ -32,6 +47,12 @@ export function SharePage({ token }: { readonly token: string }) {
   }
 
   const lockedTarget = source.target;
+  // A snapshot share never changes after creation (docs/SHARING.md) -- once
+  // it has loaded, nothing is streaming, so a connection badge would be
+  // pure noise (or worse, read as if it might still update). Keep it while
+  // still loading (so a failed fetch's `offline` state is visible), hide it
+  // the moment the snapshot resolves.
+  const showConnectionBadge = source.mode !== 'snapshot' || source.status === 'connecting';
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -53,9 +74,11 @@ export function SharePage({ token }: { readonly token: string }) {
         <span data-testid="share-mode" style={{ color: '#8892a6' }}>
           {source.mode ?? '…'}
         </span>
-        <span>
-          status: <span data-testid="header-connection-status">{source.status}</span>
-        </span>
+        {showConnectionBadge && (
+          <span data-testid="header-connection-status" title="feed connection">
+            {CONNECTION_LABELS[source.status]}
+          </span>
+        )}
         {source.includeContext === false && (
           <span data-testid="context-hidden-badge" style={{ color: '#8892a6' }} title="The sharer chose not to include producer context.">
             context hidden by the sharer
