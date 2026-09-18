@@ -143,13 +143,12 @@ or, from this repo as a marketplace (see
 [`.claude-plugin/marketplace.json`](.claude-plugin/marketplace.json)):
 
 ```
-/plugin marketplace add atriarch-systems/tracery
+/plugin marketplace add Atriarch-Systems/tracery
 /plugin install tracery@tracery
 ```
 
-(`atriarch-systems/tracery` is this repo's intended future GitHub location;
-point `/plugin marketplace add` at wherever it actually lives, local path
-included, until then.) `TRACERY_HUB_URL` (env var or the plugin's own
+(A local checkout works too: `/plugin marketplace add /path/to/tracery`.)
+`TRACERY_HUB_URL` (env var or the plugin's own
 `hub_url` config prompt) is the only thing required; `TRACERY_API_KEY`/
 `api_key` is only needed against a hub configured with `TRACERY_API_KEYS`.
 With no `TRACERY_HUB_URL` at all, every hook is a silent no-op. See
@@ -231,34 +230,6 @@ an audit log, RBAC scopes, managed retention/backups, and support — with a
 ([`docs/SPEC.md` §7](docs/SPEC.md#7-extensions-and-tracery-cloud)); its
 implementation lives in a private repository, not here. Self-hosted
 enterprise is available on request. See [`docs/CLOUD.md`](docs/CLOUD.md).
-
-## Status
-
-CI (`.github/workflows/ci.yaml`) runs the full suite on every push to `main`,
-on the project's own self-hosted runners — that live result is the source of
-truth, not a point-in-time note in this file. As of this writing all three
-jobs are green: `node` (build + every workspace's tests, including Playwright
-against a real hub, plus the Claude Code plugin's tests), `python` (3.11),
-and `docker` (the hub image builds from a clean checkout). Current test
-counts: 36 visualizer + 131 core + 45 client + 50 react + 172 hub + 21
-Playwright + 45 plugin + 28 Python, 0 failures.
-
-The first real push to GitHub caught three defects that nothing running on a
-developer machine with a pre-built working tree ever could, because a clean
-checkout has none of that leftover state: `plugin.json`'s `author` field must
-be an object, not a bare string, or Claude Code silently refuses to load the
-plugin — only surfaced by installing through the actual
-`/plugin marketplace add` + `/plugin install` flow; the Playwright job needed
-`npx playwright install --with-deps chromium` on the runner, and the plugin's
-own test suite wasn't wired into CI at all; and the Docker build only
-explicitly compiled three of the five packages it depends on, silently
-relying on leftover `dist/` output from prior local builds to satisfy a
-type-only import — invisible on a dirty working tree, and it broke outright
-on a truly clean clone with a properly scoped `.dockerignore`. All three are
-fixed, verified against fresh clones, and covered by the CI run itself going
-forward. See `docs/VALIDATION.md` for the full cold-start checklist (three
-usage tracks, exact commands, a report-back template) if you want to
-reproduce any of this on another machine.
 
 ## Support
 
