@@ -230,11 +230,18 @@ export function ActivityExplorer(props: ActivityExplorerProps) {
       }}
     >
       <div style={styles.header}>
-        <span style={styles.statusDot(source.status)} aria-hidden="true" />
-        <span style={styles.statusText} data-testid="connection-status">
-          {source.status}
-          {source.partial ? ' (partial)' : ''}
-        </span>
+        {!readOnly && (
+          <>
+            <span style={styles.statusDot(source.status)} aria-hidden="true" />
+            <span style={styles.statusText} data-testid="connection-status">
+              {source.status}
+              {source.partial ? ' (partial)' : ''}
+            </span>
+          </>
+        )}
+        {readOnly && source.partial && (
+          <span style={styles.statusText} data-testid="connection-status">partial history</span>
+        )}
         {source.error && (
           <span style={{ color: 'var(--tracery-error, #ff6b6b)' }} role="alert">
             {source.error}
