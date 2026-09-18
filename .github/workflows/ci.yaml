@@ -12,8 +12,10 @@ jobs:
         with: { node-version: '22' }
       - run: node -e "const [m,n]=process.versions.node.split('.').map(Number); if(m<22||(m===22&&n<13)) process.exit(1)"
       - run: npm ci
+      - run: npx playwright install --with-deps chromium
       - run: npm run build
       - run: npm test
+      - run: npm run test:plugin
   python:
     runs-on: self-hosted
     steps:
