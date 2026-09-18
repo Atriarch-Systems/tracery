@@ -1,0 +1,29 @@
+# Excludes this repo's OWN build outputs and caches from the Docker build
+# context -- NOT third-party vendored distributables (apps/hub/web/vendor/**
+# ships prebuilt dist/ files on purpose; do not add a blanket **/dist rule
+# here again, it silently breaks the hosted UI's vite build. See git history
+# 2026-09-18.)
+node_modules
+packages/*/node_modules
+apps/*/node_modules
+apps/hub/web/node_modules
+clients/*/node_modules
+examples/*/node_modules
+packages/*/dist
+apps/hub/dist
+apps/hub/web/dist
+clients/*/dist
+examples/*/dist
+.git
+*.tsbuildinfo
+**/*.tsbuildinfo
+__pycache__
+**/__pycache__
+*.egg-info
+**/*.egg-info
+.venv
+test-results
+**/test-results
+playwright-report
+**/playwright-report
+.playwright-mcp

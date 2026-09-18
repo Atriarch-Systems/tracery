@@ -13,23 +13,35 @@ WORKDIR /repo
 # Full monorepo context: apps/hub/web may or may not exist yet, and copying
 # the whole tree sidesteps having to conditionally COPY a maybe-missing
 # directory (Docker COPY fails outright on a source that isn't there).
+# .dockerignore excludes node_modules/dist/.git so this is always a clean
+# source-only tree, never a developer's already-built working copy.
 COPY . .
 
 RUN npm ci
 
-# Hosted UI (apps/hub/web, workstream E) is optional at this point in the
-# build: when its package.json is present it is also an npm workspace (see
-# the root package.json), so the one `npm ci` above already installed its
-# deps and it just needs to be included in the build below. When it is
-# absent, build without it and leave an empty dist/ so the final stage's
-# COPY always has something to copy; the hub then falls back to its "UI not
-# built" placeholder page (apps/hub/src/routes/ui.ts) at runtime.
+# Explicit dependency order: core has a type-only import on the visualizer's
+# ./types export (satisfied at compile time only -- core's compiled JS has
+# no runtime dependency on the visualizer, so the final stage below never
+# needs to copy it), and the hosted UI depends on core/visualizer/client/react.
+# A prior version of this step only built core+hub(+hub-web) directly and
+# relied on leftover dist/ directories from the developer's own machine to
+# satisfy those imports -- invisible on a dirty working tree (dist/ is always
+# there), but a truly clean checkout (CI, or this .dockerignore) fails
+# outright with "Cannot find module '@atriarch/tracery-visualizer/types'".
+# Caught by CI on the first push to a fresh clone; see git history.
+RUN npm run build -w @atriarch/tracery-visualizer -w @atriarch/tracery-core -w @atriarch/tracery-client -w @atriarch/tracery-react -w @atriarch/tracery-hub
+
+# Hosted UI (apps/hub/web, workstream E) is optional: when its package.json
+# is present it is also an npm workspace (see the root package.json), so the
+# `npm ci` above already installed its deps and it just needs building. When
+# it is absent, leave an empty dist/ so the final stage's COPY always has
+# something to copy; the hub then falls back to its "UI not built" placeholder
+# page (apps/hub/src/routes/ui.ts) at runtime.
 RUN if [ -f apps/hub/web/package.json ]; then \
       echo "building apps/hub/web"; \
-      npm run build -w @atriarch/tracery-core -w @atriarch/tracery-hub -w @atriarch/tracery-hub-web; \
+      npm run build -w @atriarch/tracery-hub-web; \
     else \
       echo "apps/hub/web not present yet; shipping without a hosted UI"; \
-      npm run build -w @atriarch/tracery-core -w @atriarch/tracery-hub; \
       mkdir -p apps/hub/web/dist; \
     fi
 
