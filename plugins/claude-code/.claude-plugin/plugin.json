@@ -2,7 +2,10 @@
   "name": "tracery",
   "version": "0.1.0",
   "description": "Streams Claude Code session, tool-call and subagent activity to a Tracery hub for live graph visualization.",
-  "author": "Atriarch Systems",
+  "author": {
+    "name": "Atriarch Systems",
+    "url": "https://atriarch.systems"
+  },
   "license": "Apache-2.0",
   "hooks": "./hooks/hooks.json",
   "skills": "./skills/",
