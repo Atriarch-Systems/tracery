@@ -49,4 +49,6 @@ export {
 export type { ScopeMode } from './scope.js';
 
 export { rootStyle, styles } from './style.js';
-export type { ActivityThemeVars } from './style.js';
+export type { ActivityThemeVars, ActivityTheme } from './style.js';
+
+export { THEME_PRESETS, PRESET_NAMES, resolveThemeInput } from './themes.js';

@@ -22,7 +22,7 @@ import { useProjection } from './useProjection.js';
 import { computeScope, scopeModeForKey, activatedFlow, isScopeShortcutTarget, SCOPE_LABELS, type ScopeMode } from './scope.js';
 import { latestFlows, latestFlowId } from './flow-order.js';
 import { Inspector, type InspectorSelection } from './Inspector.js';
-import { rootStyle, styles, type ActivityThemeVars } from './style.js';
+import { rootStyle, styles, type ActivityTheme } from './style.js';
 
 /** A share's fixed target (docs/SHARING.md): pass `useShareSource`'s `{ type, id }` straight through. */
 export interface LockedTarget {
@@ -35,7 +35,7 @@ export interface ActivityExplorerProps {
   readonly initialScope?: Scope;
   readonly catalog?: (node: NodeRecord, flow: Flow) => NodePresentation;
   readonly renderInspector?: (selection: InspectorSelection | null) => ReactNode;
-  readonly theme?: ActivityThemeVars;
+  readonly theme?: ActivityTheme;
   readonly className?: string;
   readonly style?: CSSProperties;
   readonly ariaLabel?: string;
@@ -319,6 +319,7 @@ export function ActivityExplorer(props: ActivityExplorerProps) {
                 nodes={guided.nodes}
                 edges={projection.edges}
                 groups={projection.groups.map((g) => ({ id: g.id, label: g.label, dimmed: g.flow !== activeFlow }))}
+                theme={theme?.graph}
                 layoutMode="guided"
                 layoutKey={scope ? (scope.mode === 'trace' ? `trace:${scope.trace}` : `${scope.mode}:${scope.flow}`) : 'none'}
                 selectedNodeId={selectedNodeId}

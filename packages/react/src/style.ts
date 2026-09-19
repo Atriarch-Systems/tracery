@@ -14,6 +14,20 @@ export interface ActivityThemeVars {
   readonly error?: string;
 }
 
+/**
+ * The full `ActivityExplorer` theme: `ActivityThemeVars`' DOM chrome (CSS
+ * variables for the header/sidebar/inspector/etc, via `rootStyle`) plus an
+ * optional `graph` palette forwarded straight to the inner `ActivityGraph`'s
+ * `theme` prop (`@atriarch/tracery-visualizer`'s `GraphTheme`, for canvas
+ * node/edge/group colors). The two stay separate types on purpose -- chrome
+ * and canvas are different rendering surfaces with different consumers --
+ * rather than one flat object mixing CSS variable names with canvas color
+ * fields.
+ */
+export interface ActivityTheme extends ActivityThemeVars {
+  readonly graph?: Partial<import('@atriarch/tracery-visualizer').GraphTheme>;
+}
+
 const DEFAULTS = {
   bg: '#12141c',
   panel: '#181b26',

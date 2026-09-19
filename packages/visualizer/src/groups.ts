@@ -1,12 +1,13 @@
 import { box, type RuntimeNode } from './model.js';
 import type { ActivityGroup } from './types.js';
+import { DEFAULT_GRAPH_THEME, type GraphTheme } from './theme.js';
 
 type Point = { x: number; y: number };
 
 const HULL_PAD = 28;
 const HULL_RADIUS = 16;
 
-const hex = (color: string | undefined, fallback = '#8bb971') => /^#[0-9a-f]{6}$/i.test(color ?? '') ? color! : fallback;
+const hex = (color: string | undefined, fallback: string) => /^#[0-9a-f]{6}$/i.test(color ?? '') ? color! : fallback;
 const rgb = (color: string) => [1, 3, 5].map(i => parseInt(color.slice(i, i + 2), 16));
 
 /** Members currently on the graph for each configured group, keyed by group id. Groups with no
@@ -72,9 +73,9 @@ const paddedCorners = (node: RuntimeNode): Point[] => {
 /** Draws one group's hull (filled at low alpha, stroked faintly) and its label. One and two
  * member groups use a padded, rounded bounding rectangle (a proper hull looks like a sliver at
  * that size); three or more members get a rounded convex hull around the padded card corners. */
-export function drawGroupHull(ctx: CanvasRenderingContext2D, group: ActivityGroup, members: readonly RuntimeNode[]) {
+export function drawGroupHull(ctx: CanvasRenderingContext2D, group: ActivityGroup, members: readonly RuntimeNode[], theme: GraphTheme = DEFAULT_GRAPH_THEME) {
   if (members.length === 0) return;
-  const color = hex(group.accent);
+  const color = hex(group.accent, theme.groupAccentFallback);
   const [r, g, b] = rgb(color);
   let labelX: number, labelY: number;
   ctx.save();
@@ -109,10 +110,10 @@ export function drawGroupHull(ctx: CanvasRenderingContext2D, group: ActivityGrou
 
 /** Draws every configured group with live members, beneath the nodes. Call from
  * `onRenderFramePre` so hulls land under the node/link canvas objects. */
-export function drawGroups(ctx: CanvasRenderingContext2D, groups: readonly ActivityGroup[], nodes: readonly RuntimeNode[]) {
+export function drawGroups(ctx: CanvasRenderingContext2D, groups: readonly ActivityGroup[], nodes: readonly RuntimeNode[], theme: GraphTheme = DEFAULT_GRAPH_THEME) {
   if (groups.length === 0) return;
   const members = groupMembers(nodes, groups);
-  for (const group of groups) drawGroupHull(ctx, group, members.get(group.id) ?? []);
+  for (const group of groups) drawGroupHull(ctx, group, members.get(group.id) ?? [], theme);
 }
 
 /** Per-node alpha multiplier so a dimmed group's member cards render at 45% alpha too. */

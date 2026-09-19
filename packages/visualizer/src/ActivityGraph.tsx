@@ -1,11 +1,12 @@
 "use client";
-import { useEffect, useRef, useState, useImperativeHandle, type ComponentType } from 'react';
+import { useEffect, useMemo, useRef, useState, useImperativeHandle, type ComponentType } from 'react';
 import type { ForceGraphMethods, ForceGraphProps } from 'react-force-graph-2d';
 import { forceCollide } from 'd3-force';
 import type { ActivityGraphProps, ActivityNode } from './types.js';
 import { emptyGraph, reconcile, box, isNodeActive, type RuntimeGraph, type RuntimeNode, type RuntimeEdge } from './model.js';
 import { drawNode, drawLink } from './drawing.js';
 import { drawGroups, groupAlpha } from './groups.js';
+import { resolveGraphTheme } from './theme.js';
 import { detectDoubleClick, emptyDoubleClickState, type DoubleClickState } from './activate.js';
 import { renderCapture, captureToBlob, type CaptureOptions } from './capture.js';
 
@@ -132,6 +133,7 @@ export function ActivityGraph<N = unknown, E = unknown>(props: ActivityGraphProp
     onNodeSelect?.(node as ActivityNode<N> | null);
   };
   const groups = props.groups ?? [];
+  const theme = useMemo(() => resolveGraphTheme(props.theme), [props.theme]);
 
   return <div ref={host} className={props.className} style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden', ...props.style }}
     role="region" tabIndex={0} aria-label={props.ariaLabel ?? 'Activity graph. Arrow keys select nodes; Enter activates the selected node; Escape clears selection; F fits the view.'}
@@ -151,9 +153,9 @@ export function ActivityGraph<N = unknown, E = unknown>(props: ActivityGraphProp
       }
     }}>
     {Renderer && <Renderer ref={api} graphData={graph} width={size.width} height={size.height}
-      backgroundColor="rgba(0,0,0,0)" nodeCanvasObject={(n, ctx) => drawNode(n, ctx, selected ?? null, reduced, groupAlpha(n, groups))}
-      linkCanvasObject={(l, ctx) => drawLink(l, ctx, selected ?? null, reduced)}
-      onRenderFramePre={ctx => drawGroups(ctx, groups, runtime.current.nodes)}
+      backgroundColor="rgba(0,0,0,0)" nodeCanvasObject={(n, ctx) => drawNode(n, ctx, selected ?? null, reduced, groupAlpha(n, groups), theme)}
+      linkCanvasObject={(l, ctx) => drawLink(l, ctx, selected ?? null, reduced, theme)}
+      onRenderFramePre={ctx => drawGroups(ctx, groups, runtime.current.nodes, theme)}
       nodeLabel={() => ''} linkLabel={() => ''} autoPauseRedraw={false}
       nodePointerAreaPaint={(n, color, ctx) => { const {w,h} = box(n); ctx.fillStyle = color; ctx.fillRect(n.x-w/2,n.y-h/2,w,h); }}
       onNodeClick={n => {

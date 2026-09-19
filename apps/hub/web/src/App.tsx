@@ -11,6 +11,8 @@ import { SharePage } from './SharePage.js';
 import { loadSession, saveSession, clearSession, type HubSession } from './session.js';
 import { fetchAuthMe, logout } from './sso.js';
 import { fetchHubInfo } from './info.js';
+import { ThemeSettings } from './ThemeSettings.js';
+import { loadThemeChoice, saveThemeChoice, resolveActivityTheme, type ThemeChoice } from './theme-storage.js';
 
 function scopeForRoute(route: Route): Scope | undefined {
   if (route.type === 'flow') return { mode: 'flow', flow: route.id };
@@ -120,6 +122,15 @@ function Explorer({ session, route, onSignOut }: { readonly session: HubSession;
   const initialScope = useMemo(() => scopeForRoute(route), [route.type, flow, trace]);
   const graphRef = useRef<ActivityGraphHandle>(null);
   const [shareOpen, setShareOpen] = useState(false);
+  // Loaded synchronously in the useState initializer (runs before first
+  // paint) so the stored theme choice applies on first render with no flash
+  // of the default theme.
+  const [themeChoice, setThemeChoice] = useState<ThemeChoice>(() => loadThemeChoice());
+  const theme = useMemo(() => resolveActivityTheme(themeChoice), [themeChoice]);
+  const updateThemeChoice = (next: ThemeChoice): void => {
+    setThemeChoice(next);
+    saveThemeChoice(next);
+  };
 
   // The Share button targets exactly the flow/trace named by a deep link
   // (docs/SHARING.md "Web"): `ActivityExplorer` owns its own flow-picker/
@@ -156,7 +167,8 @@ function Explorer({ session, route, onSignOut }: { readonly session: HubSession;
           </span>
         )}
         {route.type === 'not-found' && <span style={{ color: '#ff6b6b' }}>Unknown route: {route.path}</span>}
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
+          <ThemeSettings choice={themeChoice} onChange={updateThemeChoice} />
           {shareTarget && (
             <button
               type="button"
@@ -200,7 +212,7 @@ function Explorer({ session, route, onSignOut }: { readonly session: HubSession;
         {/* Backstop only (ui-1, ui-2 are fixed at their source): one bad
             event or projection must degrade this panel, not the whole page. */}
         <ExplorerErrorBoundary>
-          <ActivityExplorer source={source} initialScope={initialScope} ariaLabel="Tracery hosted explorer" graphRef={graphRef} />
+          <ActivityExplorer source={source} initialScope={initialScope} ariaLabel="Tracery hosted explorer" graphRef={graphRef} theme={theme} />
         </ExplorerErrorBoundary>
       </div>
       {shareOpen && shareTarget && <ShareDialog session={session} target={shareTarget} graphRef={graphRef} onClose={() => setShareOpen(false)} />}

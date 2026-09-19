@@ -1,8 +1,9 @@
 import type { CSSProperties, Ref } from 'react';
 import type { CaptureOptions } from './capture.js';
+import type { GraphTheme } from './theme.js';
 
 /** Presentation contract version, independent of agent transports. */
-export const VISUALIZER_CONTRACT_VERSION = 2 as const;
+export const VISUALIZER_CONTRACT_VERSION = 3 as const;
 /** Epoch milliseconds. Consumers own activity membership and retention. */
 export interface Activity {
   readonly highlighted?: boolean;
@@ -101,4 +102,8 @@ export interface ActivityGraphProps<NodeData = unknown, EdgeData = unknown> {
   readonly className?: string;
   readonly style?: CSSProperties;
   readonly ariaLabel?: string;
+  /** Canvas color overrides (node/edge/group palette); unset fields fall back to
+   * `DEFAULT_GRAPH_THEME`. Independent of a node/group's own explicit `accent`,
+   * which always wins over the theme's fallback accent fields. */
+  readonly theme?: Partial<GraphTheme>;
 }

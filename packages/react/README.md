@@ -76,7 +76,7 @@ interface ActivityExplorerProps {
   initialScope?: Scope;                   // { mode: 'flow' | 'ancestors', flow } | { mode: 'trace', trace }
   catalog?: (node: NodeRecord, flow: Flow) => NodePresentation;
   renderInspector?: (selection: InspectorSelection | null) => ReactNode;
-  theme?: { bg?; fg?; accent?; muted?; error? };   // sets the --tracery-* CSS variables
+  theme?: ActivityTheme;                  // chrome CSS variables + an optional canvas `graph` palette
   className?: string;
   style?: CSSProperties;
   ariaLabel?: string;
@@ -115,6 +115,34 @@ interface ActivityExplorerProps {
 - **Styling** is inline objects reading `var(--tracery-bg|fg|accent|muted|error, <dark default>)`;
   no Tailwind, no stylesheet. Pass `theme` to set those variables on the
   explorer's root element, or set them yourself further up the DOM tree.
+  `theme.graph` (a `Partial<GraphTheme>` from `@atriarch/tracery-visualizer`)
+  is forwarded to the inner `ActivityGraph` for canvas node/edge/group colors
+  -- kept as its own nested field rather than flattened in, since chrome CSS
+  variables and canvas colors are different rendering surfaces.
+
+## Theme presets
+
+`THEME_PRESETS` ships four complete, coherent themes -- chrome vars and a
+matching `graph` palette together, not one recolored field -- keyed by name
+and listed in display order via `PRESET_NAMES`: `dark` (the built-in default,
+pixel-identical to passing no `theme`), `light`, `high-contrast` and `ocean`.
+
+```tsx
+import { ActivityExplorer, THEME_PRESETS, resolveThemeInput, useHubSource } from '@atriarch/tracery-react';
+
+function MyPage() {
+  const source = useHubSource({ baseUrl: 'https://tracery.example.com', apiKey: 'read-key' });
+  return <ActivityExplorer source={source} theme={THEME_PRESETS.ocean} />;
+}
+```
+
+`resolveThemeInput(input)` turns a preset name, an already-built
+`ActivityTheme` object, or `undefined` into an `ActivityTheme | undefined` --
+an unknown name resolves to `undefined` rather than throwing, so it's safe to
+feed straight from a stored setting: `resolveThemeInput(storedPresetName)`.
+`undefined` and `THEME_PRESETS.dark` render identically, but are kept
+distinct on purpose: `undefined` means "no preference, use the component's
+own defaults", while `'dark'` is an explicit, stable choice worth persisting.
 
 ## Hooks
 
@@ -186,7 +214,11 @@ without throwing, including its flow labels; the feed reducer's full state
 machine (snapshot, events, heartbeat, disconnect, reconnect cursor, stale
 snapshot -> `truncated`, fallback to polling after two failures, recovery);
 `computeScope` in all three modes and `activatedFlow`'s child-group-activate
-rule; and flow-picker ordering (`orderFlows`/`latestFlows`/`latestFlowId`).
+rule; flow-picker ordering (`orderFlows`/`latestFlows`/`latestFlowId`); and
+the theme presets (`THEME_PRESETS.dark` matching `DEFAULT_GRAPH_THEME`/the
+chrome defaults field-for-field and rendering identically to no theme,
+`resolveThemeInput`'s four input shapes, and an SSR render with a non-dark
+preset setting `--tracery-accent`).
 
 See [`../../apps/hub/web`](../../apps/hub/web) for the hosted UI that embeds
 this package against a running hub, including a Playwright suite that

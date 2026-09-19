@@ -36,7 +36,7 @@ const edges: ActivityEdge[] = [
 
 The consumer owns its node catalog, stable IDs, domain events, aggregation/counts, request selection, retained history, error meanings and inspector content. It supplies readonly node and edge arrays. The visualizer owns canvas drawing, force layout, anchoring, selection feedback, animation and camera controls. Force-engine positions and mutated edge endpoints stay inside private wrappers; consumer objects are never mutated.
 
-`ActivityNode<Data>`, `ActivityEdge<Data>`, `ActivityGroup`, `NodePresentation`, `Activity`, `ActivityGraphProps` and `ActivityGraphHandle` are exported. `./types` is a renderer-free import. `VISUALIZER_CONTRACT_VERSION` is 2; it versions the presentation contract, not any WebSocket protocol. The data parameter lets each application retain strongly typed inspector data.
+`ActivityNode<Data>`, `ActivityEdge<Data>`, `ActivityGroup`, `NodePresentation`, `Activity`, `ActivityGraphProps` and `ActivityGraphHandle` are exported. `./types` is a renderer-free import. `VISUALIZER_CONTRACT_VERSION` is 3; it versions the presentation contract, not any WebSocket protocol. The data parameter lets each application retain strongly typed inspector data.
 
 All times are epoch milliseconds. `highlighted` lights an item; `completedAt` fades that highlight to gray; `removedAt` fades it out. The application removes expired items from its arrays. `updatedAt` animates a call traveling along an edge. Distinct edge IDs preserve incoming/outgoing and different relationship counts. Edge curvature, labels and accent are caller configuration. Different node types are presets of the same card, not renderer subclasses.
 
@@ -57,7 +57,35 @@ npm pack
 
 Install the resulting tarball into a consumer with `npm install ./vendor/atriarch-tracery-visualizer-0.3.0.tgz`. The package includes compiled ESM and TypeScript declarations. Local consumers can use this artifact without sibling-repository source imports; registry publishing is a separate action. Virali's prototype is the first consumer; Saga can provide its own catalog and adapter using the same exported contract.
 
-Tests cover frozen consumer input, stable layout across updates, engine array isolation, anchors, edge-first streams, separate directed relationships, removed nodes, duplicate IDs, lifecycle transitions, group hulls (small-group bounding rect vs. convex hull, dimmed alpha, empty groups), dashed `data` edges vs. thicker `spawn` edges, `placeBranches` ignoring `data` edges as a parent, and the pure double-click/activate window helper.
+Tests cover frozen consumer input, stable layout across updates, engine array isolation, anchors, edge-first streams, separate directed relationships, removed nodes, duplicate IDs, lifecycle transitions, group hulls (small-group bounding rect vs. convex hull, dimmed alpha, empty groups), dashed `data` edges vs. thicker `spawn` edges, `placeBranches` ignoring `data` edges as a parent, the pure double-click/activate window helper, and the `GraphTheme` contract (every semantic color slot, no-theme-vs-`DEFAULT_GRAPH_THEME` equivalence, and a node/group's own `accent` still beating the theme's fallback).
+
+## Canvas theming
+
+Every canvas color -- node fills/borders/text, edge lines/arrows/labels, the
+traveling-call dot, and group hull fallback colors -- comes from a
+`GraphTheme`, passed as `Partial<GraphTheme>` on `ActivityGraphProps.theme`.
+Unset fields fall back to `DEFAULT_GRAPH_THEME` (the exact look you get by
+omitting `theme` entirely), so a partial override only touches what it names:
+
+```tsx
+import { ActivityGraph, DEFAULT_GRAPH_THEME, type GraphTheme } from '@atriarch/tracery-visualizer';
+
+const oceanGraph: Partial<GraphTheme> = {
+  ...DEFAULT_GRAPH_THEME,
+  nodeAccentFallback: '#3fc6ff',
+  nodeFillActive: '#123246',
+  edgeAccentFallback: '#3fc6ff',
+  travelingDot: '#c8f2ff',
+};
+
+<ActivityGraph nodes={nodes} edges={edges} theme={oceanGraph} />;
+```
+
+A node's own `presentation.accent` and a group's own `accent` always win over
+the theme's fallback accent fields (`nodeAccentFallback`/`groupAccentFallback`)
+-- the theme only supplies a color for the case where the consumer's data
+supplied none. `resolveGraphTheme(partial?)` (used internally, and available
+to consumers building layered themes) fills in every unset field explicitly.
 
 ## Guided placement
 

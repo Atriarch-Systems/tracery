@@ -305,3 +305,59 @@ test('GET /v1/info reporting auth "none" skips key entry, connects with no API k
   expect(parsed.local).toBe(true);
   expect(parsed.workspace).toBe('default');
 });
+
+// Theming (task: settings UI): the gear button in the explorer header opens
+// a panel with a preset picker (`@atriarch/tracery-react`'s `PRESET_NAMES`);
+// switching presets must actually repaint the explorer (checked here via the
+// `--tracery-accent` CSS custom property on the explorer's root element,
+// which `ActivityExplorer`'s `rootStyle` sets from the resolved theme) and
+// persist under the documented `tracery.theme` localStorage key so a reload
+// keeps the choice.
+async function accentOf(page: Page): Promise<string> {
+  const value = await page.evaluate(() => {
+    const el = document.querySelector('[aria-label="Tracery hosted explorer"]');
+    return el ? getComputedStyle(el).getPropertyValue('--tracery-accent').trim() : null;
+  });
+  if (value === null) throw new Error('explorer root element not found');
+  return value;
+}
+
+test('the theme settings panel switches presets, repaints the explorer, and persists across a reload', async ({ page }) => {
+  await primeMockedHub(page);
+
+  const darkAccent = await accentOf(page);
+
+  await page.getByTestId('theme-settings-button').click();
+  await expect(page.getByTestId('theme-settings-panel')).toBeVisible();
+  await page.getByTestId('theme-preset-select').selectOption('ocean');
+
+  const oceanAccent = await accentOf(page);
+  expect(oceanAccent).not.toBe(darkAccent);
+  expect(oceanAccent.toLowerCase()).toBe('#3fc6ff');
+
+  const stored = await page.evaluate(() => window.localStorage.getItem('tracery.theme'));
+  expect(stored).not.toBeNull();
+  expect(JSON.parse(stored!)).toEqual({ preset: 'ocean' });
+
+  await page.reload();
+  await expect(page.getByTestId('flow-picker-item')).toHaveCount(3);
+  expect(await accentOf(page)).toBe(oceanAccent);
+  await expect(page.getByTestId('theme-preset-select')).toHaveCount(0); // panel closes on navigation/reload, not sticky open
+});
+
+test('a color override persists alongside the preset and "Reset to preset" clears it', async ({ page }) => {
+  await primeMockedHub(page);
+
+  await page.getByTestId('theme-settings-button').click();
+  await page.getByTestId('theme-color-accent').fill('#ff00ff');
+
+  expect(await accentOf(page)).toBe('#ff00ff');
+  let stored = JSON.parse((await page.evaluate(() => window.localStorage.getItem('tracery.theme')))!);
+  expect(stored).toEqual({ preset: 'dark', overrides: { accent: '#ff00ff' } });
+
+  await page.getByTestId('theme-reset').click();
+  const darkAccent = await accentOf(page);
+  expect(darkAccent).not.toBe('#ff00ff');
+  stored = JSON.parse((await page.evaluate(() => window.localStorage.getItem('tracery.theme')))!);
+  expect(stored).toEqual({ preset: 'dark' });
+});
