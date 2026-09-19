@@ -126,6 +126,20 @@ function MyPage() {
 }
 ```
 
+### Try it without writing any code
+
+[`examples/generator`](examples/generator) is a small interactive app: pick
+a sample flow, click **Generate**, and watch it draw itself -- no hub
+required. Check a box to also push the same events to a running hub
+(`npx @atriarch/tracery-hub` in another terminal, no key needed) and compare
+the library view against the standalone hub's UI side by side.
+
+```
+git clone https://github.com/Atriarch-Systems/tracery.git && cd tracery
+npm install
+npm run dev -w tracery-example-generator
+```
+
 ### Quick start: Claude Code plugin
 
 One command starts a hub, one starts a session pointed at it -- no key to

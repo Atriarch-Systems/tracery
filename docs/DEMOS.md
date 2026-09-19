@@ -141,6 +141,33 @@ the whole thing ends and starts over with new flow ids.
 | UI feature set | the full `ActivityExplorer` (flow picker, guided graph, inspector, scope switching) — the same component the hosted UI uses |
 | RBAC / audit / SSO | not applicable — those are Tracery Cloud concerns (`docs/CLOUD.md`) this mode never touches |
 
+### 2b. The event generator — the same library, on demand instead of looping
+
+`examples/embedded` above is a fixed, auto-looping demo. `examples/generator`
+is the interactive version: pick **Simple flow** or **Subagents + error**
+from a dropdown, click **Generate**, and watch the exact same
+`ActivityExplorer` draw it — but on your click, not on a 20-second loop. It
+also has an **Also send to a hub** checkbox that posts the identical events
+to a running hub over `POST /v1/events` at the same time, so the library
+view and the hub's own hosted UI can be compared side by side from one
+click.
+
+```sh
+npm run dev -w tracery-example-generator       # http://localhost:5173
+# separately, to try the hub half:
+npx @atriarch/tracery-hub                      # local mode, no key needed
+```
+
+Check the box, leave the hub URL at its default
+(`http://127.0.0.1:8971`), leave the API key blank, click **Generate**, and
+an **Open in hub ↗** link appears once the hub accepts the first batch.
+
+![The event generator mid-run: a subagent flow generating live, with the send-to-hub controls above it](images/generator.png)
+
+This is also the fastest way to notice a hub that predates CORS support (any
+hub built before this example was added rejects the browser's preflight
+silently — see `apps/hub/README.md` "Cross-origin requests").
+
 ## 3. Standalone hub
 
 **What it demonstrates**: `@atriarch/tracery-hub` as the aggregation point
