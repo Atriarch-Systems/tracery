@@ -35,7 +35,16 @@ export function KeyEntry({ onReady, ssoAvailable }: KeyEntryProps) {
         }}
       >
         <h1 style={{ fontSize: 16, margin: 0 }}>Tracery</h1>
-        <p style={{ fontSize: 12, color: '#8892a6', margin: 0 }}>Enter a read key to view this hub's flows.</p>
+        <p style={{ fontSize: 12, color: '#8892a6', margin: 0 }}>
+          This self-hosted hub was started with its own API keys. Ask
+          whoever runs it for one, or check its <code>TRACERY_API_KEYS</code>{' '}
+          configuration if that's you.
+        </p>
+        <p style={{ fontSize: 11, color: '#5c6479', margin: 0 }}>
+          No account, no key to manage: <code>npx @atriarch/tracery-hub</code>{' '}
+          on <code>127.0.0.1</code> starts with auth off and skips this
+          screen entirely.
+        </p>
 
         {ssoAvailable && (
           <>

@@ -600,3 +600,31 @@ test('ui: without a build, /ui serves a plain placeholder page; with one, it ser
     await built.close();
   }
 });
+
+test('cors: a browser preflight for a cross-origin POST /v1/events succeeds and reflects the caller\'s origin', async () => {
+  const created = await createTestServer({ apiKeys: KEYS });
+  try {
+    const res = await created.app.inject({
+      method: 'OPTIONS',
+      url: '/v1/events',
+      headers: {
+        origin: 'http://localhost:5173',
+        'access-control-request-method': 'POST',
+        'access-control-request-headers': 'content-type,authorization',
+      },
+    });
+    // A third-party browser app (the whole point of "library or hub, your
+    // choice") runs on a different origin than the hub it pushes events to.
+    // Community auth is a bearer token the caller sets explicitly, never an
+    // ambient cookie, so reflecting the origin carries no CSRF risk -- but
+    // with no CORS plugin registered at all, the browser's own preflight
+    // fails before the real request is ever sent, which is invisible from
+    // any server-side or Node-script test (fetch from Node has no CORS).
+    assert.equal(res.statusCode, 204);
+    assert.equal(res.headers['access-control-allow-origin'], 'http://localhost:5173');
+    assert.match(res.headers['access-control-allow-methods'] ?? '', /POST/);
+    assert.match(res.headers['access-control-allow-headers'] ?? '', /authorization/);
+  } finally {
+    await created.close();
+  }
+});

@@ -113,6 +113,21 @@ spec at `GET /v1/openapi.json` (OpenAPI 3.1). Errors are always
 `{ "error": { "code": "...", "message": "..." } }`; every response carries
 `x-request-id`.
 
+### Cross-origin requests
+
+Any origin may call the API — the hub registers `@fastify/cors` with
+`origin: true`, reflecting whichever origin the browser sends and answering
+its preflight `OPTIONS` on every route (`GET`, `POST`, `PUT`, `DELETE`) with
+`content-type`, `authorization` and `x-api-key` allowed. This matters
+because a browser-based application pushing events lives on a different
+origin than the hub it pushes to almost by definition — see
+`examples/generator`, which POSTs straight from a page served on its own
+Vite dev port. Community auth is a bearer token the caller sets explicitly
+(never an ambient cookie — Tracery Cloud's SSO session cookie is an
+extensions-module concern, not this package's), so reflecting the origin
+carries no CSRF risk; it only lets the browser's own preflight succeed
+instead of silently blocking the request before it reaches this server.
+
 ### Headers
 
 | Header | When | Meaning |

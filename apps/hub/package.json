@@ -4,12 +4,25 @@
   "license": "Apache-2.0",
   "description": "Tracery standalone hub server: ingest, storage, retention, live feed and hosted UI.",
   "type": "module",
-  "engines": { "node": ">=22.13" },
-  "funding": { "type": "ko-fi", "url": "https://ko-fi.com/demonslyr" },
+  "engines": {
+    "node": ">=22.13"
+  },
+  "funding": {
+    "type": "ko-fi",
+    "url": "https://ko-fi.com/demonslyr"
+  },
   "homepage": "https://github.com/atriarch-systems/tracery/tree/main/apps/hub#readme",
-  "bugs": { "url": "https://github.com/atriarch-systems/tracery/issues" },
-  "repository": { "type": "git", "url": "https://github.com/atriarch-systems/tracery.git", "directory": "apps/hub" },
-  "publishConfig": { "access": "public" },
+  "bugs": {
+    "url": "https://github.com/atriarch-systems/tracery/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/atriarch-systems/tracery.git",
+    "directory": "apps/hub"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "bin": {
     "tracery-hub": "./bin/hub.mjs"
   },
@@ -22,11 +35,26 @@
     "NOTICE"
   ],
   "exports": {
-    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" },
-    "./auth": { "types": "./dist/auth.d.ts", "import": "./dist/auth.js" },
-    "./store": { "types": "./dist/store/types.d.ts", "import": "./dist/store/types.js" },
-    "./config": { "types": "./dist/config.d.ts", "import": "./dist/config.js" },
-    "./test-helpers": { "types": "./dist/test-helpers.d.ts", "import": "./dist/test-helpers.js" }
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./auth": {
+      "types": "./dist/auth.d.ts",
+      "import": "./dist/auth.js"
+    },
+    "./store": {
+      "types": "./dist/store/types.d.ts",
+      "import": "./dist/store/types.js"
+    },
+    "./config": {
+      "types": "./dist/config.d.ts",
+      "import": "./dist/config.js"
+    },
+    "./test-helpers": {
+      "types": "./dist/test-helpers.d.ts",
+      "import": "./dist/test-helpers.js"
+    }
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
@@ -36,6 +64,7 @@
   },
   "dependencies": {
     "@atriarch/tracery-core": "^0.1.0",
+    "@fastify/cors": "^10.1.0",
     "@fastify/static": "^8",
     "@fastify/swagger": "^9",
     "@fastify/websocket": "^11",

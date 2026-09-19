@@ -11,7 +11,8 @@
     "packages/react",
     "apps/hub",
     "apps/hub/web",
-    "examples/embedded"
+    "examples/embedded",
+    "examples/generator"
   ],
   "scripts": {
     "build": "npm run build --workspaces --if-present",
