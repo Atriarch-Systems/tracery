@@ -153,10 +153,10 @@ const parentTracer = new ActivityTracer({
 const parentFlow = parentTracer.startFlow({ label: 'demo: orchestrator' });
 console.log(`[demo] parent flow: ${parentFlow.id}`);
 
-const llmOp = parentFlow.start({ node: 'llm:main', name: 'llm.plan', kind: 'llm', context: { tokens: 42 } });
+const llmOp = parentFlow.start({ node: 'llm:main', name: 'llm.plan', kind: 'llm', context: { tokens: 42 }, parent: parentFlow.rootOp });
 llmOp.end({ status: 'success' });
 
-const toolOp = parentFlow.start({ node: 'tool:spawn', name: 'tool.spawn', kind: 'tool' });
+const toolOp = parentFlow.start({ node: 'tool:spawn', name: 'tool.spawn', kind: 'tool', parent: llmOp });
 
 // -- child 1: TypeScript client, spawnLink() from the tool op --------------
 const linkForChild1 = parentFlow.spawnLink(toolOp);
@@ -165,7 +165,7 @@ const childTracer = new ActivityTracer({
   actor: { id: 'agent:demo-child-ts', kind: 'subagent' },
 });
 const childFlow1 = childTracer.startFlow({ label: 'demo: ts child', link: linkForChild1 });
-const child1Op = childFlow1.start({ node: 'tool:work', name: 'tool.work', kind: 'tool', context: { lang: 'ts' } });
+const child1Op = childFlow1.start({ node: 'tool:work', name: 'tool.work', kind: 'tool', context: { lang: 'ts' }, parent: childFlow1.rootOp });
 child1Op.end();
 childFlow1.end();
 await childTracer.close();

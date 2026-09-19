@@ -37,7 +37,7 @@ def main() -> int:
     )
     try:
         flow = tracer.start_flow(label="demo: python child", link=link)
-        with flow.op(node="tool:work", name="tool.work", kind="tool", context={"lang": "python"}):
+        with flow.op(node="tool:work", name="tool.work", kind="tool", context={"lang": "python"}, parent=flow.root_op):
             pass  # do the "work"; the op ends success on exit
         flow.end()
     finally:
