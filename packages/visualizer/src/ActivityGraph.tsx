@@ -2,10 +2,10 @@
 import { useEffect, useMemo, useRef, useState, useImperativeHandle, type ComponentType } from 'react';
 import type { ForceGraphMethods, ForceGraphProps } from 'react-force-graph-2d';
 import { forceCollide } from 'd3-force';
-import type { ActivityGraphProps, ActivityNode } from './types.js';
+import type { ActivityGraphProps, ActivityNode, ActivityGroup } from './types.js';
 import { emptyGraph, reconcile, box, isNodeActive, type RuntimeGraph, type RuntimeNode, type RuntimeEdge } from './model.js';
 import { drawNode, drawLink } from './drawing.js';
-import { drawGroups, groupAlpha } from './groups.js';
+import { drawGroups, groupAlpha, groupMembers, hitTestGroup } from './groups.js';
 import { resolveGraphTheme } from './theme.js';
 import { detectDoubleClick, emptyDoubleClickState, type DoubleClickState } from './activate.js';
 import { renderCapture, captureToBlob, type CaptureOptions } from './capture.js';
@@ -17,6 +17,31 @@ function waitOneFrame(): Promise<void> {
   });
 }
 
+/** Graph-space movement past which a pointer-down-then-move inside a group's hull commits to a
+ * group drag rather than a click. `screen2GraphCoords` already divides by the current zoom
+ * scale, so a flat graph-unit threshold behaves like a few screen pixels at any zoom level. */
+const GROUP_DRAG_THRESHOLD = 4;
+
+type GroupDragState = {
+  readonly pointerId: number;
+  readonly group: ActivityGroup;
+  readonly members: readonly { readonly id: string; readonly x: number; readonly y: number }[];
+  readonly startX: number;
+  readonly startY: number;
+  dragging: boolean;
+};
+
+/** Whether `point` (graph coordinates) lands on any node's own hit box -- the same rectangle
+ * `nodePointerAreaPaint` paints for the library's hit canvas -- across every node currently on
+ * the graph, not just a candidate group's own members: a node from a different group, or an
+ * unaffiliated node, sitting visually inside this group's hull must still block a group drag. */
+function pointHitsAnyNode(nodes: readonly RuntimeNode[], point: { x: number; y: number }): boolean {
+  return nodes.some(n => {
+    const { w, h } = box(n);
+    return point.x >= n.x - w / 2 && point.x <= n.x + w / 2 && point.y >= n.y - h / 2 && point.y <= n.y + h / 2;
+  });
+}
+
 /** No transports, agent catalogs, invocation reducers, or business data live here. */
 export function ActivityGraph<N = unknown, E = unknown>(props: ActivityGraphProps<N, E>) {
   const { nodes, edges, layoutKey, apiRef, onNodeSelect, onNodeMove } = props;
@@ -25,6 +50,9 @@ export function ActivityGraph<N = unknown, E = unknown>(props: ActivityGraphProp
   const runtime = useRef<RuntimeGraph>(emptyGraph());
   const lastKey = useRef(layoutKey);
   const lastClick = useRef<DoubleClickState>(emptyDoubleClickState());
+  const groupDrag = useRef<GroupDragState | null>(null);
+  const dragListeners = useRef<{ move: (e: PointerEvent) => void; up: (e: PointerEvent) => void } | null>(null);
+  const hoverCursor = useRef<'default' | 'grab' | 'grabbing'>('default');
   const [graph, setGraph] = useState<RuntimeGraph>(emptyGraph);
   const [size, setSize] = useState({ width: 1000, height: 700 });
   const [systemReduced, setSystemReduced] = useState(false);
@@ -135,9 +163,143 @@ export function ActivityGraph<N = unknown, E = unknown>(props: ActivityGraphProp
   const groups = props.groups ?? [];
   const theme = useMemo(() => resolveGraphTheme(props.theme), [props.theme]);
 
+  // Draggable group hulls (guided layout only): clicking and dragging inside a hull's own area,
+  // away from any node, moves every member node of that group together, preserving their
+  // relative positions. Removes any dangling window listeners if the component unmounts mid-drag.
+  useEffect(() => () => {
+    if (dragListeners.current) {
+      window.removeEventListener('pointermove', dragListeners.current.move);
+      window.removeEventListener('pointerup', dragListeners.current.up);
+      dragListeners.current = null;
+    }
+  }, []);
+
+  const screenToGraphPoint = (clientX: number, clientY: number): { x: number; y: number } | undefined => {
+    const convert = api.current?.screen2GraphCoords;
+    const canvasEl = host.current?.querySelector('canvas');
+    if (!canvasEl || typeof convert !== 'function') return undefined;
+    const rect = canvasEl.getBoundingClientRect();
+    return convert.call(api.current, clientX - rect.left, clientY - rect.top);
+  };
+
+  const groupAtPoint = (point: { x: number; y: number }): { group: ActivityGroup; members: RuntimeNode[] } | undefined => {
+    if (groups.length === 0) return undefined;
+    const byGroup = groupMembers(runtime.current.nodes, groups);
+    // drawGroups renders groups in array order, so a later group's hull paints over an earlier
+    // one's where they overlap; hit-testing in reverse matches whichever hull is visually on top.
+    for (let i = groups.length - 1; i >= 0; i--) {
+      const group = groups[i]!;
+      const members = byGroup.get(group.id) ?? [];
+      if (hitTestGroup(group, members, point)) return { group, members };
+    }
+    return undefined;
+  };
+
+  const setHostCursor = (cursor: 'default' | 'grab' | 'grabbing') => {
+    if (hoverCursor.current === cursor) return;
+    hoverCursor.current = cursor;
+    if (host.current) host.current.style.cursor = cursor === 'default' ? '' : cursor;
+  };
+
+  /** Capture-phase pointerdown on the host div: runs before react-force-graph-2d's own native
+   * listeners on the inner canvas/container can start their default pan or node-drag. A point
+   * that is on a node, or inside no group's hull, is left completely alone -- propagation
+   * continues and the library behaves exactly as it does today. */
+  const beginGroupDrag = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (props.layoutMode !== 'guided') return;
+    // Feature-detected: an older react-force-graph-2d/force-graph build without
+    // screen2GraphCoords simply never attaches this behavior.
+    if (typeof api.current?.screen2GraphCoords !== 'function') return;
+    if (event.pointerType === 'mouse' && event.button !== 0) return; // left button only; right-click keeps its own menu
+    const point = screenToGraphPoint(event.clientX, event.clientY);
+    if (!point || pointHitsAnyNode(runtime.current.nodes, point)) return;
+    const hit = groupAtPoint(point);
+    if (!hit) return;
+
+    // The library's own background-click detection listens on 'pointerdown'/'pointerup' on its
+    // inner container -- stopping propagation here (before it ever reaches that element) is
+    // enough to suppress it. Its pan (d3-zoom) and node-drag (d3-drag) are both driven by native
+    // 'mousedown' listeners attached directly to the canvas, a *separate* event dispatched right
+    // after this one for the same physical gesture; the onMouseDownCapture handler below stops
+    // that half using the `groupDrag` ref this call is about to set.
+    event.stopPropagation();
+
+    const state: GroupDragState = {
+      pointerId: event.pointerId,
+      group: hit.group,
+      members: hit.members.map(m => ({ id: m.id, x: m.x, y: m.y })),
+      startX: point.x,
+      startY: point.y,
+      dragging: false,
+    };
+    groupDrag.current = state;
+    api.current?.resumeAnimation(); // the plain onPointerDown handler below never runs for an intercepted gesture
+    setHostCursor('grabbing');
+
+    const handleMove = (moveEvent: PointerEvent) => {
+      if (moveEvent.pointerId !== state.pointerId) return;
+      const p = screenToGraphPoint(moveEvent.clientX, moveEvent.clientY);
+      if (!p) return;
+      const deltaX = p.x - state.startX, deltaY = p.y - state.startY;
+      if (!state.dragging && Math.hypot(deltaX, deltaY) > GROUP_DRAG_THRESHOLD) state.dragging = true;
+      if (!state.dragging) return;
+      for (const member of state.members) {
+        const node = runtime.current.nodes.find(n => n.id === member.id);
+        if (!node) continue;
+        node.x = member.x + deltaX; node.y = member.y + deltaY;
+        node.fx = node.x; node.fy = node.y;
+      }
+    };
+
+    const handleUp = (upEvent: PointerEvent) => {
+      if (upEvent.pointerId !== state.pointerId) return;
+      window.removeEventListener('pointermove', handleMove);
+      window.removeEventListener('pointerup', handleUp);
+      dragListeners.current = null;
+      groupDrag.current = null;
+      setHostCursor('default');
+
+      if (!state.dragging) {
+        // A plain click on hull-covered background: the library's own onBackgroundClick never
+        // fired (its pointerdown was intercepted), so replicate its one visible effect here.
+        select(null);
+        return;
+      }
+      const positions: { id: string; x: number; y: number }[] = [];
+      for (const member of state.members) {
+        const node = runtime.current.nodes.find(n => n.id === member.id);
+        if (!node) continue;
+        if (node.spec.position?.anchored) {
+          // Matches onNodeDragEnd's existing rule exactly: an anchored node snaps back home and
+          // never counts as "moved", group drag or not.
+          node.x = node.homeX; node.y = node.homeY; node.fx = node.homeX; node.fy = node.homeY;
+        } else {
+          node.fx = node.x; node.fy = node.y; node.placed = true;
+          positions.push({ id: node.id, x: node.x, y: node.y });
+          onNodeMove?.(node.spec as ActivityNode<N>, { x: node.x, y: node.y });
+        }
+      }
+      props.onGroupMove?.(state.group, positions);
+      setInteraction(i => i + 1);
+    };
+
+    dragListeners.current = { move: handleMove, up: handleUp };
+    window.addEventListener('pointermove', handleMove);
+    window.addEventListener('pointerup', handleUp);
+  };
+
   return <div ref={host} className={props.className} style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden', ...props.style }}
     role="region" tabIndex={0} aria-label={props.ariaLabel ?? 'Activity graph. Arrow keys select nodes; Enter activates the selected node; Escape clears selection; F fits the view.'}
+    onPointerDownCapture={beginGroupDrag}
+    onMouseDownCapture={event => { if (groupDrag.current) event.stopPropagation(); }}
     onPointerDown={() => { api.current?.resumeAnimation(); }}
+    onPointerMove={event => {
+      if (groupDrag.current) return; // the window-level listeners above are driving the live drag
+      if (props.layoutMode !== 'guided' || typeof api.current?.screen2GraphCoords !== 'function' || event.buttons !== 0) { setHostCursor('default'); return; }
+      const point = screenToGraphPoint(event.clientX, event.clientY);
+      if (!point || pointHitsAnyNode(runtime.current.nodes, point)) { setHostCursor('default'); return; }
+      setHostCursor(groupAtPoint(point) ? 'grab' : 'default');
+    }}
     onPointerUp={() => setInteraction(n => n + 1)} onWheel={() => setInteraction(n => n + 1)}
     onKeyDown={event => {
       if (event.key === 'Escape') { select(null); event.preventDefault(); }

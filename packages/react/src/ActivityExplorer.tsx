@@ -14,7 +14,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityGraph, placeBranches } from '@atriarch/tracery-visualizer';
-import type { ActivityGraphHandle } from '@atriarch/tracery-visualizer';
+import type { ActivityGraphHandle, ActivityGroup } from '@atriarch/tracery-visualizer';
 import type { ActivityNode, NodeData, NodePresentation, NodeRecord, Flow, Scope } from '@atriarch/tracery-core';
 import type { ReactNode, CSSProperties, Ref } from 'react';
 import type { ActivitySource } from './source.js';
@@ -66,6 +66,19 @@ export interface ActivityExplorerProps {
    * button in a share dialog or the explorer's own header menu.
    */
   readonly graphRef?: Ref<ActivityGraphHandle>;
+  /**
+   * Forwarded straight to the inner `ActivityGraph` (guided layout only): reports an
+   * individual node's new position after a drag. This component has no placement-persistence
+   * logic of its own to wire it into -- a host page (or a test) that wants to observe drags
+   * supplies this directly.
+   */
+  readonly onNodeMove?: (node: ActivityNode<NodeData>, position: { x: number; y: number }) => void;
+  /**
+   * Forwarded straight to the inner `ActivityGraph`: reports every member's final position once
+   * at the end of a whole-group drag (dragging inside a group's hull, away from any node), in
+   * addition to that same drag's per-node `onNodeMove` calls.
+   */
+  readonly onGroupMove?: (group: ActivityGroup, positions: readonly { id: string; x: number; y: number }[]) => void;
 }
 
 const SCOPE_MODES: readonly ScopeMode[] = ['flow', 'ancestors', 'trace'];
@@ -77,7 +90,7 @@ function scopeModesFor(lockedTarget: LockedTarget | undefined): readonly ScopeMo
 }
 
 export function ActivityExplorer(props: ActivityExplorerProps) {
-  const { source, initialScope, catalog, renderInspector, theme, className, style, ariaLabel, readOnly, lockedTarget, graphRef } = props;
+  const { source, initialScope, catalog, renderInspector, theme, className, style, ariaLabel, readOnly, lockedTarget, graphRef, onNodeMove, onGroupMove } = props;
   const availableScopeModes = useMemo(() => scopeModesFor(lockedTarget), [lockedTarget]);
 
   const [activeFlow, setActiveFlow] = useState<string | undefined>(() => {
@@ -325,6 +338,8 @@ export function ActivityExplorer(props: ActivityExplorerProps) {
                 selectedNodeId={selectedNodeId}
                 onNodeSelect={(node) => setSelectedNodeId(node?.id ?? null)}
                 onNodeActivate={(node) => activate(node as ActivityNode<NodeData>)}
+                onNodeMove={onNodeMove}
+                onGroupMove={onGroupMove}
                 ariaLabel={ariaLabel}
                 apiRef={setGraphHandle}
               />

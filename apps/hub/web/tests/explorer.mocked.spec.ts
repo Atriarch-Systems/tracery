@@ -244,6 +244,184 @@ test('a malformed deep link (stray "%") reached via client-side navigation does 
   await expect(page.getByTestId('flow-picker-item')).toHaveCount(3);
 });
 
+// Draggable group hulls (packages/visualizer README "Draggable groups"): clicking and dragging
+// inside a group's hull, away from any node, moves every member node together in guided layout.
+// The graph is canvas-drawn, so there is no DOM to read node positions off directly; these specs
+// use two oracles instead, both built entirely on top of already-shipped, already-tested
+// behavior rather than any new test-only surface on the graph itself:
+//   1. The hull hover-cursor affordance (ActivityGraph sets the host element's own CSS `cursor`
+//      to "grab" while the pointer is over a hull's background) is probed via cheap in-page
+//      `PointerEvent` dispatches -- no real round trip per probe point -- to *locate* a point
+//      that is inside a group's hull and away from any node, and later to confirm the hull's hit
+//      area actually followed the drag by the expected screen-space delta.
+//   2. `App.tsx`'s onNodeMove/onGroupMove wiring (added alongside this feature -- there was no
+//      existing placement-persistence code in this app for either callback to plug into) calls an
+//      optional `window.__traceryTestOnNodeMove`/`__traceryTestOnGroupMove` hook when one exists,
+//      never writing to the global scope itself. These specs inject that hook via `page.evaluate`
+//      before each drag, recording into a plain page-local variable the hook closes over, to
+//      confirm the callback contract actually fired with real member data.
+// Real, trusted pointer input for the drag itself still goes through `page.mouse`, matching an
+// actual click-and-drag as closely as Playwright allows.
+
+/** Dispatches a synthetic, bubbling `pointermove` directly on the explorer's `ActivityGraph`
+ * host element and reports whatever CSS cursor value that leaves on it. Cheap (no Playwright
+ * round trip), safe to call from a tight in-page loop while probing many candidate points. */
+async function cursorAt(page: Page, clientX: number, clientY: number): Promise<string> {
+  return page.evaluate(
+    ([x, y]) => {
+      const host = document.querySelector('[role="region"][aria-label="Tracery hosted explorer"]') as HTMLElement | null;
+      if (!host) return '';
+      host.dispatchEvent(new PointerEvent('pointermove', { clientX: x, clientY: y, bubbles: true, cancelable: true, pointerId: -1, pointerType: 'mouse', buttons: 0 }));
+      return host.style.cursor;
+    },
+    [clientX, clientY] as const,
+  );
+}
+
+/** Grid-scans the canvas (in a single in-page pass) for a point whose hover cursor is "grab":
+ * inside some group's hull, away from every node -- exactly the area a group drag starts from.
+ * Retries a few times (`expect.poll`-style) since the guided layout's first fit is staggered
+ * (0/200/600ms retries in ActivityExplorer) and the very first probe can land before it settles. */
+async function findHullBackgroundPoint(page: Page): Promise<{ x: number; y: number }> {
+  // ActivityExplorer's first-fit effect re-centers/re-zooms the graph at 0/200/600ms after the
+  // first scope with nodes appears (see its own comment: "a couple of cheap, short retries cover
+  // that race"); probing before the last of those lands would find a point the graph then moves
+  // out from under before the real drag below acts on it.
+  await page.waitForTimeout(750);
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const point = await page.evaluate(() => {
+      const host = document.querySelector('[role="region"][aria-label="Tracery hosted explorer"]') as HTMLElement | null;
+      const canvas = host?.querySelector('canvas') as HTMLCanvasElement | null;
+      if (!host || !canvas) return null;
+      const rect = canvas.getBoundingClientRect();
+      for (let gy = 4; gy < rect.height; gy += 6) {
+        for (let gx = 4; gx < rect.width; gx += 6) {
+          const clientX = Math.round(rect.left + gx), clientY = Math.round(rect.top + gy);
+          host.dispatchEvent(new PointerEvent('pointermove', { clientX, clientY, bubbles: true, cancelable: true, pointerId: -1, pointerType: 'mouse', buttons: 0 }));
+          if (host.style.cursor === 'grab') return { x: clientX, y: clientY };
+        }
+      }
+      return null;
+    });
+    if (point) return point;
+    await page.waitForTimeout(150);
+  }
+  throw new Error('findHullBackgroundPoint: no grab-cursor (hull background) point found on the canvas after retrying');
+}
+
+test('dragging inside a group hull, away from any node, moves every member together', async ({ page }) => {
+  await primeMockedHub(page);
+  await page.getByTestId('scope-trace').click();
+
+  const start = await findHullBackgroundPoint(page);
+  const dx = 70, dy = 45;
+  await page.evaluate(() => {
+    (window as unknown as { __traceryTestOnGroupMove?: unknown; __traceryLastGroupMove?: unknown }).__traceryLastGroupMove = undefined;
+    (window as unknown as { __traceryTestOnGroupMove?: (move: unknown) => void }).__traceryTestOnGroupMove = (move: unknown) => {
+      (window as unknown as { __traceryLastGroupMove?: unknown }).__traceryLastGroupMove = move;
+    };
+  });
+
+  await page.mouse.move(start.x, start.y);
+  await page.mouse.down();
+  await page.mouse.move(start.x + dx, start.y + dy, { steps: 12 });
+  await page.mouse.up();
+
+  const groupMove = await page.evaluate(() => (window as unknown as { __traceryLastGroupMove?: { groupId: string; positions: { id: string; x: number; y: number }[] } }).__traceryLastGroupMove);
+  expect(groupMove, 'onGroupMove must have fired with the dragged group and its members').toBeTruthy();
+  expect(groupMove!.positions.length).toBeGreaterThan(0);
+
+  // The hull's own hit area -- recomputed live from the members' now-mutated positions, the same
+  // geometry hitTestGroup/drawGroupHull share -- must have followed the pointer: the drag's
+  // start point is no longer inside a hull, and the shifted point now is.
+  expect(await cursorAt(page, start.x, start.y)).not.toBe('grab');
+  expect(await cursorAt(page, start.x + dx, start.y + dy)).toBe('grab');
+});
+
+test('a plain click (no movement) inside a hull\'s empty area still deselects the current node', async ({ page }) => {
+  await primeMockedHub(page);
+  await page.getByTestId('scope-trace').click();
+
+  const parentNode = page.locator(`[data-testid="node-item"][data-group-id="${sampleFlowIds.parent}"]`).first();
+  await parentNode.click();
+  await expect(page.getByTestId('inspector-op-context').first()).toBeVisible();
+
+  const point = await findHullBackgroundPoint(page);
+  await page.mouse.click(point.x, point.y); // mousedown+mouseup at the same coordinates -- never crosses the drag threshold
+
+  await expect(page.getByTestId('inspector-op-context')).toHaveCount(0);
+});
+
+/**
+ * Locates a node card's own screen position using the same cheap in-page cursor probe as
+ * `findHullBackgroundPoint`, but inverted: a node card is a "hole" in its group's hull, so it
+ * reads back a "default" cursor at the candidate point itself while a "grab" cursor shows up a
+ * short distance to the left and right of it (still inside the same hull's padded background).
+ * That combination is specific enough not to also match open space entirely outside any hull
+ * (which reads "default" with no nearby "grab" on either side).
+ */
+async function findNodeInteriorPoint(page: Page): Promise<{ x: number; y: number }> {
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const point = await page.evaluate(() => {
+      const host = document.querySelector('[role="region"][aria-label="Tracery hosted explorer"]') as HTMLElement | null;
+      const canvas = host?.querySelector('canvas') as HTMLCanvasElement | null;
+      if (!host || !canvas) return null;
+      const cursorAtLocal = (clientX: number, clientY: number) => {
+        host.dispatchEvent(new PointerEvent('pointermove', { clientX, clientY, bubbles: true, cancelable: true, pointerId: -1, pointerType: 'mouse', buttons: 0 }));
+        return host.style.cursor;
+      };
+      const rect = canvas.getBoundingClientRect();
+      // ActivityGraph's setHostCursor stores its "default" state as an empty string (it only ever
+      // writes '' | 'grab' | 'grabbing' to host.style.cursor), never the literal word "default".
+      const reach = 90; // past a default card's own half-width (69) plus HULL_PAD (28), short of a neighboring card
+      for (let gy = 8; gy < rect.height; gy += 8) {
+        for (let gx = 8; gx < rect.width; gx += 8) {
+          const clientX = Math.round(rect.left + gx), clientY = Math.round(rect.top + gy);
+          if (cursorAtLocal(clientX, clientY) !== '') continue;
+          const left = cursorAtLocal(clientX - reach, clientY) === 'grab';
+          const right = cursorAtLocal(clientX + reach, clientY) === 'grab';
+          if (left && right) return { x: clientX, y: clientY };
+        }
+      }
+      return null;
+    });
+    if (point) return point;
+    await page.waitForTimeout(150);
+  }
+  throw new Error('findNodeInteriorPoint: no node-card point found on the canvas after retrying');
+}
+
+test('an individual node inside a group can still be dragged independently after a group drag', async ({ page }) => {
+  await primeMockedHub(page);
+  await page.getByTestId('scope-trace').click();
+
+  // One whole-group drag first, exactly like the first test above, to prove the two interactions
+  // don't leave any stuck state (e.g. a dangling window listener) behind for each other.
+  const hullPoint = await findHullBackgroundPoint(page);
+  await page.mouse.move(hullPoint.x, hullPoint.y);
+  await page.mouse.down();
+  await page.mouse.move(hullPoint.x + 40, hullPoint.y + 25, { steps: 8 });
+  await page.mouse.up();
+
+  // Locate a node's on-canvas position *after* the group drag (it may have carried this node
+  // along, if it belonged to the dragged group, so its position is only meaningful post-drag).
+  const nodePoint = await findNodeInteriorPoint(page);
+
+  await page.evaluate(() => {
+    (window as unknown as { __traceryTestOnNodeMove?: unknown; __traceryLastNodeMove?: unknown }).__traceryLastNodeMove = undefined;
+    (window as unknown as { __traceryTestOnNodeMove?: (move: unknown) => void }).__traceryTestOnNodeMove = (move: unknown) => {
+      (window as unknown as { __traceryLastNodeMove?: unknown }).__traceryLastNodeMove = move;
+    };
+  });
+  await page.mouse.move(nodePoint.x, nodePoint.y);
+  await page.mouse.down();
+  await page.mouse.move(nodePoint.x + 35, nodePoint.y + 15, { steps: 8 });
+  await page.mouse.up();
+
+  const nodeMove = await page.evaluate(() => (window as unknown as { __traceryLastNodeMove?: { id: string; x: number; y: number } }).__traceryLastNodeMove);
+  expect(nodeMove, 'the library\'s own individual node drag must still report onNodeMove after a prior group drag').toBeTruthy();
+});
+
 // SPEC.md §7 "Extensions and Tracery Cloud": the SSO-button-seam Playwright
 // tests that used to live here (KeyEntry showing/hiding "Sign in with SSO"
 // per a mocked GET /v1/auth/me, and skipping KeyEntry for an

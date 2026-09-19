@@ -63,12 +63,60 @@ function roundedPolygonPath(ctx: CanvasRenderingContext2D, points: readonly Poin
 }
 
 /** Padded corners of a node's card box, used as hull input so the hull clears the cards. */
-const paddedCorners = (node: RuntimeNode): Point[] => {
+export const paddedCorners = (node: RuntimeNode): Point[] => {
   const { w, h } = box(node);
   const x0 = node.x - w / 2 - HULL_PAD, x1 = node.x + w / 2 + HULL_PAD;
   const y0 = node.y - h / 2 - HULL_PAD, y1 = node.y + h / 2 + HULL_PAD;
   return [{ x: x0, y: y0 }, { x: x1, y: y0 }, { x: x1, y: y1 }, { x: x0, y: y1 }];
 };
+
+/** The one shape `drawGroupHull` fills/strokes and `hitTestGroup` hit-tests against -- factored
+ * out so a future change to the padding/shape math here cannot silently desync drawing from hit
+ * testing. One and two member groups synthesize a `HULL_PAD`-padded bounding rect (a true convex
+ * hull is a visually thin sliver at that size); three or more take the convex hull of every
+ * member's padded card corners. */
+export type GroupHullShape =
+  | { readonly kind: 'rect'; readonly x0: number; readonly y0: number; readonly x1: number; readonly y1: number }
+  | { readonly kind: 'polygon'; readonly points: readonly Point[] };
+
+export function groupHullShape(members: readonly RuntimeNode[]): GroupHullShape {
+  if (members.length <= 2) {
+    const boxes = members.map(n => ({ n, ...box(n) }));
+    const x0 = Math.min(...boxes.map(({ n, w }) => n.x - w / 2)) - HULL_PAD;
+    const x1 = Math.max(...boxes.map(({ n, w }) => n.x + w / 2)) + HULL_PAD;
+    const y0 = Math.min(...boxes.map(({ n, h }) => n.y - h / 2)) - HULL_PAD;
+    const y1 = Math.max(...boxes.map(({ n, h }) => n.y + h / 2)) + HULL_PAD;
+    return { kind: 'rect', x0, y0, x1, y1 };
+  }
+  return { kind: 'polygon', points: convexHull(members.flatMap(paddedCorners)) };
+}
+
+/** Standard ray-casting point-in-polygon test against a convex (or arbitrary simple) polygon.
+ * Boundary behavior follows the classic half-open-edge convention of this algorithm: a point
+ * lying exactly on an edge tests as inside or outside depending on which of that edge's two
+ * endpoints is above it in `y` -- sane (no point is ever double-counted or missed entirely by
+ * two adjoining edges) but not a guaranteed "always inside" for exact boundary points. */
+function pointInPolygon(point: Point, polygon: readonly Point[]): boolean {
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const pi = polygon[i]!, pj = polygon[j]!;
+    const crosses = (pi.y > point.y) !== (pj.y > point.y);
+    if (crosses && point.x < ((pj.x - pi.x) * (point.y - pi.y)) / (pj.y - pi.y) + pi.x) inside = !inside;
+  }
+  return inside;
+}
+
+/** Whether `point` (graph coordinates) falls within `group`'s current hull, computed from the
+ * exact same `groupHullShape` that `drawGroupHull` fills/strokes -- so a click can never land
+ * "inside" a hull the user cannot see, or miss one that is visibly under the pointer. */
+export function hitTestGroup(group: ActivityGroup, members: readonly RuntimeNode[], point: Point): boolean {
+  void group; // shape depends only on member positions; kept for a symmetrical, self-describing call site
+  if (members.length === 0) return false;
+  const shape = groupHullShape(members);
+  return shape.kind === 'rect'
+    ? point.x >= shape.x0 && point.x <= shape.x1 && point.y >= shape.y0 && point.y <= shape.y1
+    : pointInPolygon(point, shape.points);
+}
 
 /** Draws one group's hull (filled at low alpha, stroked faintly) and its label. One and two
  * member groups use a padded, rounded bounding rectangle (a proper hull looks like a sliver at
@@ -83,22 +131,17 @@ export function drawGroupHull(ctx: CanvasRenderingContext2D, group: ActivityGrou
   ctx.fillStyle = `rgba(${r},${g},${b},0.12)`;
   ctx.strokeStyle = `rgba(${r},${g},${b},0.35)`;
   ctx.lineWidth = 1;
-  if (members.length <= 2) {
-    const boxes = members.map(n => ({ n, ...box(n) }));
-    const x0 = Math.min(...boxes.map(({ n, w }) => n.x - w / 2)) - HULL_PAD;
-    const x1 = Math.max(...boxes.map(({ n, w }) => n.x + w / 2)) + HULL_PAD;
-    const y0 = Math.min(...boxes.map(({ n, h }) => n.y - h / 2)) - HULL_PAD;
-    const y1 = Math.max(...boxes.map(({ n, h }) => n.y + h / 2)) + HULL_PAD;
+  const shape = groupHullShape(members);
+  if (shape.kind === 'rect') {
     ctx.beginPath();
-    ctx.roundRect(x0, y0, x1 - x0, y1 - y0, HULL_RADIUS);
+    ctx.roundRect(shape.x0, shape.y0, shape.x1 - shape.x0, shape.y1 - shape.y0, HULL_RADIUS);
     ctx.fill(); ctx.stroke();
-    labelX = x0 + 10; labelY = y0 + 12;
+    labelX = shape.x0 + 10; labelY = shape.y0 + 12;
   } else {
-    const hull = convexHull(members.flatMap(paddedCorners));
-    roundedPolygonPath(ctx, hull, HULL_RADIUS);
+    roundedPolygonPath(ctx, shape.points, HULL_RADIUS);
     ctx.fill(); ctx.stroke();
-    labelX = Math.min(...hull.map(p => p.x)) + 10;
-    labelY = Math.min(...hull.map(p => p.y)) + 12;
+    labelX = Math.min(...shape.points.map(p => p.x)) + 10;
+    labelY = Math.min(...shape.points.map(p => p.y)) + 12;
   }
   ctx.font = '10px system-ui';
   ctx.textAlign = 'left';

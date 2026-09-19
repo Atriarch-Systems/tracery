@@ -90,6 +90,15 @@ export interface ActivityGraphProps<NodeData = unknown, EdgeData = unknown> {
   readonly selectedNodeId?: string | null;
   readonly onNodeSelect?: (node: ActivityNode<NodeData> | null) => void;
   readonly onNodeMove?: (node: ActivityNode<NodeData>, position: { x: number; y: number }) => void;
+  /**
+   * Fired once, in `layoutMode="guided"` only, at the end of a group drag (clicking and
+   * dragging inside a group's hull, away from any node, moves every member together). Every
+   * moved member also gets its own `onNodeMove` call in the same shape an individual drag
+   * produces, so existing per-node persistence needs no changes to pick up a group move; this
+   * callback is additional, letting a consumer distinguish "moved the whole group" from "moved
+   * one node" if it wants to.
+   */
+  readonly onGroupMove?: (group: ActivityGroup, positions: readonly { id: string; x: number; y: number }[]) => void;
   /** Fired on double-click of a node (two clicks within 350ms) and on Enter while a node is selected. */
   readonly onNodeActivate?: (node: ActivityNode<NodeData>) => void;
   readonly apiRef?: Ref<ActivityGraphHandle>;

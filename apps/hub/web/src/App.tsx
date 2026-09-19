@@ -14,6 +14,15 @@ import { fetchHubInfo } from './info.js';
 import { ThemeSettings } from './ThemeSettings.js';
 import { loadThemeChoice, saveThemeChoice, resolveActivityTheme, type ThemeChoice } from './theme-storage.js';
 
+declare global {
+  interface Window {
+    /** Set only by Playwright specs via `page.addInitScript`, never by this app itself -- an
+     * optional test observability hook for node/group drags. See explorer.mocked.spec.ts. */
+    __traceryTestOnNodeMove?: (move: { id: string; x: number; y: number }) => void;
+    __traceryTestOnGroupMove?: (move: { groupId: string; positions: readonly { id: string; x: number; y: number }[] }) => void;
+  }
+}
+
 function scopeForRoute(route: Route): Scope | undefined {
   if (route.type === 'flow') return { mode: 'flow', flow: route.id };
   if (route.type === 'trace') return { mode: 'trace', trace: route.id };
@@ -212,7 +221,25 @@ function Explorer({ session, route, onSignOut }: { readonly session: HubSession;
         {/* Backstop only (ui-1, ui-2 are fixed at their source): one bad
             event or projection must degrade this panel, not the whole page. */}
         <ExplorerErrorBoundary>
-          <ActivityExplorer source={source} initialScope={initialScope} ariaLabel="Tracery hosted explorer" graphRef={graphRef} theme={theme} />
+          <ActivityExplorer
+            source={source}
+            initialScope={initialScope}
+            ariaLabel="Tracery hosted explorer"
+            graphRef={graphRef}
+            theme={theme}
+            // No persistence logic lives here today for either callback to plug into. Rather
+            // than unconditionally publishing drag state to `window` for every real user (a
+            // prior version of this did exactly that), call an optional hook ONLY if a test
+            // harness has already defined one via `page.addInitScript` -- a no-op `typeof` check
+            // in production that never itself writes to the global scope. See
+            // apps/hub/web/tests/explorer.mocked.spec.ts's "group drag" tests.
+            onNodeMove={(node, position) => {
+              window.__traceryTestOnNodeMove?.({ id: node.id, ...position });
+            }}
+            onGroupMove={(group, positions) => {
+              window.__traceryTestOnGroupMove?.({ groupId: group.id, positions });
+            }}
+          />
         </ExplorerErrorBoundary>
       </div>
       {shareOpen && shareTarget && <ShareDialog session={session} target={shareTarget} graphRef={graphRef} onClose={() => setShareOpen(false)} />}
