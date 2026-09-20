@@ -16,8 +16,9 @@ claude --plugin-dir ./plugins/claude-code
 ```
 
 From a marketplace: this repo's own [`.claude-plugin/marketplace.json`](../../.claude-plugin/marketplace.json)
-lists this plugin as `tracery`, so once its marketplace is added (assuming
-the repo's intended future location):
+lists this plugin as `tracery`. The repo is live at
+[github.com/Atriarch-Systems/tracery](https://github.com/Atriarch-Systems/tracery),
+so this works today:
 
 ```
 /plugin marketplace add atriarch-systems/tracery

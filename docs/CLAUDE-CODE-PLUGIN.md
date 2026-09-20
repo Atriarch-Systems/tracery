@@ -25,9 +25,8 @@ Or add this repository as a plugin marketplace and install from it. The
 repo root's [`.claude-plugin/marketplace.json`](../.claude-plugin/marketplace.json)
 lists this plugin with `source: "./plugins/claude-code"`, so a marketplace
 install resolves to the same directory as the `--plugin-dir` path above --
-there's no separate build or publish step. Assuming this repo lives at
-`atriarch-systems/tracery` on GitHub (the intended future location -- swap
-in wherever this checkout actually lives if that's not yet true):
+there's no separate build or publish step. This repo is live at
+[github.com/Atriarch-Systems/tracery](https://github.com/Atriarch-Systems/tracery):
 
 ```
 /plugin marketplace add atriarch-systems/tracery
