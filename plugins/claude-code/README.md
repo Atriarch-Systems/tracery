@@ -69,11 +69,12 @@ the `npx @atriarch/tracery-hub` default) it should be left empty.
 
 ## Sharing the plugin with someone
 
-Three ways to hand this plugin to someone else, depending on whether this
-repository is on GitHub yet.
+Three ways to hand this plugin to someone else. This works today, right
+now, with nothing else to publish first -- the plugin itself has no npm
+dependencies, and the repo is already public on GitHub.
 
-**(a) Once this repo is on GitHub** -- the normal path, and the only one
-that updates itself when the plugin changes:
+**(a) The marketplace** -- the normal path, and the only one that updates
+itself when the plugin changes:
 
 ```
 /plugin marketplace add atriarch-systems/tracery
