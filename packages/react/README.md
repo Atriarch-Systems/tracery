@@ -96,7 +96,11 @@ interface ActivityExplorerProps {
   bound to keys `1`/`2`/`3` while the explorer has focus.
 - **Graph**: `ActivityGraph` in `layoutMode="guided"` via `placeBranches`, so
   spawned subgraphs grow beside their spawner and re-render with stable
-  positions. In trace scope, a **group legend** lists each flow
+  positions. Dragged node and group positions survive live updates, "Follow
+  latest" switches, and temporarily leaving the scope for the lifetime of the
+  explorer. Ancestors and trace scopes share positions for the same actor/node;
+  "This flow" keeps manual positions separate per flow. Reloading the page or
+  remounting the explorer clears these positions. In trace scope, a **group legend** lists each flow
   (`data-testid="group-legend-item"`, one per `FlowGroup`); clicking a legend
   item jumps the active flow there.
 - Because the graph itself is canvas-drawn, each group also gets a small

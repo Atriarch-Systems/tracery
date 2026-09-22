@@ -7,6 +7,7 @@ import { randomUUID } from 'node:crypto';
 import Fastify, { type FastifyError, type FastifyInstance, type FastifyRequest } from 'fastify';
 import websocketPlugin from '@fastify/websocket';
 import corsPlugin from '@fastify/cors';
+import { allowsBrowserRequest } from './origin.js';
 import swaggerPlugin from '@fastify/swagger';
 import { ACTIVITY_LIMITS } from '@atriarch/tracery-core/contract';
 import { authenticate, localModeAuth, AuthError, type AuthContext } from './auth.js';
@@ -159,20 +160,21 @@ export async function createServer(config: Config, extensions?: HubExtensions): 
     reply.code(status).send({ error: { code: clientErrorCode(fastifyError), message: error.message } });
   });
 
-  // Any browser-based application (this is the whole point of the "library
-  // or hub, your choice" pitch -- SPEC.md §6) will POST /v1/events to a hub
-  // running on a different origin than the app itself. Community auth here
-  // is a bearer token the caller sets explicitly, never an ambient cookie
-  // (Tracery Cloud's SSO session cookie is an extensions-module concern, not
-  // this package's), so reflecting the request origin carries no CSRF risk
-  // -- it just lets the browser's own CORS preflight succeed instead of
-  // silently blocking the request before it ever reaches this server.
+  // Install upgrade bookkeeping first so rejected upgrades also release their sockets.
+
+  await app.register(websocketPlugin);
+  // Reject before CORS and before WebSocket upgrades: withholding CORS response
+  // headers alone would still allow simple cross-origin writes in local mode.
+  app.addHook('onRequest', async (request, reply) => {
+    if (!allowsBrowserRequest(request, config)) {
+      return reply.code(403).send({ error: { code: 'origin_forbidden', message: 'browser origin or local hostname is not allowed' } });
+    }
+  });
   await app.register(corsPlugin, {
     origin: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['content-type', 'authorization', 'x-api-key'],
   });
-  await app.register(websocketPlugin);
   await app.register(swaggerPlugin, {
     openapi: {
       openapi: '3.1.0',

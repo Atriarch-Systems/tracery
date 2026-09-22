@@ -1,40 +1,15 @@
 # Tracery Cloud
 
-Tracery by Atriarch Systems is **free and open source, Apache-2.0, full stop.**
-Every package in this repository -- the contract, reducers, visualizer, React
-explorer, client SDKs, the standalone hub (including its hosted UI, storage
-engines, retention, and live feed) and the Claude Code plugin -- is
-100% Apache-2.0. There is no paid tier of the software itself, no feature
-flag in this repository that unlocks with a key, and no part of self-hosting
-the hub that requires a license. See [`SPEC.md` §7](SPEC.md#7-extensions-and-tracery-cloud)
-for the extension seam this document builds on, and the root
-[`README.md`](../README.md) for the licensing summary.
+Tracery's original community code is Apache-2.0. Third-party code retains its
+own licenses; see [LICENSING.md](LICENSING.md). The source release has no paid
+feature gate and does not require purchasing hosting.
 
-## Tracery Cloud is the managed service
-
-**Tracery Cloud** is Atriarch Systems' hosted, managed version of the hub,
-plus the operational and organizational features that only make sense for a
-managed service or a larger self-hosted team:
-
-- **Accounts and seats** -- sign up, invite teammates, manage who has access.
-- **SSO (OIDC)** -- sign in with your identity provider instead of an API key.
-- **Audit log** -- every authenticated request recorded, exportable.
-- **RBAC** -- API keys scoped to specific actors/tags, for ingest and reads.
-- **Retention and backups** -- longer/managed retention than a self-run
-  `TRACERY_RETENTION_HOURS`, with backups Atriarch Systems operates.
-- **Support** -- a real person to ask, instead of a GitHub issue queue.
-
-A **14-day trial** is available with no credit card at
-[atriarch.systems](https://atriarch.systems) -- sign up, get a hub URL, point
-your client SDK at it. Nothing in this repository is required to try it;
-nothing in this repository changes if you never do.
-
-**Self-hosted enterprise** (the same feature set above, running on your own
-infrastructure instead of Atriarch Systems') is available on request --
-reach out at [atriarch.systems](https://atriarch.systems) or via the
-[support link](https://ko-fi.com/demonslyr) in this repository. It ships as a
-private extensions module (see below), not as code that lives in this
-repository.
+Atriarch's managed hosting and private enterprise extension offering are separate
+from this repository. Contact [Atriarch Systems](https://atriarch.systems) for
+current availability, supported identity integrations, service features and terms.
+The extension interface supports integrations such as OIDC SSO, audit and RBAC.
+This tag does not claim a working signup/trial, SAML implementation, billing system,
+or managed backups; verify those against the operated service before advertising them.
 
 ## How Cloud plugs into the open hub
 

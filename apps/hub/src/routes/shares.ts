@@ -163,7 +163,7 @@ function canManage(auth: AuthContext, share: ShareRecord): boolean {
   return auth.roles.includes('admin') || share.createdBy === auth.keyId;
 }
 
-function registerAuthedShareRoutes(app: FastifyInstance, ctx: HubContext): void {
+function registerAuthedShareRoutes(app: FastifyInstance, ctx: HubContext, disconnect: (id: string) => void): void {
   app.post(
     '/v1/shares',
     { schema: { summary: 'Create a share link for a flow or trace', tags: ['shares'] } },
@@ -238,6 +238,7 @@ function registerAuthedShareRoutes(app: FastifyInstance, ctx: HubContext): void 
       if (!share) return reply.code(404).send(errorBody('not_found', `no such share: ${request.params.id}`));
       if (!canManage(auth, share)) return reply.code(403).send(errorBody('forbidden', 'only the share\'s creator or an admin may revoke it'));
       await ctx.store.revokeShare(auth.workspace, share.id, Date.now());
+      disconnect(share.id);
       reply.code(204).send();
     },
   );
@@ -293,7 +294,7 @@ async function resolveUsableShare(ctx: HubContext, token: string): Promise<Share
   return share;
 }
 
-function registerPublicShareRoutes(app: FastifyInstance, ctx: HubContext, limiter: TokenBucketLimiter): void {
+function registerPublicShareRoutes(app: FastifyInstance, ctx: HubContext, limiter: TokenBucketLimiter, sockets: Map<string, Set<WebSocket>>): void {
   const guard = async (request: FastifyRequest, reply: FastifyReply, token: string): Promise<ShareRecord | undefined> => {
     if (!limiter.allow(request.ip)) {
       tooManyRequests(reply);
@@ -394,8 +395,24 @@ function registerPublicShareRoutes(app: FastifyInstance, ctx: HubContext, limite
       const auth: AuthContext = { keyId: `share:${share.id}`, workspace: share.workspace, roles: ['read'], isOperator: false };
       const filter: LiveFilter = share.target.type === 'trace' ? { trace: share.target.id } : { flow: share.target.id };
 
-      attachLiveSocket(socket, request, { store: ctx.store, metrics: ctx.metrics, transformFrame: share.includeContext ? undefined : redactFrame }, auth, filter, initialAfter);
-    })();
+      if (socket.readyState !== socket.OPEN) return;
+      const members = sockets.get(share.id) ?? new Set<WebSocket>();
+      sockets.set(share.id, members);
+      members.add(socket);
+      socket.once('close', () => {
+        members.delete(socket);
+        if (members.size === 0) sockets.delete(share.id);
+      });
+      attachLiveSocket(socket, request, {
+        store: ctx.store, metrics: ctx.metrics,
+        transformFrame: share.includeContext ? undefined : redactFrame,
+        authorizeFrame: async () => Boolean(await resolveUsableShare(ctx, token)),
+        expiresAt: share.expiresAt,
+      }, auth, filter, initialAfter);
+    })().catch((err: unknown) => {
+      request.log.error({ err }, 'tracery share: live setup failed');
+      socket.close(1011, 'internal error');
+    });
   });
 }
 
@@ -406,6 +423,9 @@ export function registerSharesRoutes(app: FastifyInstance, ctx: HubContext): voi
   app.addContentTypeParser('image/png', { parseAs: 'buffer' }, (_request, body, done) => done(null, body));
 
   const limiter = new TokenBucketLimiter(PUBLIC_RATE_LIMIT.capacity, PUBLIC_RATE_LIMIT.windowMs);
-  registerAuthedShareRoutes(app, ctx);
-  registerPublicShareRoutes(app, ctx, limiter);
+  const sockets = new Map<string, Set<WebSocket>>();
+  registerAuthedShareRoutes(app, ctx, id => {
+    for (const socket of sockets.get(id) ?? []) socket.close(4404, 'not found');
+  });
+  registerPublicShareRoutes(app, ctx, limiter, sockets);
 }

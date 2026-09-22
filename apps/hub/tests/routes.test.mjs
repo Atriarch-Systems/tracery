@@ -602,7 +602,7 @@ test('ui: without a build, /ui serves a plain placeholder page; with one, it ser
 });
 
 test('cors: a browser preflight for a cross-origin POST /v1/events succeeds and reflects the caller\'s origin', async () => {
-  const created = await createTestServer({ apiKeys: KEYS });
+  const created = await createTestServer({ apiKeys: KEYS, allowedOrigins: ['http://localhost:5173'] });
   try {
     const res = await created.app.inject({
       method: 'OPTIONS',

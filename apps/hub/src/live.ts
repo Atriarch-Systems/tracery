@@ -41,6 +41,9 @@ export interface LiveFilter {
 }
 
 export interface AttachLiveSocketDeps {
+  /** Rechecked before every frame, including the initial snapshot and heartbeats. */
+  readonly authorizeFrame?: () => Promise<boolean>;
+  readonly expiresAt?: number | null;
   readonly store: EventStore;
   readonly metrics: MetricsRegistry;
   readonly extensions?: HubExtensions;
@@ -114,8 +117,18 @@ export function attachLiveSocket(
     socket.terminate();
   };
 
-  const send = (frame: ActivityFrame): void => {
+  const send = async (frame: ActivityFrame): Promise<void> => {
     if (closed || socket.readyState !== socket.OPEN) return;
+    if (deps.authorizeFrame && !await deps.authorizeFrame()) {
+      socket.close(4404, 'not found');
+      return;
+    }
+    // Store checks may await I/O: check the deadline and socket again afterwards.
+    if (closed || socket.readyState !== socket.OPEN) return;
+    if (deps.expiresAt != null && Date.now() >= deps.expiresAt) {
+      socket.close(4404, 'not found');
+      return;
+    }
     const transformed = deps.transformFrame ? deps.transformFrame(frame) : frame;
     if (transformed === null) return; // e.g. redacted-context share frame that ended up empty
     const filtered = deps.extensions?.onLiveFrame ? deps.extensions.onLiveFrame({ auth, frame: transformed }) : transformed;
@@ -150,7 +163,7 @@ export function attachLiveSocket(
   const unsubscribe = deps.store.subscribe((event) => {
     void belongsToFilter(event)
       .then((matches) => {
-        if (matches) send({ type: 'events', cursor: event.cursor, events: [event] });
+        if (matches) return send({ type: 'events', cursor: event.cursor, events: [event] });
       })
       .catch(onStoreError);
   });
@@ -162,9 +175,23 @@ export function attachLiveSocket(
   }, HEARTBEAT_MS);
   heartbeat.unref?.();
 
+  let expiryTimer: ReturnType<typeof setTimeout> | undefined;
+  const expire = () => {
+    if (deps.expiresAt == null || closed) return;
+    const remaining = deps.expiresAt - Date.now();
+    if (remaining <= 0) { socket.close(4404, 'not found'); return; }
+    expiryTimer = setTimeout(expire, Math.min(remaining, 2_147_483_647));
+    expiryTimer.unref?.();
+  };
+  expire();
+
+  let cleanedUp = false;
   const cleanup = (): void => {
+    if (cleanedUp) return;
+    cleanedUp = true;
     closed = true;
     clearInterval(heartbeat);
+    clearTimeout(expiryTimer);
     unsubscribe();
     deps.metrics.wsClientDisconnected();
   };

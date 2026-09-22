@@ -159,3 +159,29 @@ test('shares live: reconnecting with after=<cursor> replays only newer events', 
   assert.equal(frame.type, 'events');
   assert.deepEqual(frame.events.map((e) => e.id), ['b']);
 });
+
+for (const action of ['revoke', 'expire']) {
+  test('shares live: ' + action + ' closes existing subscriptions without leaking later events', { timeout: 5000 }, async t => {
+    const created = await createTestServer({ apiKeys: KEYS });
+    const address = await created.app.listen({ port: 0, host: '127.0.0.1' });
+    t.after(() => created.close());
+    await ingest(created.app, [oneEvent()]);
+    const share = await createShare(created.app, { target: { type: 'flow', id: 'f1' }, mode: 'live', expiresInDays: action === 'expire' ? 0.00001 : 'never' });
+    const ws = new WebSocket(address.replace('http', 'ws') + '/v1/shares/' + share.token + '/live');
+    const frames = frameQueue(ws);
+    const closed = waitClose(ws);
+    t.after(() => ws.close());
+    await waitOpen(ws);
+    assert.equal((await frames.next()).type, 'snapshot');
+    const subsequent = [];
+    ws.on('message', data => subsequent.push(JSON.parse(data.toString())));
+    if (action === 'revoke') {
+      const result = await created.app.inject({ method: 'DELETE', url: '/v1/shares/' + share.id, headers: bearer('key-full') });
+      assert.equal(result.statusCode, 204);
+      await ingest(created.app, [oneEvent({ id: 'after-revoke', ts: 2000 })]);
+    }
+    assert.equal((await closed).code, 4404);
+    assert.equal(subsequent.some(frame => frame.events?.some(event => event.id === 'after-revoke')), false);
+    assert.equal((await created.app.inject({ url: '/v1/shares/' + share.token + '/meta' })).statusCode, 404);
+  });
+}

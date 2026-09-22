@@ -68,6 +68,8 @@ export interface Config {
    * (e.g. behind a CDN or a path-rewriting gateway).
    */
   readonly publicUrl: string | undefined;
+  /** Exact browser origins allowed in addition to the hub's own origin. */
+  readonly allowedOrigins?: readonly string[];
   /**
    * Fastify request body size cap, in bytes (hub-4). No env var: it always
    * defaults to `ACTIVITY_LIMITS.maxEventsPerBatch * ACTIVITY_LIMITS.maxEventBytes`
@@ -243,6 +245,14 @@ function loadPostgresUrl(env: NodeJS.ProcessEnv, store: StoreKind): string | und
 
 /** Reads every hub environment variable, applying defaults. Never touches `process.env` directly (pass it in). */
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
+  const allowedOrigins = (env.TRACERY_ALLOWED_ORIGINS ?? '').split(',').map(value => value.trim()).filter(Boolean);
+  for (const origin of allowedOrigins) {
+    let parsed: URL;
+    try { parsed = new URL(origin); } catch { throw new Error('TRACERY_ALLOWED_ORIGINS must contain exact http(s) origins'); }
+    if (!['http:', 'https:'].includes(parsed.protocol) || parsed.origin !== origin) {
+      throw new Error('TRACERY_ALLOWED_ORIGINS must contain exact http(s) origins without paths or wildcards');
+    }
+  }
   const store = parseStoreKind(env.TRACERY_STORE);
   // Task ("local mode"): `npx @atriarch/tracery-hub` with no env at all must
   // bind loopback-only and run with auth off, never mint or print a key --
@@ -254,6 +264,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   return {
     port: parseNumber(env.TRACERY_PORT, 8971, 'TRACERY_PORT', { min: 1, max: 65_535, integer: true }),
     host,
+    allowedOrigins,
     store,
     sqlitePath: env.TRACERY_SQLITE_PATH ?? '/data/tracery.db',
     postgresUrl: loadPostgresUrl(env, store),

@@ -5,6 +5,9 @@ import { drawNode, drawLink } from '../dist/drawing.js';
 import { drawGroupHull } from '../dist/groups.js';
 import { DEFAULT_GRAPH_THEME, resolveGraphTheme } from '../dist/theme.js';
 
+// Animation comparisons must render the same instant, including elapsed-time fades.
+test.beforeEach((t) => t.mock.method(Date, 'now', () => 1_700_000_000_000));
+
 const fakeCtx = () => {
   const calls = [];
   const ctx = new Proxy({}, {

@@ -19,16 +19,8 @@ COPY . .
 
 RUN npm ci
 
-# Explicit dependency order: core has a type-only import on the visualizer's
-# ./types export (satisfied at compile time only -- core's compiled JS has
-# no runtime dependency on the visualizer, so the final stage below never
-# needs to copy it), and the hosted UI depends on core/visualizer/client/react.
-# A prior version of this step only built core+hub(+hub-web) directly and
-# relied on leftover dist/ directories from the developer's own machine to
-# satisfy those imports -- invisible on a dirty working tree (dist/ is always
-# there), but a truly clean checkout (CI, or this .dockerignore) fails
-# outright with "Cannot find module '@atriarch/tracery-visualizer/types'".
-# Caught by CI on the first push to a fresh clone; see git history.
+# Build all server and UI packages in dependency order. Core ships self-contained
+# data declarations and never imports the renderer at runtime.
 RUN npm run build -w @atriarch/tracery-visualizer -w @atriarch/tracery-core -w @atriarch/tracery-client -w @atriarch/tracery-react -w @atriarch/tracery-hub
 
 # Hosted UI (apps/hub/web, workstream E) is optional: when its package.json
@@ -58,22 +50,17 @@ RUN addgroup -S tracery && adduser -S tracery -G tracery
 # -- a container needs to accept connections from outside its network
 # namespace, so this image binds all interfaces explicitly.
 #
-# TRACERY_AUTH=none: a bare `docker run -p 8971:8971 image` with no other env
-# would otherwise fail to boot (config.ts: non-loopback host + no
-# TRACERY_API_KEYS = a startup error, on purpose -- see apps/hub/README.md
-# "Auth mode"). This default assumes whatever you're doing with a bare
-# `docker run` already trusts the network it's exposed on; a real deployment
-# should instead set TRACERY_API_KEYS/_FILE (docker-compose.yaml, k8s/, and
-# helm/ all do) and drop this back to unset.
+# Network-exposed containers require API keys or an explicit runtime auth opt-out.
 ENV NODE_ENV=production \
     TRACERY_HOST=0.0.0.0 \
     TRACERY_PORT=8971 \
     TRACERY_STORE=memory \
-    TRACERY_SQLITE_PATH=/data/tracery.db \
-    TRACERY_AUTH=none
+    TRACERY_SQLITE_PATH=/data/tracery.db
 
 COPY --from=build /repo/node_modules ./node_modules
 COPY --from=build /repo/package.json ./package.json
+COPY --from=build /repo/LICENSE /repo/NOTICE ./
+COPY --from=build /repo/apps/hub/web/dist/THIRD-PARTY-NOTICES.txt ./THIRD-PARTY-NOTICES.txt
 COPY --from=build /repo/packages/core/package.json ./packages/core/package.json
 COPY --from=build /repo/packages/core/dist ./packages/core/dist
 COPY --from=build /repo/apps/hub/package.json ./apps/hub/package.json

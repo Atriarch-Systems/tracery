@@ -14,7 +14,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityGraph, placeBranches } from '@atriarch/tracery-visualizer';
-import type { ActivityGraphHandle, ActivityGroup } from '@atriarch/tracery-visualizer';
+import type { ActivityGraphHandle, ActivityGroup, Placement } from '@atriarch/tracery-visualizer';
 import type { ActivityNode, NodeData, NodePresentation, NodeRecord, Flow, Scope } from '@atriarch/tracery-core';
 import type { ReactNode, CSSProperties, Ref } from 'react';
 import type { ActivitySource } from './source.js';
@@ -67,10 +67,8 @@ export interface ActivityExplorerProps {
    */
   readonly graphRef?: Ref<ActivityGraphHandle>;
   /**
-   * Forwarded straight to the inner `ActivityGraph` (guided layout only): reports an
-   * individual node's new position after a drag. This component has no placement-persistence
-   * logic of its own to wire it into -- a host page (or a test) that wants to observe drags
-   * supplies this directly.
+   * Reports an individual node's new position after a drag. Manual positions are remembered for this
+   * explorer's lifetime, including group drags and nodes that temporarily leave the scope.
    */
   readonly onNodeMove?: (node: ActivityNode<NodeData>, position: { x: number; y: number }) => void;
   /**
@@ -103,7 +101,10 @@ export function ActivityExplorer(props: ActivityExplorerProps) {
   });
   const [followLatest, setFollowLatest] = useState(!lockedTarget && initialScope === undefined);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
-  const [placement, setPlacement] = useState(() => new Map());
+  const [placement, setPlacement] = useState(() => new Map<string, Placement>());
+  // Keep only explicit user moves here; automatic placements can be discarded when nodes
+  // leave the view. Both caches are in-memory and disappear when the explorer unmounts.
+  const manualPlacement = useRef(new Map<string, Placement>());
 
   const ordered = useMemo(() => latestFlows(source.flows), [source.flows]);
 
@@ -155,13 +156,34 @@ export function ActivityExplorer(props: ActivityExplorerProps) {
   const scope: Scope | undefined = activeFlow !== undefined ? computeScope(mode, activeFlow, source.flows) : undefined;
   const projection = useProjection(source, scope ?? { mode: 'flow', flow: '' }, { catalog });
   const hasScope = scope !== undefined && (scope.mode === 'trace' ? true : source.flows.has(scope.flow));
+  // Flow projections use local node IDs; ancestors/trace use actor-qualified IDs. Keep
+  // unrelated flows' local IDs separate, while sharing actor placements across follow-latest
+  // switches and repeated runs. JSON tuple keys avoid collisions with consumer-supplied IDs.
+  const placementKey = (id: string) => JSON.stringify([scope?.mode === 'flow' ? scope.flow : null, id]);
 
   const guided = useMemo(
-    () => placeBranches(hasScope ? projection.nodes : [], hasScope ? projection.edges : [], placement),
+    () => {
+      const previous = new Map(placement);
+      for (const node of projection.nodes) {
+        const moved = manualPlacement.current.get(placementKey(node.id));
+        if (moved && !node.position?.anchored) previous.set(node.id, moved);
+      }
+      // Supply moved positions before admitting new nodes so branches grow beside their
+      // actual parents and collision checks use the user's arrangement.
+      return placeBranches(hasScope ? projection.nodes : [], hasScope ? projection.edges : [], previous);
+    },
     [hasScope, projection.nodes, projection.edges],
   );
 
   useEffect(() => setPlacement(guided.positions), [guided.positions]);
+
+  const rememberNodeMove = (node: ActivityNode<NodeData>, position: { x: number; y: number }) => {
+    const placed = guided.positions.get(node.id);
+    if (placed && !node.position?.anchored) {
+      manualPlacement.current.set(placementKey(node.id), { ...placed, ...position });
+    }
+    onNodeMove?.(node, position);
+  };
 
   const selectedNode: InspectorSelection | null = useMemo(
     () => (selectedNodeId ? (guided.nodes.find((n) => n.id === selectedNodeId) as ActivityNode<NodeData> | undefined) ?? null : null),
@@ -338,7 +360,7 @@ export function ActivityExplorer(props: ActivityExplorerProps) {
                 selectedNodeId={selectedNodeId}
                 onNodeSelect={(node) => setSelectedNodeId(node?.id ?? null)}
                 onNodeActivate={(node) => activate(node as ActivityNode<NodeData>)}
-                onNodeMove={onNodeMove}
+                onNodeMove={rememberNodeMove}
                 onGroupMove={onGroupMove}
                 ariaLabel={ariaLabel}
                 apiRef={setGraphHandle}

@@ -63,10 +63,8 @@ workspace? }` -- `workspace` is present only in `'none'` mode -- so a client
 can discover which mode a hub is running in with one unauthenticated call;
 the hosted UI uses it to skip the key-entry screen entirely in local mode.
 
-The Dockerfile's own default `ENV` includes `TRACERY_AUTH=none` (alongside
-`TRACERY_HOST=0.0.0.0`) specifically so a bare `docker run -p 8971:8971
-image` with no other env still starts -- see "Docker" below for why a real
-deployment should instead configure real keys and leave that unset.
+The container binds all interfaces and requires configured keys, unless you explicitly
+set `TRACERY_AUTH=none` at runtime behind a trusted access-control boundary.
 
 ### API key file format
 
@@ -115,18 +113,15 @@ spec at `GET /v1/openapi.json` (OpenAPI 3.1). Errors are always
 
 ### Cross-origin requests
 
-Any origin may call the API — the hub registers `@fastify/cors` with
-`origin: true`, reflecting whichever origin the browser sends and answering
-its preflight `OPTIONS` on every route (`GET`, `POST`, `PUT`, `DELETE`) with
-`content-type`, `authorization` and `x-api-key` allowed. This matters
-because a browser-based application pushing events lives on a different
-origin than the hub it pushes to almost by definition — see
-`examples/generator`, which POSTs straight from a page served on its own
-Vite dev port. Community auth is a bearer token the caller sets explicitly
-(never an ambient cookie — Tracery Cloud's SSO session cookie is an
-extensions-module concern, not this package's), so reflecting the origin
-carries no CSRF risk; it only lets the browser's own preflight succeed
-instead of silently blocking the request before it reaches this server.
+Browser HTTP requests and WebSocket upgrades accept the hub's own origin and
+exact origins in `TRACERY_ALLOWED_ORIGINS` (comma-separated, for example
+`http://localhost:5173,https://app.example.com`). Opaque origins (`null`), paths,
+and wildcards are not accepted. Set `TRACERY_PUBLIC_URL` when a reverse proxy
+serves a different external origin. Do not trust arbitrary forwarded headers.
+Native SDK requests without an Origin header continue to work and still require
+keys in authenticated mode. Origin checks never replace authentication.
+
+For the generator demo, allow its Vite origin explicitly on the target hub.
 
 ### Headers
 
@@ -278,19 +273,12 @@ optionally, `apps/hub/web`):
 
 ```
 docker build -f apps/hub/Dockerfile -t atriarch/tracery-hub:dev .
-docker run --rm -p 8971:8971 atriarch/tracery-hub:dev
+docker run --rm -p 127.0.0.1:8971:8971 -e TRACERY_AUTH=none atriarch/tracery-hub:dev
 ```
 
-That bare `docker run` still starts with no other env at all: the image's
-own `ENV` sets `TRACERY_HOST=0.0.0.0` (a container needs to accept
-connections from outside its network namespace, unlike the Node-process
-default of `127.0.0.1`) and `TRACERY_AUTH=none` (so rule 2 of "Auth mode"
-above -- loopback gets local mode automatically -- doesn't apply here, and
-the hub doesn't just fail to start). This is the same "local mode" as
-`npx @atriarch/tracery-hub`, just reachable from outside the container.
-**For anything beyond a quick local look, configure real
-`TRACERY_API_KEYS`/`_FILE` instead** (rule 1 always wins over the image's
-`TRACERY_AUTH=none` default, regardless of host):
+The local example explicitly opts out of authentication and publishes the port
+only on loopback. The image has no unauthenticated default. For network access,
+configure a real key:
 
 ```
 docker run --rm -p 8971:8971 \
@@ -298,9 +286,7 @@ docker run --rm -p 8971:8971 \
   atriarch/tracery-hub:dev
 ```
 
-or with compose (also root-context; see `docker-compose.yaml`, which
-already configures a keys file rather than relying on the image's
-`TRACERY_AUTH=none` default):
+or with compose (also root-context; its services configure a keys file):
 
 ```
 docker compose -f apps/hub/docker-compose.yaml up --build

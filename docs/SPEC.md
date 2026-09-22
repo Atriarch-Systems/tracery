@@ -185,9 +185,9 @@ Projection rules:
 - `catalog` lets the caller map `kind` to `NodePresentation`; a default catalog
   ships (`agent`, `subagent`, `llm`, `tool`, `memory`, `guard`, `human`, `service`, fallback).
 
-`@atriarch/tracery-core` depends on `@atriarch/tracery-visualizer/types` for
-the `ActivityNode` / `ActivityEdge` / `NodePresentation` types only (a type-only
-import; no renderer code is pulled in).
+`@atriarch/tracery-core` ships self-contained, renderer-free projection types.
+A build check keeps them identical to the visualizer data contract. Import React
+graph props and capture handles from `@atriarch/tracery-visualizer`.
 
 ## 3. Visualizer (`@atriarch/tracery-visualizer`) additions
 
@@ -267,9 +267,8 @@ Type hints, `py.typed`, PEP-420 namespace (no `atriarch/__init__.py`).
 ## 6. Hub (`@atriarch/tracery-hub`)
 
 Fastify 5 on Node 22. Configuration by environment variables (documented in
-`apps/hub/README.md`), all with defaults so `docker run -p 8971:8971 image`
-works with an in-memory store and no authentication of its own ("local
-mode" -- see "Auth" below; no key is ever minted or printed).
+`apps/hub/README.md`), with an in-memory loopback-only local default for the Node process. Containers
+bind all interfaces and require keys or an explicit runtime auth opt-out.
 
 ### HTTP API (all under `/v1`, JSON, OpenAPI 3.1 served at `/v1/openapi.json`)
 

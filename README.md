@@ -1,5 +1,20 @@
 # Tracery
 
+> **v0.1.0 source release:** clone this tag and build locally. npm/PyPI packages
+> and container publication are a separate follow-up; registry install examples
+> below describe those distribution paths. See [release notes](CHANGELOG.md).
+
+```sh
+git clone --branch v0.1.0 https://github.com/Atriarch-Systems/tracery.git
+cd tracery
+npm ci
+npm run build
+node apps/hub/bin/hub.mjs
+```
+
+Open http://127.0.0.1:8971/ui/ for the local hub.
+
+
 <p align="center">
   <a href="https://github.com/Atriarch-Systems/tracery/actions/workflows/ci.yaml"><img src="https://github.com/Atriarch-Systems/tracery/actions/workflows/ci.yaml/badge.svg?branch=main" alt="CI status"></a>
 </p>
@@ -80,9 +95,7 @@ docker run -d --name tracery-hub -p 8971:8971 \
   atriarch/tracery-hub
 ```
 
-(a bare `docker run` with no env at all still starts -- the image's own
-default is `TRACERY_AUTH=none`, i.e. also local mode, since it binds
-`0.0.0.0` rather than loopback; see `apps/hub/README.md`.) Running on a
+(containers require keys or an explicit runtime authentication opt-out; see `apps/hub/README.md`) Running on a
 cluster: `apps/hub/k8s/` (plain manifests) or the
 [Helm chart](apps/hub/helm/README.md) -- both expect real
 `TRACERY_API_KEYS`/`_FILE` to be configured, same as any other shared
@@ -227,23 +240,26 @@ flow reachable that way resolves to one `trace`.
 - [`docs/PUBLISHING.md`](docs/PUBLISHING.md) — the runbook for publishing to npmjs.com, PyPI, Docker Hub/GHCR, and GitHub, plus what `npm run publish:check` proves before every release.
 - [`CLAUDE.md`](CLAUDE.md) — repository layout and conventions for agents working in this codebase.
 
+## Contributing
+
+Bug reports, documentation, examples, and code contributions are welcome. See
+[CONTRIBUTING.md](CONTRIBUTING.md) for local setup, tests, pull requests, and
+licensing expectations.
+
 ## Licensing
 
-**100% Apache License 2.0.** Every package in this repository — ingest,
+**Tracery's original code is licensed under Apache License 2.0.** Every Tracery package in this repository — ingest,
 storage, retention, the live feed, the hosted UI, the client SDKs, and the
 Claude Code plugin — works unlicensed and unmodified; there is no commercial
-layer, license key, or feature flag anywhere in this repository. See
+layer, license key, or feature flag anywhere in this repository. Third-party dependencies and vendored code retain their own licenses; see [licensing and redistribution](docs/LICENSING.md). See
 [`NOTICE`](NOTICE) for third-party attributions.
 
 ## Tracery Cloud
 
-Tracery Cloud is Atriarch Systems' managed hub — accounts, seats, SSO (OIDC),
-an audit log, RBAC scopes, managed retention/backups, and support — with a
-14-day free trial. It plugs into the open hub through the same
-`HubExtensions` seam any self-hosted extensions module could use
-([`docs/SPEC.md` §7](docs/SPEC.md#7-extensions-and-tracery-cloud)); its
-implementation lives in a private repository, not here. Self-hosted
-enterprise is available on request. See [`docs/CLOUD.md`](docs/CLOUD.md).
+Atriarch's managed hosting and private enterprise extensions are separate from
+this community source release. Contact [Atriarch Systems](https://atriarch.systems)
+for current availability and terms. This tag does not establish trial, SAML,
+billing, or managed-backup availability. See [Cloud architecture](docs/CLOUD.md).
 
 ## Support
 

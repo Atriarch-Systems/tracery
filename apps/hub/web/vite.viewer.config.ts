@@ -1,3 +1,5 @@
+// @ts-ignore -- build-only JavaScript plugin
+import { bundleLicenses } from '../../../scripts/bundle-licenses.mjs';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { viteSingleFile } from 'vite-plugin-singlefile';
@@ -11,7 +13,7 @@ import { viteSingleFile } from 'vite-plugin-singlefile';
 // AFTER vite.config.ts's (see package.json's `build` script) into the same
 // `dist/`, and must not wipe out that first build's output.
 export default defineConfig({
-  plugins: [react(), viteSingleFile()],
+  plugins: [react(), bundleLicenses(), viteSingleFile()],
   build: {
     outDir: 'dist',
     emptyOutDir: false,

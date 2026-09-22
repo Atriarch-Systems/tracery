@@ -39,3 +39,7 @@ grows the same way a real agent's activity would. `src/sendToHub.ts` posts
 them to `POST /v1/events` (SPEC.md §6) with a plain `fetch()` -- see there
 for why this example doesn't use `@atriarch/tracery-client`'s `ActivityTracer`
 builder API for this.
+
+For cross-origin hub delivery, set `TRACERY_ALLOWED_ORIGINS` to this page's exact
+origin (for example `http://localhost:5173`) when starting the hub. Use the actual
+port Vite prints. This is required in local mode too. Native SDKs are unaffected.

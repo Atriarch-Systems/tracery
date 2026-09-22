@@ -62,6 +62,9 @@ async function primeMockedHubWithFrame(page: Page, frame: unknown, path = '/ui/'
         constructor(url: string) {
           super();
           this.url = url;
+          (window as unknown as { __sendTraceryFrame: (frame: unknown) => void }).__sendTraceryFrame = (next) => {
+            this.dispatchEvent(new MessageEvent('message', { data: JSON.stringify(next) }));
+          };
           setTimeout(() => {
             this.readyState = 1;
             this.dispatchEvent(new Event('open'));
@@ -336,6 +339,64 @@ test('dragging inside a group hull, away from any node, moves every member toget
   // start point is no longer inside a hull, and the shifted point now is.
   expect(await cursorAt(page, start.x, start.y)).not.toBe('grab');
   expect(await cursorAt(page, start.x + dx, start.y + dy)).toBe('grab');
+});
+
+test('ancestor group positions survive streamed updates, follow-latest switches, and leaving the scope', async ({ page }) => {
+  await primeMockedHubWithFrame(page, { ...snapshotFrame, events: storedEvents.filter(e => e.id === 'evt-p-01' || e.id === 'evt-r2-01') });
+  await page.getByTestId('scope-trace').click();
+  // Let initial framing finish before switching scope, which uses the default viewport.
+  await findHullBackgroundPoint(page);
+  await page.getByTestId('scope-ancestors').click();
+  const start = await findHullBackgroundPoint(page);
+  await page.evaluate(() => {
+    (window as unknown as { __traceryTestOnGroupMove: (move: unknown) => void }).__traceryTestOnGroupMove = (move) => {
+      (window as unknown as { __lastMove: unknown }).__lastMove = move;
+    };
+  });
+  const drag = async (x: number, y: number, dx: number, dy: number) => {
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.mouse.move(x + dx, y + dy, { steps: 12 });
+    await page.mouse.up();
+  };
+  const lastMove = () => page.evaluate(() => (window as unknown as {
+    __lastMove: { groupId: string; positions: { id: string; x: number; y: number }[] };
+  }).__lastMove);
+  await drag(start.x, start.y, 70, 45);
+  const moved = await lastMove();
+  expect(moved.positions.length).toBeGreaterThan(0);
+  const selectedFlow = await page.locator('[data-testid="flow-picker-item"][data-active="true"]').getAttribute('data-flow-id');
+  const send = async (event: object, cursor: number) => page.evaluate(({ event, cursor }) => {
+    (window as unknown as { __sendTraceryFrame: (frame: unknown) => void }).__sendTraceryFrame({
+      type: 'events', cursor, events: [{ ...event, cursor, workspace: 'default', receivedAt: Date.now() }],
+    });
+  }, { event, cursor });
+  // A status-only update, followed by a new descendant: Follow latest switches the layout key,
+  // while both existing ancestor groups remain part of the projection.
+  const ts = 1_700_000_100_000;
+  await send({ v: 1, id: 'drag-update', ts, flow: selectedFlow, op: 'drag-op', node: 'llm:main', type: 'annotate', name: 'drag.check' }, storedEvents.length + 1);
+  await expect.poll(() => cursorAt(page, start.x + 70, start.y + 45)).toBe('grab');
+  await send({ v: 1, id: 'drag-child', ts: ts + 1, flow: 'drag-child', op: 'drag-child-op', node: 'new-node', type: 'start', name: 'new.child', root: true,
+    actor: { id: 'drag-child-actor' }, link: { parentFlow: selectedFlow } }, storedEvents.length + 2);
+  await expect(page.locator('[data-testid="flow-picker-item"][data-flow-id="drag-child"]')).toHaveAttribute('data-active', 'true');
+  await expect.poll(() => cursorAt(page, start.x + 70, start.y + 45)).toBe('grab');
+  // A node's position must survive even when a scope temporarily omits it.
+  await page.getByTestId('scope-flow').click();
+  await page.getByTestId('scope-ancestors').click();
+  await expect.poll(() => cursorAt(page, start.x + 70, start.y + 45)).toBe('grab');
+  const zoom = await page.locator('[role="region"][aria-label="Tracery hosted explorer"]').evaluate(el => {
+    const rect = el.getBoundingClientRect();
+    return Math.min(rect.width / 1220, rect.height / 660);
+  });
+  await drag(start.x + 70, start.y + 45, 10, 10);
+  const again = await lastMove();
+  expect(again.groupId).toBe(moved.groupId);
+  expect(again.positions.length).toBe(moved.positions.length);
+  for (const before of moved.positions) {
+    const after = again.positions.find(p => p.id === before.id)!;
+    expect(after.x).toBeCloseTo(before.x + 10 / zoom, 3);
+    expect(after.y).toBeCloseTo(before.y + 10 / zoom, 3);
+  }
 });
 
 test('a plain click (no movement) inside a hull\'s empty area still deselects the current node', async ({ page }) => {
