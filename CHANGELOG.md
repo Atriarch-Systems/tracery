@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Make source builds the active hub/plugin quick start; mark npm, PyPI and
+  prebuilt Docker distribution as pending. Add the missing local image build
+  step and correct Docker smoke commands for explicit local authentication opt-out.
+
 ## v0.1.0 — source release
 
 This is the first coordinated GitHub source release. npm, PyPI and container

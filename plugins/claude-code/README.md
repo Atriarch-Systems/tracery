@@ -1,5 +1,9 @@
 # tracery (Claude Code plugin)
 
+> **Source release:** npm packages and prebuilt Docker images are not published yet.
+> Follow the [source checkout/build instructions](../../README.md) first; run the
+> commands below from the repository root.
+
 Streams Claude Code session, tool-call and subagent activity to an
 [Tracery](../../docs/SPEC.md) hub, so a running session shows up as a
 live flow graph instead of only scrollback. See
@@ -28,14 +32,14 @@ so this works today:
 See [`../../docs/CLAUDE-CODE-PLUGIN.md`](../../docs/CLAUDE-CODE-PLUGIN.md#install-and-configure)
 for the local-path variant of `/plugin marketplace add`.
 
-## Quick start: one command, no key
+## Quick start: built source, no key
 
 Point the plugin at a hub started with no configuration at all -- it runs
 loopback-only with auth off (SPEC.md §6 "Auth mode"), so there is no key to
 generate, copy, or configure:
 
 ```sh
-npx @atriarch/tracery-hub
+node apps/hub/bin/hub.mjs
 ```
 
 ```sh
@@ -65,7 +69,7 @@ With no `hub_url` at all, every hook is a silent no-op -- installing the
 plugin without configuring it does nothing. `api_key` is only needed against
 a hub running with `TRACERY_API_KEYS` configured (needs the `ingest` role,
 see `apps/hub/README.md`); against a local-mode hub (no `TRACERY_API_KEYS`,
-the `npx @atriarch/tracery-hub` default) it should be left empty.
+the `node apps/hub/bin/hub.mjs` default) it should be left empty.
 
 ## Sharing the plugin with someone
 
@@ -107,15 +111,8 @@ directory containing this plugin's own `plugin.json`, `hooks/`, and
 
 **(c) Either way, your friend also needs a hub to point it at.** The plugin
 only ever talks to whatever `TRACERY_HUB_URL` names -- it does not ship one.
-Cheapest option once `@atriarch/tracery-hub` is published: their own local
-hub, no install beyond `npx`:
-
-```sh
-npx @atriarch/tracery-hub
-```
-
-Until then (or if they'd rather run from source), a clone of this repo does
-the same thing:
+For v0.1.0, have them follow the root README's source checkout/build steps,
+then start their own local hub from the repository root:
 
 ```sh
 node apps/hub/bin/hub.mjs

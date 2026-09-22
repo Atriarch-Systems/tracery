@@ -1,8 +1,9 @@
 # Tracery
 
-> **v0.1.0 source release:** clone this tag and build locally. npm/PyPI packages
-> and container publication are a separate follow-up; registry install examples
-> below describe those distribution paths. See [release notes](CHANGELOG.md).
+> **v0.1.0 is available from source. npm/PyPI packages and Docker images are not published yet.**
+> `npx @atriarch/tracery-hub` and `docker pull atriarch/tracery-hub` will not work
+> until registry publication. Use the commands below (Node.js >=22.13), or try the
+> [hosted demo](https://atriarch.systems/demos/tracery/). See [release notes](CHANGELOG.md).
 
 ```sh
 git clone --branch v0.1.0 https://github.com/Atriarch-Systems/tracery.git
@@ -51,7 +52,10 @@ for the full specification.
 Plus a **Claude Code plugin** that streams a running Claude Code session
 (tool calls, subagents) to a hub as its own live flow graph.
 
-### Quick start: library
+### Library integration (npm publication pending)
+
+For v0.1.0, try the source examples below. This install command becomes available
+after npm publication:
 
 ```
 npm install @atriarch/tracery-core @atriarch/tracery-react
@@ -76,10 +80,11 @@ function MyPage() {
 
 ### Quick start: hub
 
-The fastest way to a running hub -- no Docker, no keys:
+After cloning and building the source as shown above, run this from the repository
+root (no Docker or keys required):
 
 ```
-npx @atriarch/tracery-hub
+node apps/hub/bin/hub.mjs
 ```
 
 That binds `127.0.0.1:8971`, runs entirely in memory, and serves the hosted
@@ -87,12 +92,13 @@ UI at `http://127.0.0.1:8971/ui/` with auth off ("local mode" -- SPEC.md §6
 "Auth mode"): a single `default` workspace, no API key to generate or paste
 anywhere. Fine for a laptop, a demo, or trying the plugin; for anything a
 second person or process should reach, run it as a container instead with
-real keys:
+real keys. Build the image locally first, from the repository root:
 
-```
+```sh
+docker build -f apps/hub/Dockerfile -t atriarch/tracery-hub:dev .
 docker run -d --name tracery-hub -p 8971:8971 \
   -e TRACERY_API_KEYS='[{"id":"me","key":"CHANGE_ME","workspace":"default","roles":["ingest","read","admin"]}]' \
-  atriarch/tracery-hub
+  atriarch/tracery-hub:dev
 ```
 
 (containers require keys or an explicit runtime authentication opt-out; see `apps/hub/README.md`) Running on a
@@ -100,6 +106,9 @@ cluster: `apps/hub/k8s/` (plain manifests) or the
 [Helm chart](apps/hub/helm/README.md) -- both expect real
 `TRACERY_API_KEYS`/`_FILE` to be configured, same as any other shared
 deployment.
+
+The following SDK install command requires the pending npm publication. For now,
+run the examples in this built checkout.
 
 ```
 npm install @atriarch/tracery-client
@@ -120,10 +129,12 @@ flow.end();
 await tracer.close();
 ```
 
-Or from Python: `pip install atriarch-tracery` (see
+Or from Python, install from the checkout: `python -m pip install ./clients/python` (see
 [`clients/python/README.md`](clients/python/README.md)).
 
-### Quick start: both
+### Embedded hub client (npm publication pending)
+
+This install command becomes available after npm publication:
 
 ```
 npm install @atriarch/tracery-react
@@ -133,7 +144,7 @@ npm install @atriarch/tracery-react
 import { ActivityExplorer, useHubSource } from '@atriarch/tracery-react';
 
 function MyPage() {
-  // apiKey is optional against a local-mode hub (npx @atriarch/tracery-hub, see above).
+  // apiKey is optional against a local-mode hub (node apps/hub/bin/hub.mjs, see above).
   const source = useHubSource({ baseUrl: 'http://127.0.0.1:8971', workspace: 'default' });
   return <div style={{ height: '100vh' }}><ActivityExplorer source={source} /></div>;
 }
@@ -144,22 +155,23 @@ function MyPage() {
 [`examples/generator`](examples/generator) is a small interactive app: pick
 a sample flow, click **Generate**, and watch it draw itself -- no hub
 required. Check a box to also push the same events to a running hub
-(`npx @atriarch/tracery-hub` in another terminal, no key needed) and compare
+(`node apps/hub/bin/hub.mjs` in another terminal, no key needed) and compare
 the library view against the standalone hub's UI side by side.
 
 ```
 git clone https://github.com/Atriarch-Systems/tracery.git && cd tracery
-npm install
+npm ci
+npm run build
 npm run dev -w tracery-example-generator
 ```
 
 ### Quick start: Claude Code plugin
 
-One command starts a hub, one starts a session pointed at it -- no key to
-generate or paste:
+After the source checkout/build above, start the hub from the repository root,
+then start a session in a second terminal -- no key to generate or paste:
 
 ```
-npx @atriarch/tracery-hub
+node apps/hub/bin/hub.mjs
 ```
 
 ```

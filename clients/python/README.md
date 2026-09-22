@@ -8,8 +8,11 @@ TypeScript sibling.
 
 ## Install
 
-```
-pip install atriarch-tracery
+For v0.1.0, install from a source checkout (PyPI publication is pending):
+
+```sh
+# From the repository root:
+python -m pip install ./clients/python
 ```
 
 Requires Python >=3.11. `atriarch` is a PEP 420 namespace package (there is

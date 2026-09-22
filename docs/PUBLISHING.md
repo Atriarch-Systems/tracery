@@ -245,8 +245,8 @@ Tag with both `latest` and the exact `apps/hub` version (e.g. `0.1.0`) so a
 consumer can pin. Smoke-test the built image before pushing anywhere:
 
 ```sh
-docker run --rm -p 8971:8971 atriarch/tracery-hub:<version>
-curl http://127.0.0.1:8971/v1/info    # {"auth":"none", ...} -- local-mode default, see apps/hub/README.md
+docker run --rm -p 127.0.0.1:8971:8971 -e TRACERY_AUTH=none atriarch/tracery-hub:<version>
+curl http://127.0.0.1:8971/v1/info    # {"auth":"none", ...} -- explicit local testing opt-out, see apps/hub/README.md
 ```
 
 ### Docker Hub

@@ -1,7 +1,9 @@
 # Getting started
 
-For v0.1.0, use the source-checkout instructions in the root README. Registry
-commands below apply after the separate npm/container publication.
+**v0.1.0 is a source release. npm/PyPI packages and prebuilt Docker images are
+not published yet.** The hub instructions below build from source. SDK registry
+install commands later in this guide apply only after publication; use this
+checkout's examples meanwhile.
 
 A longer walkthrough than the root [`README.md`](../README.md)'s quick
 starts: running the hub with Docker Compose and a real keys file, emitting
@@ -12,10 +14,14 @@ managed service this guide doesn't need.
 
 ## 1. Run the hub
 
-### `npx` (no install, no Docker, no keys)
+### Source checkout (Node.js >=22.13, no Docker or keys)
 
 ```sh
-npx @atriarch/tracery-hub
+git clone --branch v0.1.0 https://github.com/Atriarch-Systems/tracery.git
+cd tracery
+npm ci
+npm run build
+node apps/hub/bin/hub.mjs
 ```
 
 Binds `127.0.0.1:8971`, in-memory store, hosted UI at
@@ -26,7 +32,10 @@ fastest way to try the hub or point the Claude Code plugin at one (§4
 below); reach for Docker once more than one machine or process needs to
 reach it.
 
-### Plain `docker run`
+### Build and run a local Docker image
+
+Clone the repository above first and run these commands at its root. No public
+Tracery image is available to pull yet; Docker builds it locally:
 
 ```sh
 docker build -f apps/hub/Dockerfile -t atriarch/tracery-hub:dev .   # from the repo root
@@ -50,12 +59,12 @@ nothing survives a restart. Full environment variable reference:
 
 `apps/hub/docker-compose.yaml` builds from the repository root (the image
 needs `packages/core` and, optionally, the hosted UI in `apps/hub/web`) and
-mounts a real keys file rather than relying on the image's `TRACERY_AUTH=none`
-default:
+mounts a keys file. The container requires keys or an explicit authentication
+opt-out; it has no unauthenticated default:
 
 ```sh
-cd apps/hub
-docker compose -f docker-compose.yaml up --build
+# From the repository root:
+docker compose -f apps/hub/docker-compose.yaml up --build
 ```
 
 This starts the hub with `TRACERY_STORE=sqlite` (durable across restarts,
@@ -231,7 +240,7 @@ watch any other producer's activity. One command each, no key needed against
 the local-mode hub from §1:
 
 ```sh
-npx @atriarch/tracery-hub
+node apps/hub/bin/hub.mjs
 ```
 
 ```sh

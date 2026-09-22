@@ -1,18 +1,22 @@
 # @atriarch/tracery-hub
 
+> **Source release:** npm packages and prebuilt Docker images are not published yet.
+> Follow the [source checkout/build instructions](../../README.md) first; run the
+> commands below from the repository root.
+
 Standalone server for Tracery (see [`../../docs/SPEC.md`](../../docs/SPEC.md)
 §6). Apps push events with a client SDK (`@atriarch/tracery-client` or the
 Python `atriarch-tracery`); the hub stores, sorts, serves and draws. Nothing
 renders in the producing app.
 
 ```
-npx @atriarch/tracery-hub
+node apps/hub/bin/hub.mjs
 ```
 
 starts the server bound to `127.0.0.1:8971` with an in-memory store and
 **no authentication of its own** ("local mode" -- see "Auth mode" below): a
 single `default` workspace, no key to generate, copy, or configure. Every
-other setting below has a default, so this works entirely out of the box.
+other setting below has a default once the source and hosted UI are built.
 
 ## Environment variables
 

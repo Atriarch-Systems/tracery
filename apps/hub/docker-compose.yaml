@@ -30,8 +30,8 @@ services:
       # TRACERY_API_KEYS_FILE at it (see ./keys.example.json below). There is
       # no dev-key fallback (apps/hub/README.md "Auth mode"); with neither
       # set on a non-loopback TRACERY_HOST, the hub fails at boot unless
-      # TRACERY_AUTH=none is also set (the image's own Dockerfile default --
-      # only for a hub deliberately run with no auth of its own).
+      # TRACERY_AUTH=none is explicitly set at runtime for a hub deliberately
+      # run behind a trusted access-control boundary.
       TRACERY_API_KEYS_FILE: /run/secrets/tracery-keys.json
     volumes:
       - tracery-data:/data
