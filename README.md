@@ -248,6 +248,7 @@ flow reachable that way resolves to one `trace`.
 - [`docs/GETTING-STARTED.md`](docs/GETTING-STARTED.md) — a longer walkthrough: hub via Docker Compose, a keys file, TS and Python emitters, embedding the explorer, the plugin.
 - [`docs/DEMOS.md`](docs/DEMOS.md) — the three demos (Claude Code plugin, npm library, standalone hub): commands, screenshots, and what each distribution can and can't do.
 - [`docs/HARDENING.md`](docs/HARDENING.md) — findings from a review/verify/fix pass (confirmed vs. refuted, with reasoning) and the roadmap items delivered alongside it.
+- [`docs/CLEAN-MACHINE-TEST.md`](docs/CLEAN-MACHINE-TEST.md) — clean-machine acceptance plan for npm tarballs, Docker, the graph UI, persistence, and final registry installs.
 - [`docs/VALIDATION.md`](docs/VALIDATION.md) — a from-scratch checklist (exact commands, expected output, PASS/FAIL) for an agent verifying a fresh checkout on a new machine: the npm library, the self-hosted hub (plus Docker), and the Claude Code plugin.
 - [`docs/PUBLISHING.md`](docs/PUBLISHING.md) — the runbook for publishing to npmjs.com, PyPI, Docker Hub/GHCR, and GitHub, plus what `npm run publish:check` proves before every release.
 - [`CLAUDE.md`](CLAUDE.md) — repository layout and conventions for agents working in this codebase.
