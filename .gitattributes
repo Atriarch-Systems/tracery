@@ -1,0 +1,2 @@
+# Preserve the reviewed upstream license bytes, including on Windows checkouts.
+licenses/vendor/node-v22.23.2-LICENSE -text

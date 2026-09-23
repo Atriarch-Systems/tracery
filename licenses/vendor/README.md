@@ -16,3 +16,14 @@ build fails for any newly missing license until its source is reviewed.
   The fallback preserves that page's MIT grant and copyright notice retrieved
   2026-09-23 (the linked site renders the current year), with its obfuscated
   email rendered as the same author address recorded in package.json.
+
+## Node 22.23.2
+
+`node-v22.23.2-LICENSE` is the unmodified complete upstream license from
+https://raw.githubusercontent.com/nodejs/node/v22.23.2/LICENSE, retrieved on
+2026-09-23. SHA-256:
+`c738ae413cf561f174e34f6961f8ca458aae2369a73640dda6234c629b98bcc4`.
+It is identical to the license in the pinned AMD64 Node image. The pinned ARM64
+variant omits `/usr/local/LICENSE`, so the Dockerfile copies this reviewed file
+explicitly for both architectures. The release license gate verifies the hash;
+all of Node's bundled third-party notices are retained.

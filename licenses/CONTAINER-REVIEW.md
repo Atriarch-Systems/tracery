@@ -25,7 +25,8 @@ source archive and retained scan/SBOM evidence.
 ## Exact runtime
 
 - Node 22.23.2, from the digest-pinned official `node:22.23.2-alpine3.24` image.
-  Copy its unmodified binary and complete upstream LICENSE. npm, Corepack and
+  Copy its unmodified binary and the complete reviewed upstream LICENSE from
+  licenses/vendor; the official ARM image omits /usr/local/LICENSE. npm, Corepack and
   Yarn are absent from the final image, including its base layers.
 - Alpine 3.24.2, digest pinned. The exact 18 packages, source commits and declared
   licenses are recorded in [container-policy.json](container-policy.json).

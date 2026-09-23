@@ -45,7 +45,9 @@ RUN npm prune --omit=dev && node scripts/runtime-notices.mjs
 FROM alpine:3.24.2@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6 AS runtime-base
 RUN apk add --no-cache libstdc++=15.2.0-r5 ca-certificates-bundle=20260909-r0
 COPY --from=build /usr/local/bin/node /usr/local/bin/node
-COPY --from=build /usr/local/LICENSE /usr/share/licenses/node/LICENSE
+# Some official ARM builds omit /usr/local/LICENSE; preserve the same reviewed
+# upstream license on both architectures. The release gate verifies its SHA-256.
+COPY licenses/vendor/node-v22.23.2-LICENSE /usr/share/licenses/node/LICENSE
 
 # Collect sources using the runtime inventory, before adding build tools.
 FROM alpine:3.24.2@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6 AS sources
