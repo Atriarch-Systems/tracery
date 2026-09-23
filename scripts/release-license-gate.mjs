@@ -8,12 +8,16 @@ const permissive = new Set(['MIT', 'ISC', 'Apache-2.0', 'BSD-2-Clause', 'BSD-3-C
 const nodeNotices = new Set(['GPL-2.0-with-autoconf-exception', 'GPL-3.0-with-autoconf-exception', 'Artistic-2.0', 'ICU', 'LicenseRef-C-Ares', 'NAIST-2003', 'Unicode-3.0', 'Unicode-DFS-2016', 'BSD-2-Clause-FreeBSD']);
 const canonical = packages => JSON.stringify(packages.map(p => ({ name: p.name, version: p.version, license: p.license, origin: p.origin, aportsCommit: p.aportsCommit })).sort((a, b) => a.name.localeCompare(b.name)));
 
-export function checkReleaseScan(scan, { policy, inventory, nodeLicense } = {}) {
+export function checkReleaseScan(scan, { policy, inventory, nodeLicense, architecture } = {}) {
   const failures = [];
   const results = scan.Results ?? [];
   if (!results.length) throw new Error('Empty scan; refusing release');
   const image = Boolean(policy);
   if (image) {
+    if (architecture) {
+      const apkArch = { amd64: 'x86_64', arm64: 'aarch64' }[architecture];
+      if (!apkArch || !inventory?.length || inventory.some(p => ![apkArch, 'noarch'].includes(p.architecture))) failures.push('Source inventory architecture does not match the tested image');
+    }
     if (!inventory?.length || canonical(inventory) !== canonical(policy.alpinePackages)) failures.push('Alpine inventory differs from the reviewed source/license policy');
     if (!nodeLicense || createHash('sha256').update(nodeLicense).digest('hex') !== policy.nodeLicenseSha256) failures.push('Node license text differs from the reviewed version');
     const os = results.find(result => result.Class === 'os-pkgs' && result.Type === 'alpine');
@@ -45,12 +49,13 @@ export function checkReleaseScan(scan, { policy, inventory, nodeLicense } = {}) 
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const [scanPath, inventoryPath, nodeLicensePath] = process.argv.slice(2);
+  const [scanPath, inventoryPath, nodeLicensePath, architecture] = process.argv.slice(2);
   const scan = JSON.parse(readFileSync(scanPath, 'utf8'));
   const options = inventoryPath ? {
     policy: JSON.parse(readFileSync(new URL('../licenses/container-policy.json', import.meta.url), 'utf8')),
     inventory: JSON.parse(readFileSync(inventoryPath, 'utf8')),
     nodeLicense: readFileSync(nodeLicensePath),
+    architecture,
   } : {};
   console.log(`PASS: ${checkReleaseScan(scan, options)} final-artifact license findings reviewed; no blocked findings in the supplied scan`);
 }

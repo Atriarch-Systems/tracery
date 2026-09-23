@@ -1,18 +1,14 @@
 # Publishing npm and Docker releases
 
 Publication runs through [release.yaml](../.github/workflows/release.yaml) on
-Atriarch's self-hosted Linux x64 runners. A manual run validates without
-publishing. Pushing a new stable `v0.x.y` tag runs the same checks and then
-publishes the tested artifacts. The tag must match the root and hub versions,
-and its commit must be on the history of `main`.
+Atriarch's self-hosted runners. Use its manual **validate** operation for a dry
+run, or **publish** to validate, create the version tag, and publish npm packages,
+Docker images and the GitHub release in one run. Ordinary version-tag pushes
+remain supported. No additional personal GitHub token is required.
 
-The existing `v0.1.0` is a GitHub source release. Registry publication is still
-pending. The next coordinated candidate is `v0.1.1`; the independently versioned
-visualizer is `0.3.1`. Do not move the old source-release tag.
+## One-time account setup
 
-## One-time organization setup
-
-Create these **GitHub organization Actions secrets**, with repository access
+Create these GitHub organization **Actions secrets**, with repository access
 restricted to `Atriarch-Systems/tracery`:
 
 | Secret | Value to obtain |
@@ -31,15 +27,13 @@ The workflow creates the configured Docker Hub repository with **Public**
 visibility if it does not exist. The Docker account must be allowed to create
 repositories in that namespace as well as push images. An existing private
 repository causes a failure; its visibility is never changed automatically.
-Confirm that the `@atriarch` npm scope belongs to your account or
-organization; lack of existing public packages does not prove a scope is free.
+Confirm that the `@atriarch` npm scope belongs to your account or organization.
 Organization administration permissions on an npm token are not a substitute
 for package/scope publication permissions.
 
-No personal GitHub token is needed: the publication job uses its short-lived
-`GITHUB_TOKEN` for GitHub release assets. The workflow receives registry secrets
-only in the publication job, after validation succeeds. Do not put tokens in
-source files, issue comments or chat.
+The publication job uses its short-lived `GITHUB_TOKEN` for the tag and GitHub
+release. Registry secrets are available only to that job, after all validation
+jobs succeed. Do not put tokens in source files, issue comments or chat.
 
 npm currently supports trusted publishing on GitHub-hosted runners, **not
 self-hosted runners**, so this workflow uses a granular token. See the official
@@ -47,76 +41,95 @@ self-hosted runners**, so this workflow uses a granular token. See the official
 [npm token setup](https://docs.npmjs.com/creating-and-viewing-access-tokens/), and
 [Docker access-token setup](https://docs.docker.com/security/access-tokens/).
 
-## Release procedure
+## Release from the GitHub UI
 
-1. Bump the packages that changed, their dependent ranges where needed, and the
-   corresponding workspace entries in `package-lock.json`. Keep the root and hub
-   version aligned. Update CHANGELOG.md. Python, plugin and wire-contract
-   versions are separate and are not automatically published by this workflow.
-2. Push the reviewed commit to `main`. Require normal CI to pass.
-3. In GitHub Actions, run **release → Run workflow** against `main`. This dry run
-   performs the release checks without registry credentials or publication.
-4. Once that run passes and the settings above exist, push a new annotated tag
-   matching the prepared version, for example `v0.1.1`. Tag pushes publish; do
-   not use them to test workflow changes.
-5. Inspect the release run. Confirm all five npm packages and the versioned
-   Docker image are publicly retrievable. Run the post-publication section of
-   [CLEAN-MACHINE-TEST.md](CLEAN-MACHINE-TEST.md), then update the public quick
-   start to advertise the now-available registry paths.
+1. Prepare the package versions and dependent ranges, update the lockfile and
+   CHANGELOG, and push to `main`. Root and hub versions must agree. Require CI
+   to pass. The workflow does not silently bump versions or commit changes.
+2. Open **Actions → release → Run workflow**, select **main**, and leave
+   **operation** as **validate**. This tests the npm packages and both native
+   container architectures without creating tags, releases or registry uploads.
+3. Once validation and the account setup above are complete, run the workflow
+   again on **main**, select **publish**, and enter the exact prepared version
+   without a `v`, for example `0.1.1`.
+4. After validation and credential checks succeed, the workflow creates an
+   annotated `v0.1.1` tag at the exact tested commit and a draft GitHub release.
+   It publishes the tested npm tarballs and Docker images, attaches the evidence,
+   and publishes the GitHub release. An existing tag must already resolve to
+   that same commit; the workflow never moves it.
+5. Check the release run and run the post-publication section of
+   [CLEAN-MACHINE-TEST.md](CLEAN-MACHINE-TEST.md) from a clean machine. Update the
+   public quick start to advertise the registry paths after they are available.
 
-The first Docker release targets `linux/amd64`. ARM64 must be built, scanned and
-smoke-tested separately before advertising support.
+The same run performs publication because a tag created with `GITHUB_TOKEN`
+does not trigger a second push workflow. See
+[GitHub's event rules](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/trigger-a-workflow).
+You can still push a version tag yourself; it must match the prepared package
+version and point to a commit on `main`'s history.
 
-## What is checked and published
+## Container architectures and tags
 
-Validation includes the repository unit, browser, plugin and Python tests,
-lockfile license policy, and release-gate regression tests. `publish:check`
-builds and packs core, visualizer, client, React and hub, installs their tarballs
-into a fresh consumer, checks imports/SSR, launches `npx tracery-hub`, and tests
-live trace ingestion. Each tarball must contain LICENSE and NOTICE; the hub must
-also contain its hosted UI and third-party notices.
+| Image tag (example version) | Contents |
+| --- | --- |
+| `0.1.1`, `latest` | Multi-platform image: Docker selects Linux AMD64 or ARM64 automatically. |
+| `0.1.1-amd64`, `latest-amd64` | Linux AMD64 only. |
+| `0.1.1-arm64`, `latest-arm64` | Linux ARM64 only. |
 
-With `TRACERY_RELEASE_DIR` set, the checker retains those exact passing tarballs
-and their file lists, npm integrity values and SHA-256 hashes. Publication uses
-them in dependency order with lifecycle scripts disabled; it does not repack or
-rebuild them. Private workspaces are never published independently.
+AMD64 builds and smoke tests run on `[self-hosted, Linux, X64, arc-amd64]`;
+ARM64 runs on `[self-hosted, Linux, ARM64, arc-pi]`. Both the runner and Docker
+daemon architecture are checked. No emulation is used. Each image gets its own
+license/vulnerability/secret scan, source archive, inventory, SBOM and checksums.
+Both must pass before **any** registry publication. A failed or unavailable ARM
+runner blocks the release instead of silently publishing only AMD64.
 
-The Docker build pins its upstream Node/Alpine images, omits unused npm/Yarn
-runtime tooling, and includes the Alpine corresponding-source archive inside
-its final image. The acceptance script checks non-root operation, UI/notices,
-source-archive checksums, live tracing, SQLite persistence and fail-closed
-network authentication. Trivy scans the actual image for vulnerabilities,
-licenses and secrets. Unreviewed licenses, missing inventories, source-policy
-drift, secret findings and HIGH/CRITICAL vulnerabilities block publication.
+ARM64 covers 64-bit Raspberry Pi systems, Apple Silicon Docker installations and
+ARM cloud servers. It does not advertise support for 32-bit ARM. Combining the
+verified image digests follows [Docker's multi-platform workflow](https://docs.docker.com/build/ci/github-actions/multi-platform/).
+The publishing job runs on AMD64 and only loads/pushes saved ARM64 bytes; all
+ARM execution and smoke testing already happened on the ARM64 runner.
 
-See [LICENSING.md](LICENSING.md) and the detailed
-[container review](../licenses/CONTAINER-REVIEW.md). Operating-system GPL/LGPL
-components retain their own licenses and source obligations; they are not
-silently relabeled Apache-2.0.
+## Validation and release evidence
 
-The release-candidate Actions artifact retains the exact npm tarballs, saved
-Docker image, source archive, inventories, source and image CycloneDX SBOMs,
-scan reports, source commit and checksums. The publication job checks these
-checksums and publishes the saved image without rebuilding. GitHub release
-assets include the evidence and source archive; the large saved image remains
-in Actions for 30 days and is distributed through Docker Hub. The SHA256SUMS
-file also describes that Actions-only image archive.
+Validation includes unit, browser, plugin and Python tests, lockfile license
+policy, and release-script regression tests. `publish:check` packs core,
+visualizer, client, React and hub, installs the actual tarballs into a fresh
+consumer, checks imports/SSR, launches `npx tracery-hub`, and tests live tracing.
+Each tarball must contain LICENSE and NOTICE; the hub must include its hosted UI
+and third-party notices. Publication uses those exact tarballs with lifecycle
+scripts disabled, rather than repacking them. Private workspaces are not published.
 
-The workflow publishes the five npm packages, Docker tags `VERSION` and
-`latest`, and GitHub release assets. It does not publish to PyPI, GHCR, a private
-enterprise registry, or deploy the hosted website.
+The pinned Node/Alpine containers omit unused npm/Yarn runtime tooling and include
+corresponding Alpine sources. Native acceptance tests verify architecture,
+non-root operation, UI/notices, source checksums, live tracing, SQLite persistence
+and fail-closed authentication. Trivy rejects unreviewed licenses, source-policy
+drift, secrets and HIGH/CRITICAL vulnerabilities. See [LICENSING.md](LICENSING.md)
+and the [container review](../licenses/CONTAINER-REVIEW.md). GPL/LGPL operating-system
+components retain their licenses and source obligations.
+
+Actions retains `release-candidate-npm`, `release-candidate-container-amd64` and
+`release-candidate-container-arm64` for 30 days. They contain the actual tarballs,
+saved images and evidence, with checksums and the tested commit. The publication
+job verifies all three before loading the saved images and forming the combined
+manifest from immutable digests. It does not rebuild either image.
+
+GitHub release assets include npm tarballs, source/report evidence and separately
+named `container-amd64-*` and `container-arm64-*` source archives, inventories and
+reports. Saved image archives remain in Actions and are distributed through Docker
+Hub. `SHA256SUMS` records the original artifact paths, including those image archives.
+The workflow does not publish Python/PyPI, GHCR, private enterprise images, or
+deploy the hosted website.
 
 ## Retries and partial publication
 
-npm and Docker are separate registries; a release cannot be atomic across them.
-If publication fails, correct the account/connection problem and rerun the
-failed **publication job** from the same workflow run. It reuses the validated
-artifacts. Matching npm versions and Docker image configurations can be reused;
-an existing version with different bytes is rejected. Existing GitHub evidence
-must match byte-for-byte. Never overwrite a tag or unpublish packages to disguise
-a partial release.
+Registries cannot publish atomically together. If a publication job fails, fix
+the credentials or connection problem and rerun **only that failed job** from
+the same Actions run. It reuses the validated artifacts. Existing tags, npm
+versions, architecture images and GitHub assets must match; mismatches fail
+rather than overwrite evidence. A draft release stays draft until all assets
+are uploaded and both registries have been published.
 
-If rebuilding changes artifact bytes after any registry upload, prepare a new
-patch version. For a successful release, npm's `latest` and Docker's `latest`
-refer to the published stable candidate. Keep versioned tags available for
-reproducible installs.
+If rebuilding changes bytes after any upload, prepare a new patch version.
+Never move a version tag or unpublish packages to disguise a partial release.
+`latest`, `latest-amd64` and `latest-arm64` are moving aliases; version tags remain
+available for reproducible installs. Python, plugin and wire-contract versions
+remain independent of this coordinated npm/container release.

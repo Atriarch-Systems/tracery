@@ -3,7 +3,10 @@
 ## v0.1.1 — release candidate (registries pending)
 
 - Publish tested npm packages and Docker images through tag-triggered GitHub
-  Actions, with a manual validation-only run and retained SBOM/scan evidence.
+  Actions, with manual validate/publish controls and retained SBOM/scan evidence.
+- Create annotated release tags and draft GitHub releases from the manual workflow.
+- Build and test AMD64 and ARM64 containers on native runners; publish combined
+  version/latest tags plus explicit architecture tags after both pass.
 - Include matching Alpine sources, patches, build recipes and notices with each
   container; preserve Node's complete license and enforce the reviewed inventory.
 - Preserve Vite and bundled runtime-helper notices in browser builds and exports.

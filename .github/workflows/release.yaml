@@ -2,8 +2,18 @@ name: release
 on:
   push:
     tags: ['v*']
-  # Manual runs validate only. A new stable version tag enables publication.
   workflow_dispatch:
+    inputs:
+      operation:
+        description: Validate only, or create the tag and publish to npm, Docker Hub and GitHub
+        type: choice
+        options: [validate, publish]
+        default: validate
+        required: true
+      version:
+        description: Exact prepared package version, without v (required for publish)
+        type: string
+        required: false
 permissions:
   contents: read
 defaults:
@@ -12,34 +22,38 @@ defaults:
 concurrency:
   group: tracery-release
   cancel-in-progress: false
-env:
-  LOCAL_IMAGE: tracery-release:${{ github.run_id }}
 jobs:
-  validate:
+  prepare:
     runs-on: [self-hosted, Linux, X64, arc-amd64]
-    timeout-minutes: 60
+    timeout-minutes: 5
+    outputs:
+      tag: ${{ steps.context.outputs.tag }}
+      version: ${{ steps.context.outputs.version }}
+      publish: ${{ steps.context.outputs.publish }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          persist-credentials: false
-          fetch-depth: 0
+        with: { persist-credentials: false, fetch-depth: 0 }
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with: { node-version: '22.23.2' }
-      - name: Check release ref
-        shell: bash
-        run: |
-          set -euo pipefail
-          git merge-base --is-ancestor HEAD origin/main
-          node --input-type=module <<'NODE'
-          import fs from 'node:fs';
-          const root = JSON.parse(fs.readFileSync('package.json'));
-          const hub = JSON.parse(fs.readFileSync('apps/hub/package.json'));
-          if (!/^0\.[0-9]+\.[0-9]+$/.test(root.version) || hub.version !== root.version) throw Error('Invalid coordinated release version');
-          if (process.env.GITHUB_EVENT_NAME === 'push' && process.env.GITHUB_REF !== `refs/tags/v${root.version}`) throw Error('Tag must match package version');
-          NODE
+      - run: git merge-base --is-ancestor HEAD origin/main
+      - id: context
+        run: node scripts/release-context.mjs
+        env:
+          RELEASE_OPERATION: ${{ inputs.operation }}
+          RELEASE_INPUT_VERSION: ${{ inputs.version }}
+
+  validate:
+    needs: prepare
+    runs-on: [self-hosted, Linux, X64, arc-amd64]
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with: { persist-credentials: false }
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with: { node-version: '22.23.2' }
       - run: npm ci
       - run: npm run license:check
-      - run: node --test scripts/release-license-gate.test.mjs scripts/release-docker-repository.test.mjs
+      - run: node --test scripts/release-*.test.mjs
       - run: npx playwright install --with-deps chromium
       - run: npm run build && npm test && npm run test:plugin
       - name: Test and retain actual npm tarballs
@@ -52,7 +66,6 @@ jobs:
       - uses: aquasecurity/setup-trivy@81e514348e19b6112ce2a7e3ecbafe19c1e1f567 # v0.3.1
         with: { version: v0.74.0, cache: false }
       - name: Inspect packaged npm files and record source SBOM
-        shell: bash
         run: |
           set -euo pipefail
           mkdir -p artifacts/reports artifacts/unpacked
@@ -64,52 +77,95 @@ jobs:
           trivy fs --scanners license,secret --license-full --skip-version-check --format json --output artifacts/reports/npm-scan.json artifacts/unpacked
           node scripts/release-license-gate.mjs artifacts/reports/npm-scan.json
           trivy fs --scanners license --include-dev-deps --offline-scan --skip-version-check --skip-dirs .git --skip-dirs artifacts --format cyclonedx --output artifacts/reports/source-sbom.cdx.json .
-      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
-        with:
-          driver: docker
-          version: v0.37.1
-      - name: Build and test the image with matching sources
-        run: |
-          docker buildx build --load --platform linux/amd64 --provenance=false -f apps/hub/Dockerfile -t "$LOCAL_IMAGE" .
-          node scripts/release-image-check.mjs "$LOCAL_IMAGE" artifacts/container
-      - name: Gate final image and record its SBOM
-        run: |
-          trivy image --image-src docker --scanners vuln,license,secret --license-full --list-all-pkgs --skip-version-check --format json --output artifacts/reports/image-scan.json "$LOCAL_IMAGE"
-          node scripts/release-license-gate.mjs artifacts/reports/image-scan.json artifacts/container/alpine-packages.json artifacts/container/NODE-LICENSE
-          trivy image --image-src docker --scanners license --skip-version-check --format cyclonedx --output artifacts/reports/image-sbom.cdx.json "$LOCAL_IMAGE"
-      - name: Save tested image and checksums
-        run: |
-          docker save "$LOCAL_IMAGE" | gzip > artifacts/container/image.tar.gz
-          docker image inspect "$LOCAL_IMAGE" --format '{{.Id}}' > artifacts/container/image-id.txt
           git rev-parse HEAD > artifacts/reports/source-commit.txt
           cp apps/hub/web/dist/THIRD-PARTY-NOTICES.txt artifacts/reports/
           cd artifacts
-          find npm container reports -type f -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS
+          find npm reports -type f ! -name npm-SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > reports/npm-SHA256SUMS
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
-          name: release-candidate
+          name: release-candidate-npm
           path: |
             artifacts/npm/
-            artifacts/container/
             artifacts/reports/
-            artifacts/SHA256SUMS
           if-no-files-found: error
           retention-days: 30
-      - name: Remove local build tag
+
+  containers:
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: [self-hosted, Linux, X64, arc-amd64]
+            machine: x86_64
+          - arch: arm64
+            runner: [self-hosted, Linux, ARM64, arc-pi]
+            machine: aarch64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    env:
+      ARCH: ${{ matrix.arch }}
+      LOCAL_IMAGE: tracery-release:${{ github.run_id }}-${{ matrix.arch }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with: { persist-credentials: false }
+      - name: Require a native runner and Docker daemon
+        env:
+          MACHINE: ${{ matrix.machine }}
+        run: |
+          test "$(uname -m)" = "$MACHINE"
+          daemon_arch="$(docker info --format '{{.Architecture}}')"
+          case "$ARCH:$daemon_arch" in amd64:x86_64|amd64:amd64|arm64:aarch64|arm64:arm64) ;; *) echo 'Docker daemon architecture does not match runner'; exit 1 ;; esac
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with: { node-version: '22.23.2' }
+      - run: npm ci && npm run build -w @atriarch/tracery-core -w @atriarch/tracery-client
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+        with: { driver: docker, version: v0.37.1 }
+      - name: Build and natively test the image with matching sources
+        run: |
+          docker buildx build --load --platform "linux/$ARCH" --provenance=false -f apps/hub/Dockerfile -t "$LOCAL_IMAGE" .
+          node scripts/release-image-check.mjs "$LOCAL_IMAGE" "artifacts/container/$ARCH" "$ARCH"
+      - uses: aquasecurity/setup-trivy@81e514348e19b6112ce2a7e3ecbafe19c1e1f567 # v0.3.1
+        with: { version: v0.74.0, cache: false }
+      - name: Gate this architecture and record its SBOM
+        run: |
+          dir="artifacts/container/$ARCH"
+          trivy image --image-src docker --scanners vuln,license,secret --license-full --list-all-pkgs --skip-version-check --format json --output "$dir/image-scan.json" "$LOCAL_IMAGE"
+          node scripts/release-license-gate.mjs "$dir/image-scan.json" "$dir/alpine-packages.json" "$dir/NODE-LICENSE" "$ARCH"
+          trivy image --image-src docker --scanners license --skip-version-check --format cyclonedx --output "$dir/image-sbom.cdx.json" "$LOCAL_IMAGE"
+      - name: Save the tested image and checksums
+        run: |
+          dir="artifacts/container/$ARCH"
+          docker save "$LOCAL_IMAGE" | gzip > "$dir/image.tar.gz"
+          docker image inspect "$LOCAL_IMAGE" --format '{{.Id}}' > "$dir/image-id.txt"
+          git rev-parse HEAD > "$dir/source-commit.txt"
+          cd artifacts
+          find "container/$ARCH" -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > "container/$ARCH/SHA256SUMS"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: release-candidate-container-${{ matrix.arch }}
+          # Include the artifacts root so downloading all candidates can safely merge them.
+          path: artifacts/
+          if-no-files-found: error
+          retention-days: 30
+      - name: Remove the local image tag
         if: always()
         run: docker image rm "$LOCAL_IMAGE" || true
 
   publish:
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
-    needs: validate
+    if: needs.prepare.outputs.publish == 'true'
+    needs: [prepare, validate, containers]
     runs-on: [self-hosted, Linux, X64, arc-amd64]
     timeout-minutes: 30
     permissions:
       contents: write
     env:
-      # Set this to the confirmed public Docker Hub repository, e.g. atriarch/tracery-hub.
       DOCKERHUB_IMAGE: ${{ vars.DOCKERHUB_IMAGE }}
+      RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
+      RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with: { persist-credentials: false }
@@ -119,9 +175,10 @@ jobs:
           registry-url: https://registry.npmjs.org
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
-          name: release-candidate
+          pattern: release-candidate-*
+          merge-multiple: true
           path: artifacts
-      - name: Verify artifacts and required publication settings
+      - name: Verify all artifacts and required publication settings
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           DOCKER_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -132,43 +189,49 @@ jobs:
           test -n "$DOCKER_USERNAME" || { echo 'Missing DOCKERHUB_USERNAME'; exit 1; }
           test -n "$DOCKER_TOKEN" || { echo 'Missing DOCKERHUB_TOKEN'; exit 1; }
           [[ "$DOCKERHUB_IMAGE" =~ ^[a-z0-9][a-z0-9_-]*/[a-z0-9][a-z0-9._-]*$ ]] || { echo 'Set DOCKERHUB_IMAGE to namespace/repository'; exit 1; }
-          (cd artifacts && sha256sum -c SHA256SUMS)
+          (cd artifacts && sha256sum -c reports/npm-SHA256SUMS)
           test "$(cat artifacts/reports/source-commit.txt)" = "$GITHUB_SHA"
+          for arch in amd64 arm64; do
+            (cd artifacts && sha256sum -c "container/$arch/SHA256SUMS")
+            test "$(cat "artifacts/container/$arch/source-commit.txt")" = "$GITHUB_SHA"
+            gzip -dc "artifacts/container/$arch/image.tar.gz" | docker load
+            image="tracery-release:$GITHUB_RUN_ID-$arch"
+            test "$(docker image inspect "$image" --format '{{.Id}}')" = "$(cat "artifacts/container/$arch/image-id.txt")"
+            test "$(docker image inspect "$image" --format '{{.Os}}/{{.Architecture}}')" = "linux/$arch"
+          done
           npm whoami --registry https://registry.npmjs.org
-          gzip -dc artifacts/container/image.tar.gz | docker load
-          test "$(docker image inspect "$LOCAL_IMAGE" --format '{{.Id}}')" = "$(cat artifacts/container/image-id.txt)"
+          cd artifacts
+          find npm container reports -type f -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+        with: { driver: docker, version: v0.37.1 }
       - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: Ensure public Docker repository and immutable version
+      - name: Ensure public Docker repository and immutable version tags
         run: node scripts/release-docker-check.mjs
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Create or verify the release tag and draft GitHub release
+        run: node scripts/release-github.mjs --prepare
+        env:
+          GH_TOKEN: ${{ github.token }}
+      # This same run publishes: tags created with GITHUB_TOKEN do not trigger push workflows.
       - name: Publish tested npm tarballs in dependency order
         run: node scripts/release-npm.mjs artifacts/npm
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-      - name: Publish tested image
-        env:
-          VERSION: ${{ github.ref_name }}
-        run: |
-          set -euo pipefail
-          version="${VERSION#v}"
-          docker tag "$LOCAL_IMAGE" "$DOCKERHUB_IMAGE:$version"
-          docker push "$DOCKERHUB_IMAGE:$version"
-          docker tag "$LOCAL_IMAGE" "$DOCKERHUB_IMAGE:latest"
-          docker push "$DOCKERHUB_IMAGE:latest"
-      - name: Publish GitHub release evidence
+      - name: Publish tested architecture images and multi-platform tags
+        run: node scripts/release-docker-publish.mjs
+      - name: Publish GitHub release and evidence
+        run: node scripts/release-github.mjs
         env:
           GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ github.ref_name }}
-        run: node scripts/release-github.mjs
       - name: Remove local image tags
         if: always()
-        env:
-          VERSION: ${{ github.ref_name }}
         run: |
-          docker image rm "$LOCAL_IMAGE" || true
-          if [ -n "$DOCKERHUB_IMAGE" ]; then docker image rm "$DOCKERHUB_IMAGE:${VERSION#v}" "$DOCKERHUB_IMAGE:latest" || true; fi
+          for arch in amd64 arm64; do
+            docker image rm "tracery-release:$GITHUB_RUN_ID-$arch" || true
+            if [ -n "$DOCKERHUB_IMAGE" ]; then docker image rm "$DOCKERHUB_IMAGE:$RELEASE_VERSION-$arch" || true; fi
+          done

@@ -32,6 +32,10 @@ test('image exceptions require exact sources and Node notices, and never cover a
     { Target: 'Loose File License(s)', Licenses: [{ Name: 'GPL-3.0-with-autoconf-exception', FilePath: 'usr/share/licenses/node/LICENSE' }] },
   ] };
   const options = { policy, inventory, nodeLicense };
+  for (const [architecture, apkArch] of [['amd64', 'x86_64'], ['arm64', 'aarch64']]) {
+    assert.equal(checkReleaseScan(image, { ...options, architecture, inventory: inventory.map(p => ({ ...p, architecture: apkArch })) }), 2);
+    assert.throws(() => checkReleaseScan(image, { ...options, architecture, inventory: inventory.map(p => ({ ...p, architecture: 'wrong' })) }), /architecture does not match/);
+  }
   assert.equal(checkReleaseScan(image, options), 2);
   assert.throws(() => checkReleaseScan(image, { ...options, nodeLicense: Buffer.from('changed') }), /Node license text differs/);
   assert.throws(() => checkReleaseScan(image, { ...options, inventory: [{ ...inventory[0], aportsCommit: 'b'.repeat(40) }] }), /Alpine inventory differs/);

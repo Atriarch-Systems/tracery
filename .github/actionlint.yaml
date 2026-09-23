@@ -1,2 +1,2 @@
 self-hosted-runner:
-  labels: [arc-amd64]
+  labels: [arc-amd64, arc-pi]

@@ -17,6 +17,11 @@ Commercial hosting and distribution still require respecting third-party
 notices and any applicable source obligations. This review covers the public
 community artifacts, not a future private enterprise distribution.
 
+The release matrix applies this review independently to Linux AMD64 and ARM64.
+Each native image must match the reviewed package versions and source commits;
+its recorded APK architecture must match the tested image. Each carries its own
+source archive and retained scan/SBOM evidence.
+
 ## Exact runtime
 
 - Node 22.23.2, from the digest-pinned official `node:22.23.2-alpine3.24` image.

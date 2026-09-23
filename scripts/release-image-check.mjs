@@ -4,7 +4,10 @@ import { mkdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 
 const image = process.argv[2];
-if (!image) throw new Error('Usage: node scripts/release-image-check.mjs IMAGE [artifact-directory]');
+if (!image) throw new Error('Usage: node scripts/release-image-check.mjs IMAGE [artifact-directory] [amd64|arm64]');
+const expectedArch = process.argv[4] ?? ({ x64: 'amd64', arm64: 'arm64' })[process.arch];
+assert(['amd64', 'arm64'].includes(expectedArch), 'Expected a supported release architecture');
+assert.equal(process.arch, expectedArch === 'amd64' ? 'x64' : 'arm64', 'Smoke tests must run natively');
 const out = path.resolve(process.argv[3] ?? 'artifacts/container');
 mkdirSync(out, { recursive: true });
 const docker = (...args) => execFileSync('docker', args, { encoding: 'utf8', timeout: 180_000 }).trim();
@@ -28,6 +31,7 @@ async function json(route) {
   return response.json();
 }
 try {
+  assert.equal(docker('image', 'inspect', image, '--format', '{{.Os}}/{{.Architecture}}'), `linux/${expectedArch}`);
   docker('volume', 'create', volume);
   docker('run', '-d', '--name', name, '-p', '127.0.0.1::8971', '-e', 'TRACERY_AUTH=none', '-e', 'TRACERY_STORE=sqlite', '-v', `${volume}:/data`, image);
   await ready();
@@ -36,6 +40,7 @@ try {
   assert.equal(info.version, JSON.parse(readFileSync(new URL('../apps/hub/package.json', import.meta.url))).version);
   const policy = JSON.parse(readFileSync(new URL('../licenses/container-policy.json', import.meta.url)));
   assert.equal(docker('exec', name, 'node', '-p', 'process.versions.node'), policy.nodeVersion);
+  assert.equal(docker('exec', name, 'node', '-p', 'process.arch'), expectedArch === 'amd64' ? 'x64' : 'arm64');
   assert.equal(info.auth, 'none');
   const ui = await (await fetch(`${base}/ui/`)).text();
   assert(ui.includes('Tracery') && ui.includes('tracery-licenses'), 'Hosted UI and embedded notices required');
