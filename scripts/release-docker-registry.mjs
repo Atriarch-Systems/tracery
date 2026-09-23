@@ -16,12 +16,23 @@ export function dockerContext(env = process.env) {
   return { repository, version };
 }
 export async function registryClient(repository, fetcher = (url, options) => fetch(url, { ...options, signal: AbortSignal.timeout(30_000) })) {
-  const auth = await fetcher(`https://auth.docker.io/token?service=registry.docker.io&scope=repository:${repository}:pull`);
-  if (!auth.ok) throw Error(`Registry authentication failed: ${auth.status}`);
-  const { token } = await auth.json();
-  const headers = { Authorization: `Bearer ${token}`, Accept: 'application/vnd.oci.image.index.v1+json, application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.v2+json, application/vnd.docker.distribution.manifest.list.v2+json' };
+  const headers = { Accept: 'application/vnd.oci.image.index.v1+json, application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.v2+json, application/vnd.docker.distribution.manifest.list.v2+json' };
+  const authorize = async () => {
+    const auth = await fetcher(`https://auth.docker.io/token?service=registry.docker.io&scope=repository:${repository}:pull`);
+    if (!auth.ok) throw Error(`Registry authentication failed: ${auth.status}`);
+    const { token } = await auth.json();
+    if (!token) throw Error('Registry returned no pull token');
+    headers.Authorization = `Bearer ${token}`;
+  };
+  await authorize();
   return { async manifest(reference) {
-    const response = await fetcher(`https://registry-1.docker.io/v2/${repository}/manifests/${encodeURIComponent(reference)}`, { headers });
+    const url = `https://registry-1.docker.io/v2/${repository}/manifests/${encodeURIComponent(reference)}`;
+    let response = await fetcher(url, { headers });
+    // Uploading two source-inclusive images can outlast Docker Hub's pull token.
+    if (response.status === 401) {
+      await authorize();
+      response = await fetcher(url, { headers });
+    }
     if (response.status === 404) return null;
     if (!response.ok) throw Error(`Registry manifest lookup failed: ${response.status}`);
     const body = await response.text();

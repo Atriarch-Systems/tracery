@@ -65,3 +65,15 @@ test('registry lookup distinguishes missing manifests from network/server failur
     else await assert.rejects(client.manifest('0.1.1'), /500/);
   }
 });
+
+test('expired anonymous pull tokens are renewed after long image uploads', async () => {
+  let authCalls = 0, manifestCalls = 0;
+  const client = await registryClient('test/hub', async (url, options) => {
+    if (url.includes('auth.docker.io')) return new Response(JSON.stringify({ token: `token-${++authCalls}` }));
+    if (++manifestCalls === 1) return new Response('', { status: 401 });
+    assert.equal(options.headers.Authorization, 'Bearer token-2');
+    return new Response(JSON.stringify(images.amd64.document));
+  });
+  assert.equal((await client.manifest('0.1.1-amd64')).document.config.digest, expected.amd64);
+  assert.equal(authCalls, 2);
+});
