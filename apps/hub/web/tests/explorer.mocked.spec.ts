@@ -384,18 +384,36 @@ test('ancestor group positions survive streamed updates, follow-latest switches,
   await page.getByTestId('scope-flow').click();
   await page.getByTestId('scope-ancestors').click();
   await expect.poll(() => cursorAt(page, start.x + 70, start.y + 45)).toBe('grab');
-  const zoom = await page.locator('[role="region"][aria-label="Tracery hosted explorer"]').evaluate(el => {
-    const rect = el.getBoundingClientRect();
-    return Math.min(rect.width / 1220, rect.height / 660);
+  // Scope changes resize the canvas as the accessible node list changes height.
+  // Record the actual pointer-to-graph displacement: assuming a fixed viewport
+  // mistakes a late ResizeObserver/recentering frame for a lost node position.
+  await page.locator('[role="region"][aria-label="Tracery hosted explorer"]').evaluate(el => {
+    const canvas = el.querySelector('canvas') as HTMLCanvasElement & { __zoom: { x: number; y: number; k: number } };
+    const points = { start: { x: 0, y: 0 }, end: { x: 0, y: 0 } };
+    (window as unknown as { __dragPoints: typeof points }).__dragPoints = points;
+    const record = (event: PointerEvent) => {
+      const rect = canvas.getBoundingClientRect();
+      const transform = canvas.__zoom; // d3's live canvas transform, used by screen2GraphCoords
+      const point = { x: (event.clientX - rect.left - transform.x) / transform.k, y: (event.clientY - rect.top - transform.y) / transform.k };
+      if (event.type === 'pointerdown') points.start = point;
+      else points.end = point;
+    };
+    window.addEventListener('pointerdown', record, { capture: true, once: true });
+    window.addEventListener('pointermove', record, true);
+    window.addEventListener('pointerup', () => window.removeEventListener('pointermove', record, true), { capture: true, once: true });
   });
   await drag(start.x + 70, start.y + 45, 10, 10);
   const again = await lastMove();
+  const delta = await page.evaluate(() => {
+    const { start, end } = (window as unknown as { __dragPoints: { start: { x: number; y: number }; end: { x: number; y: number } } }).__dragPoints;
+    return { x: end.x - start.x, y: end.y - start.y };
+  });
   expect(again.groupId).toBe(moved.groupId);
   expect(again.positions.length).toBe(moved.positions.length);
   for (const before of moved.positions) {
     const after = again.positions.find(p => p.id === before.id)!;
-    expect(after.x).toBeCloseTo(before.x + 10 / zoom, 3);
-    expect(after.y).toBeCloseTo(before.y + 10 / zoom, 3);
+    expect(after.x).toBeCloseTo(before.x + delta.x, 3);
+    expect(after.y).toBeCloseTo(before.y + delta.y, 3);
   }
 });
 
