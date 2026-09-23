@@ -78,10 +78,7 @@ export function ActivityGraph<N = unknown, E = unknown>(props: ActivityGraphProp
   useEffect(() => {
     const previous = lastKey.current === layoutKey ? runtime.current : emptyGraph();
     lastKey.current = layoutKey;
-    if (props.layoutMode === 'guided') for (const n of previous.nodes) {
-      n.fx = n.x; n.fy = n.y; n.placed = true;
-    }
-    runtime.current = reconcile(previous, nodes, edges);
+    runtime.current = reconcile(previous, nodes, edges, props.layoutMode);
     setGraph(runtime.current); setSettled(false);
   }, [nodes, edges, layoutKey, props.layoutMode]);
 

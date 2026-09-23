@@ -24,7 +24,7 @@ export const opacity = (a: Activity | undefined, now: number) => a?.removedAt ==
  * error boundary above it, that unmounted the whole hosted UI over one bad
  * projection. Keep the first occurrence and drop the rest instead.
  */
-export function reconcile(previous: RuntimeGraph, nodes: readonly ActivityNode[], edges: readonly ActivityEdge[]): RuntimeGraph {
+export function reconcile(previous: RuntimeGraph, nodes: readonly ActivityNode[], edges: readonly ActivityEdge[], layoutMode: 'force' | 'guided' = 'force'): RuntimeGraph {
   const old = new Map(previous.nodes.map(n => [n.id, n]));
   const ids = new Set<string>();
   const next: RuntimeNode[] = [];
@@ -37,6 +37,10 @@ export function reconcile(previous: RuntimeGraph, nodes: readonly ActivityNode[]
     const node: RuntimeNode = old.get(spec.id) ?? { id: spec.id, spec, x: spec.position?.x ?? 0, y: spec.position?.y ?? 0, homeX: 0, homeY: 0 };
     node.spec = spec;
     node.homeX = spec.position?.x ?? 0; node.homeY = spec.position?.y ?? 0;
+    // Guided positions are final, including newly admitted and restored nodes.
+    // Pin them before the renderer's first simulation tick, not only after it
+    // settles or the next update arrives.
+    if (layoutMode === 'guided') node.placed = true;
     node.fx = spec.position?.anchored ? node.homeX : node.placed ? node.x : undefined;
     node.fy = spec.position?.anchored ? node.homeY : node.placed ? node.y : undefined;
     next.push(node);

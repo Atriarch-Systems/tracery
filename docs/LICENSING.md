@@ -77,7 +77,8 @@ scans the actual packaged npm files and final container, retains the evidence,
 and blocks publication on unreviewed licenses or a changed runtime inventory.
 
 Hosted and standalone viewer builds automatically collect license files for
-resolved third-party modules, emit THIRD-PARTY-NOTICES.txt and embed a readable
+resolved third-party modules and Vite runtime helpers (including bundled helper
+licenses), emit THIRD-PARTY-NOTICES.txt and embed a readable
 Open-source licenses disclosure in each HTML artifact. Missing packaged license
 text fails the build; reviewed upstream fallbacks live in licenses/vendor with
 pinned source references. The container Dockerfile copies the resulting notices

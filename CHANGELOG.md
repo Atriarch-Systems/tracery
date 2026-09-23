@@ -6,6 +6,8 @@
   Actions, with a manual validation-only run and retained SBOM/scan evidence.
 - Include matching Alpine sources, patches, build recipes and notices with each
   container; preserve Node's complete license and enforce the reviewed inventory.
+- Preserve Vite and bundled runtime-helper notices in browser builds and exports.
+- Pin new and restored guided-layout nodes before the first physics tick.
 - Remove unused npm/Corepack/Yarn from the runtime image and pin upstream images.
 - Reject unreviewed final-artifact licenses, secrets and high/critical
   vulnerability findings before publication.

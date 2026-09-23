@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { forceSimulation, forceManyBody } from 'd3-force';
 import { reconcile, emptyGraph, intensity, opacity, edgeWidth } from '../dist/model.js';
 import { VISUALIZER_CONTRACT_VERSION } from '../dist/types.js';
 
@@ -149,4 +150,30 @@ test('active cards pulse; idle, completed, gray and reduced-motion cards stay st
   assert.notDeepEqual(render(erroredBusy,450),render(erroredBusy,1350));
   assert.ok(render(erroredBusy,450).some(([key,value]) => key==='shadowColor' && value==='#f28b82aa'));
   assert.equal(isNodeActive({...busy,activity:{highlighted:true,completedAt:449}},450),false);
+});
+
+test('guided nodes retain exact placements through the first physics ticks, updates and scope restoration', () => {
+  const specs = [
+    { id: 'parent', label: 'Parent', position: { x: 120, y: 78 } },
+    { id: 'child', label: 'Child', position: { x: 120, y: 220 } },
+  ];
+  const verifyTicks = (graph, expected) => {
+    // A renderer can tick before its forces are configured. Guided positions
+    // must survive that ordering, including the first frame after a scope swap.
+    const simulation = forceSimulation(graph.nodes).force('charge', forceManyBody()).stop();
+    simulation.tick(5);
+    assert.deepEqual(graph.nodes.map(({ id, x, y }) => ({ id, x, y })), expected);
+  };
+  const expected = specs.map(({ id, position }) => ({ id, x: position.x, y: position.y }));
+  const first = reconcile(emptyGraph(), specs, [], 'guided');
+  verifyTicks(first, expected);
+  first.nodes[0].x += 70; first.nodes[0].y += 45;
+  const moved = expected.map(node => node.id === 'parent' ? { ...node, x: node.x + 70, y: node.y + 45 } : node);
+  verifyTicks(reconcile(first, specs, [], 'guided'), moved);
+  const restored = specs.map(spec => ({ ...spec, position: moved.find(node => node.id === spec.id) }));
+  verifyTicks(reconcile(emptyGraph(), restored, [], 'guided'), moved);
+  const free = reconcile(emptyGraph(), specs, [], 'force');
+  const simulation = forceSimulation(free.nodes).force('charge', forceManyBody()).stop();
+  simulation.tick(5);
+  assert.notEqual(free.nodes[0].y, expected[0].y, 'force layout must remain free to move');
 });

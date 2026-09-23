@@ -52,5 +52,5 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     inventory: JSON.parse(readFileSync(inventoryPath, 'utf8')),
     nodeLicense: readFileSync(nodeLicensePath),
   } : {};
-  console.log(`PASS: ${checkReleaseScan(scan, options)} final-artifact license findings reviewed; no HIGH/CRITICAL vulnerabilities or secret findings`);
+  console.log(`PASS: ${checkReleaseScan(scan, options)} final-artifact license findings reviewed; no blocked findings in the supplied scan`);
 }
