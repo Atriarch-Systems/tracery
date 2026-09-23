@@ -31,7 +31,9 @@ loaded through `TRACERY_EXTENSIONS_MODULE`) -- see `docs/SPEC.md` §7 and
 - Consumer inputs are `readonly` and never mutated. No `any` in exports.
 - Node >= 22.13 (`node:sqlite`). Python 3.11 is the supported interpreter.
 - CI runs on self-hosted runners only. Never `runs-on: ubuntu-latest`.
-- Licensing: 100% Apache-2.0. No commercial code, license gate, or feature flag lives in this repository.
+- Licensing: original Tracery code is Apache-2.0; third-party files retain their
+  own licenses. No enterprise implementation or runtime commercial-license gate
+  lives in this repository. Release license-compliance checks are required.
 
 ## Commands
 

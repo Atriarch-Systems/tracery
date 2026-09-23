@@ -1,6 +1,6 @@
 {
   "name": "@atriarch/tracery-react",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "license": "Apache-2.0",
   "description": "ActivityExplorer: a composite React explorer (flow picker, guided graph, inspector) and live-source hooks for Tracery.",
   "type": "module",
@@ -24,9 +24,9 @@
     "react-dom": ">=18 <20"
   },
   "dependencies": {
-    "@atriarch/tracery-core": "^0.1.0",
-    "@atriarch/tracery-visualizer": "^0.3.0",
-    "@atriarch/tracery-client": "^0.1.0"
+    "@atriarch/tracery-core": "^0.1.1",
+    "@atriarch/tracery-visualizer": "^0.3.1",
+    "@atriarch/tracery-client": "^0.1.1"
   },
   "devDependencies": {
     "typescript": "^5.6.0",

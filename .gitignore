@@ -18,3 +18,4 @@ playwright-report/
 !apps/hub/web/vendor/vite-plugin-singlefile/dist/
 !apps/hub/web/vendor/vite-plugin-singlefile/dist/**
 .hero-video-tmp*
+artifacts/

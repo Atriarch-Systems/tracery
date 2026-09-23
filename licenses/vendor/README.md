@@ -10,3 +10,9 @@ build fails for any newly missing license until its source is reviewed.
   identifies Pomax and grants MIT; its README repeats that grant. The fallback
   preserves that attribution and appends the standard MIT permission/warranty
   text. No copyright year was supplied by that source or invented here.
+- abstract-logging 2.0.1: npm package and upstream tag commit
+  [80dfaef](https://github.com/jsumners/abstract-logging/tree/80dfaef91ee87008f4ed2b6e78921d383bccd406)
+  omit LICENSE and link to <https://jsumners.mit-license.org/> from Readme.md.
+  The fallback preserves that page's MIT grant and copyright notice retrieved
+  2026-09-23 (the linked site renders the current year), with its obfuscated
+  email rendered as the same author address recorded in package.json.

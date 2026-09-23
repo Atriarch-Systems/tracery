@@ -72,12 +72,19 @@ ambiguous, unknown and copyleft licenses pending review. BlueOak-1.0.0 is accept
 as permissive; caniuse-lite's CC-BY-4.0 data is accepted only as a development
 entry. New exceptions require a documented source and justification in the PR.
 CI also uses Trivy 0.74.0 for license inventory and a CycloneDX source SBOM,
-retained in the license-and-sbom artifact. This does not scan a final container.
+retained in the license-and-sbom artifact. The release workflow additionally
+scans the actual packaged npm files and final container, retains the evidence,
+and blocks publication on unreviewed licenses or a changed runtime inventory.
 
 Hosted and standalone viewer builds automatically collect license files for
 resolved third-party modules, emit THIRD-PARTY-NOTICES.txt and embed a readable
 Open-source licenses disclosure in each HTML artifact. Missing packaged license
 text fails the build; reviewed upstream fallbacks live in licenses/vendor with
 pinned source references. The container Dockerfile copies the resulting notices
-and Tracery's own LICENSE/NOTICE. Final image and registry validation are separate
-from the v0.1.0 source release.
+and Tracery's own LICENSE/NOTICE. Node's complete upstream license is retained
+separately. The container includes verified matching source archives, Alpine
+build recipes, patches and notices for its operating-system packages at
+`/usr/share/tracery/sources.tar.gz`. Sources therefore accompany each image.
+See the [container redistribution review](../licenses/CONTAINER-REVIEW.md) for
+the exact inventory, GPL/LGPL treatment and Node notice exceptions, and
+[PUBLISHING.md](PUBLISHING.md) for the GitHub Actions release process.

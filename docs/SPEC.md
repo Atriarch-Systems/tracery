@@ -355,7 +355,7 @@ served by the hub as static files. First load asks for a read key (kept in
 
 ### Packaging
 
-- `apps/hub/Dockerfile`: multi-stage, builds workspaces, final `node:22-alpine`
+- `apps/hub/Dockerfile`: multi-stage, builds workspaces, final pinned Alpine/Node runtime
   image with only production deps, non-root user, `VOLUME /data`, `EXPOSE 8971`,
   `HEALTHCHECK` on `/healthz`.
 - `apps/hub/docker-compose.yaml`: hub + volume, example keys file.
@@ -364,8 +364,9 @@ served by the hub as static files. First load asks for a read key (kept in
 
 ## 7. Extensions and Tracery Cloud
 
-This repository is **100% Apache-2.0**. There is no commercial layer, license
-gate, or feature flag anywhere in it. The hub exposes exactly one seam for
+Original Tracery code is **Apache-2.0**; third-party files retain their own licenses.
+There is no commercial layer or runtime commercial-license
+gate in the community hub. The hub exposes exactly one seam for
 anything beyond what ships here: `HubExtensions`
 (`apps/hub/src/server-context.ts`) --
 
@@ -404,7 +405,7 @@ repo, executed by the integration workstream:
 1. `npm ci && npm run build && npm test` green at the root on Node 22.
 2. `python -m pytest clients/python` green on 3.11 (3.13 acceptable locally).
 3. `docker build -f apps/hub/Dockerfile .` succeeds; `docker run` with no env
-   starts in local mode (no key minted or printed) and serves `/healthz`,
+   fails closed; explicit `TRACERY_AUTH=none` on a loopback-published port serves `/healthz`,
    `/v1/info`, `/v1/openapi.json`, `/ui/`.
 4. A demo script (`scripts/demo.mjs`) drives the TS client to emit a parent flow
    that spawns two child flows (one via the Python client), then asserts through

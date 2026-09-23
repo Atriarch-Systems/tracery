@@ -1,6 +1,6 @@
 {
   "name": "@atriarch/tracery-visualizer",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "license": "Apache-2.0",
   "description": "Consumer-configured React canvas for live nodes and directed activity edges.",
   "type": "module",

@@ -1,6 +1,7 @@
 # Tracery
 
 > **v0.1.0 is available from source. npm/PyPI packages and Docker images are not published yet.**
+> The current checkout prepares v0.1.1; see [Publishing](docs/PUBLISHING.md) for the GitHub Actions release and credential setup.
 > `npx @atriarch/tracery-hub` and `docker pull atriarch/tracery-hub` will not work
 > until registry publication. Use the commands below (Node.js >=22.13), or try the
 > [hosted demo](https://atriarch.systems/demos/tracery/). See [release notes](CHANGELOG.md).
@@ -212,13 +213,13 @@ redaction rules, expiry/revocation, rate limits, Open Graph previews, and
 
 | Package | Path | Version | License |
 | --- | --- | --- | --- |
-| `@atriarch/tracery-core` | `packages/core` | 0.1.0 | Apache-2.0 |
-| `@atriarch/tracery-visualizer` | `packages/visualizer` | 0.3.0 | Apache-2.0 |
-| `@atriarch/tracery-client` | `packages/client` | 0.1.0 | Apache-2.0 |
-| `@atriarch/tracery-react` | `packages/react` | 0.1.0 | Apache-2.0 |
+| `@atriarch/tracery-core` | `packages/core` | 0.1.1 | Apache-2.0 |
+| `@atriarch/tracery-visualizer` | `packages/visualizer` | 0.3.1 | Apache-2.0 |
+| `@atriarch/tracery-client` | `packages/client` | 0.1.1 | Apache-2.0 |
+| `@atriarch/tracery-react` | `packages/react` | 0.1.1 | Apache-2.0 |
 | `atriarch-tracery` (Python, `atriarch.tracery`) | `clients/python` | 0.1.0 | Apache-2.0 |
-| `@atriarch/tracery-hub` | `apps/hub` | 0.1.0 | Apache-2.0 |
-| `@atriarch/tracery-hub-web` (hosted UI, not published) | `apps/hub/web` | 0.1.0 | Apache-2.0 |
+| `@atriarch/tracery-hub` | `apps/hub` | 0.1.1 | Apache-2.0 |
+| `@atriarch/tracery-hub-web` (hosted UI, not published) | `apps/hub/web` | 0.1.1 | Apache-2.0 |
 | `tracery` (Claude Code plugin) | `plugins/claude-code` | 0.1.0 | Apache-2.0 |
 
 ## Event model

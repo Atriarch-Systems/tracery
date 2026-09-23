@@ -1,6 +1,15 @@
 # Changelog
 
-## Unreleased
+## v0.1.1 — release candidate (registries pending)
+
+- Publish tested npm packages and Docker images through tag-triggered GitHub
+  Actions, with a manual validation-only run and retained SBOM/scan evidence.
+- Include matching Alpine sources, patches, build recipes and notices with each
+  container; preserve Node's complete license and enforce the reviewed inventory.
+- Remove unused npm/Corepack/Yarn from the runtime image and pin upstream images.
+- Reject unreviewed final-artifact licenses, secrets and high/critical
+  vulnerability findings before publication.
+- Prepare core/client/React/hub 0.1.1 and visualizer 0.3.1. Python remains 0.1.0.
 
 - Make the client flush-concurrency regression deterministic: control timer ticks
   and transport completion instead of assuming eleven sends finish within 500 ms.

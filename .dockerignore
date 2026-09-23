@@ -27,3 +27,8 @@ test-results
 playwright-report
 **/playwright-report
 .playwright-mcp
+.hero-video-tmp*
+.env
+.env.*
+artifacts
+apps/hub/data

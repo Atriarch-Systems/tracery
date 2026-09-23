@@ -1,6 +1,6 @@
 {
   "name": "@atriarch/tracery-hub-web",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "license": "Apache-2.0",
   "type": "module",
@@ -12,9 +12,9 @@
     "test": "playwright test"
   },
   "dependencies": {
-    "@atriarch/tracery-client": "^0.1.0",
-    "@atriarch/tracery-core": "^0.1.0",
-    "@atriarch/tracery-react": "^0.1.0",
+    "@atriarch/tracery-client": "^0.1.1",
+    "@atriarch/tracery-core": "^0.1.1",
+    "@atriarch/tracery-react": "^0.1.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },

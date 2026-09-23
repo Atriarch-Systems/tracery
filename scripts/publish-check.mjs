@@ -28,7 +28,8 @@
  * packed tarballs, and the hub process it started, even on failure.
  */
 import { spawnSync, spawn, execSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync, rmSync, existsSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, rmSync, existsSync, mkdirSync, copyFileSync, readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import net from 'node:net';
@@ -161,6 +162,7 @@ console.log(`[publish-check] scratch dir: ${scratchRoot}`);
 
 let hubProc;
 let hubPort;
+const releasePackages = [];
 
 async function main() {
   // -------------------------------------------------------------------------
@@ -194,6 +196,17 @@ async function main() {
         const parsed = JSON.parse(start !== -1 && end !== -1 ? res.stdout.slice(start, end + 1) : res.stdout);
         filename = parsed[0]?.filename;
         ok = Boolean(filename) && existsSync(path.join(tarballDir, filename));
+        if (ok) {
+          const pack = parsed[0];
+          const files = pack.files.map(file => file.path);
+          for (const required of ['LICENSE', 'NOTICE', 'package.json']) {
+            if (!files.includes(required)) throw new Error(`${pkgDir} is missing ${required}`);
+          }
+          if (pkgDir === 'apps/hub' && (!files.includes('web/dist/THIRD-PARTY-NOTICES.txt') || !files.includes('web/dist/index.html'))) {
+            throw new Error('Hub tarball is missing the hosted UI or third-party notices');
+          }
+          releasePackages.push({ name: pack.name, version: pack.version, filename, integrity: pack.integrity, files });
+        }
       } catch (err) {
         ok = false;
       }
@@ -367,6 +380,22 @@ if (failed.length > 0) {
   exitCode = 1;
 } else if (exitCode === 0) {
   console.log('ALL CHECKS PASSED');
+  if (process.env.TRACERY_RELEASE_DIR) {
+    try {
+      const destination = path.resolve(process.env.TRACERY_RELEASE_DIR);
+      mkdirSync(destination, { recursive: true });
+      for (const pkg of releasePackages) {
+        const source = path.join(tarballDir, pkg.filename);
+        pkg.sha256 = createHash('sha256').update(readFileSync(source)).digest('hex');
+        copyFileSync(source, path.join(destination, pkg.filename));
+      }
+      writeFileSync(path.join(destination, 'packages.json'), JSON.stringify(releasePackages, null, 2) + '\n');
+      console.log(`[publish-check] retained the tested tarballs in ${destination}`);
+    } catch (err) {
+      console.error(`[publish-check] cannot retain release artifacts: ${err.message}`);
+      exitCode = 1;
+    }
+  }
 }
 
 // -----------------------------------------------------------------------------

@@ -184,15 +184,15 @@ were actually published before this step. Use the final version/namespace if it
 changed during release preparation.
 
 ```sh
-npx --yes @atriarch/tracery-hub@0.1.0
+npx --yes @atriarch/tracery-hub@0.1.1
 ```
 
 PASS: <http://127.0.0.1:8971/ui/> loads from the registry-installed package. Stop
 with Ctrl-C. Then, on a machine without a locally built image under this tag:
 
 ```sh
-docker pull atriarch/tracery-hub:0.1.0
-docker run --rm -p 127.0.0.1:18972:8971 -e TRACERY_AUTH=none atriarch/tracery-hub:0.1.0
+docker pull atriarch/tracery-hub:0.1.1
+docker run --rm -p 127.0.0.1:18972:8971 -e TRACERY_AUTH=none atriarch/tracery-hub:0.1.1
 ```
 
 PASS: <http://127.0.0.1:18972/ui/> works. Record the pulled digest and architecture.

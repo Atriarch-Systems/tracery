@@ -5,9 +5,9 @@
 # Multi-stage: builds the npm workspaces this image actually needs
 # (@atriarch/tracery-core + @atriarch/tracery-hub), builds the hosted UI in
 # apps/hub/web when that directory exists (workstream E), and ships a final
-# node:22-alpine image with only production dependencies.
+# pinned Alpine/Node runtime with production dependencies and matching OS sources.
 
-FROM node:22-alpine AS build
+FROM node:22.23.2-alpine3.24@sha256:b6f26b36c8ff49624cfdac716b8ea1138d606df02586a77d364bb5536a634f85 AS build
 WORKDIR /repo
 
 # Full monorepo context: apps/hub/web may or may not exist yet, and copying
@@ -39,10 +39,24 @@ RUN if [ -f apps/hub/web/package.json ]; then \
 
 # Drop devDependencies (typescript, @types/*, ws, ...) from node_modules now
 # that everything is compiled; keeps the npm-workspaces symlink graph intact.
-RUN npm prune --omit=dev
+RUN npm prune --omit=dev && node scripts/runtime-notices.mjs
 
-FROM node:22-alpine
+# Copy the runtime, not npm, Corepack or Yarn and their unused dependencies.
+FROM alpine:3.24.2@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6 AS runtime-base
+RUN apk add --no-cache libstdc++=15.2.0-r5 ca-certificates-bundle=20260909-r0
+COPY --from=build /usr/local/bin/node /usr/local/bin/node
+COPY --from=build /usr/local/LICENSE /usr/share/licenses/node/LICENSE
+
+# Collect sources using the runtime inventory, before adding build tools.
+FROM alpine:3.24.2@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6 AS sources
+RUN apk add --no-cache python3 git abuild xz
+COPY --from=runtime-base /lib/apk/db/installed /runtime-installed
+COPY scripts/container-sources.py /container-sources.py
+RUN python3 /container-sources.py
+
+FROM runtime-base
 WORKDIR /app
+COPY --from=sources /out/ /usr/share/tracery/
 RUN addgroup -S tracery && adduser -S tracery -G tracery
 
 # TRACERY_HOST=0.0.0.0: config.ts's local-mode default (127.0.0.1) is a
@@ -59,7 +73,7 @@ ENV NODE_ENV=production \
 
 COPY --from=build /repo/node_modules ./node_modules
 COPY --from=build /repo/package.json ./package.json
-COPY --from=build /repo/LICENSE /repo/NOTICE ./
+COPY --from=build /repo/LICENSE /repo/NOTICE /repo/RUNTIME-NOTICES.txt ./
 COPY --from=build /repo/apps/hub/web/dist/THIRD-PARTY-NOTICES.txt ./THIRD-PARTY-NOTICES.txt
 COPY --from=build /repo/packages/core/package.json ./packages/core/package.json
 COPY --from=build /repo/packages/core/dist ./packages/core/dist
