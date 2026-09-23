@@ -1,10 +1,10 @@
 // A published version tag is immutable. Retries may reuse the exact image config.
 import { execFileSync } from 'node:child_process';
+import { ensureDockerRepository } from './release-docker-repository.mjs';
 const repository = process.env.DOCKERHUB_IMAGE;
 const version = process.env.GITHUB_REF_NAME?.replace(/^v/, '');
 if (!/^[a-z0-9][a-z0-9_-]*\/[a-z0-9][a-z0-9._-]*$/.test(repository ?? '') || !/^0\.\d+\.\d+$/.test(version ?? '')) throw Error('Invalid release image or version');
-const info = await fetch(`https://hub.docker.com/v2/repositories/${repository}/`);
-if (!info.ok || (await info.json()).is_private !== false) throw Error('Create the public Docker Hub repository before tagging the release');
+await ensureDockerRepository({ image: repository, username: process.env.DOCKERHUB_USERNAME, token: process.env.DOCKERHUB_TOKEN }, (url, options) => fetch(url, { ...options, signal: AbortSignal.timeout(30_000) }));
 const tokenResponse = await fetch(`https://auth.docker.io/token?service=registry.docker.io&scope=repository:${repository}:pull`);
 if (!tokenResponse.ok) throw Error(`Registry authentication failed: ${tokenResponse.status}`);
 const { token } = await tokenResponse.json();

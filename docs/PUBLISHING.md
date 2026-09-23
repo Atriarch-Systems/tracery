@@ -27,8 +27,11 @@ Create an organization or repository **Actions variable**, not a secret:
 | --- | --- |
 | `DOCKERHUB_IMAGE` | The confirmed namespace and repository, for example `atriarch/tracery-hub`. Do not include a registry hostname or tag. |
 
-Create that Docker Hub repository with **Public** visibility before the first
-release. Confirm that the `@atriarch` npm scope belongs to your account or
+The workflow creates the configured Docker Hub repository with **Public**
+visibility if it does not exist. The Docker account must be allowed to create
+repositories in that namespace as well as push images. An existing private
+repository causes a failure; its visibility is never changed automatically.
+Confirm that the `@atriarch` npm scope belongs to your account or
 organization; lack of existing public packages does not prove a scope is free.
 Organization administration permissions on an npm token are not a substitute
 for package/scope publication permissions.

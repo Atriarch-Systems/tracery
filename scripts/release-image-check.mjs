@@ -1,6 +1,6 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import assert from 'node:assert/strict';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 
 const image = process.argv[2];
@@ -33,6 +33,9 @@ try {
   await ready();
   const info = await json('/v1/info');
   assert.equal(info.edition, 'community');
+  assert.equal(info.version, JSON.parse(readFileSync(new URL('../apps/hub/package.json', import.meta.url))).version);
+  const policy = JSON.parse(readFileSync(new URL('../licenses/container-policy.json', import.meta.url)));
+  assert.equal(docker('exec', name, 'node', '-p', 'process.versions.node'), policy.nodeVersion);
   assert.equal(info.auth, 'none');
   const ui = await (await fetch(`${base}/ui/`)).text();
   assert(ui.includes('Tracery') && ui.includes('tracery-licenses'), 'Hosted UI and embedded notices required');
@@ -43,6 +46,7 @@ try {
   docker('exec', name, 'sh', '-ec', 'mkdir /tmp/source-check; tar -xzf /usr/share/tracery/sources.tar.gz -C /tmp/source-check; cd /tmp/source-check/sources; sha256sum -c SHA256SUMS > /dev/null; cmp packages.json /usr/share/tracery/alpine-packages.json; cmp installed.apk.txt /lib/apk/db/installed');
   for (const file of ['sources.tar.gz', 'alpine-packages.json', 'SOURCES.txt']) docker('cp', `${name}:/usr/share/tracery/${file}`, path.join(out, file));
   docker('cp', `${name}:/usr/share/licenses/node/LICENSE`, path.join(out, 'NODE-LICENSE'));
+  docker('cp', `${name}:/app/RUNTIME-NOTICES.txt`, path.join(out, 'RUNTIME-NOTICES.txt'));
   const fixture = spawnSync(process.execPath, ['scripts/publish-check-demo.template.mjs'], { env: { ...process.env, TRACERY_HUB_URL: base, TRACERY_API_KEY: '' }, stdio: 'inherit', timeout: 30_000 });
   assert.equal(fixture.status, 0, 'Live trace fixture must pass');
   const before = await json('/v1/flows');

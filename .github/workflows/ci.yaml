@@ -18,7 +18,7 @@ jobs:
       - run: node -e "const [m,n]=process.versions.node.split('.').map(Number); if(m<22||(m===22&&n<13)) process.exit(1)"
       - run: npm ci
       - run: npm run license:check
-      - run: node --test scripts/release-license-gate.test.mjs
+      - run: node --test scripts/release-license-gate.test.mjs scripts/release-docker-repository.test.mjs
       - run: npx playwright install --with-deps chromium
       - run: npm run build
       - run: npm test

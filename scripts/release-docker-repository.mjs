@@ -1,0 +1,31 @@
+// Docker Hub API setup: create only the explicitly configured public repository.
+// Existing private repositories are never made public by this helper.
+export async function ensureDockerRepository({ image, username, token }, request = fetch) {
+  if (!/^[a-z0-9][a-z0-9_-]*\/[a-z0-9][a-z0-9._-]*$/.test(image ?? '')) throw Error('Invalid Docker Hub repository');
+  if (!username || !token) throw Error('Missing Docker Hub credentials');
+  const [namespace, name] = image.split('/');
+  const auth = await request('https://hub.docker.com/v2/auth/token', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ identifier: username, secret: token }),
+  });
+  if (!auth.ok) throw Error(`Docker Hub API authentication failed: ${auth.status}`);
+  const { access_token } = await auth.json();
+  if (!access_token) throw Error('Docker Hub did not return an access token');
+  const headers = { Authorization: `Bearer ${access_token}`, 'Content-Type': 'application/json' };
+  const url = `https://hub.docker.com/v2/namespaces/${namespace}/repositories/${name}`;
+  let response = await request(url, { headers });
+  if (response.status === 404) {
+    response = await request(`https://hub.docker.com/v2/namespaces/${namespace}/repositories`, {
+      method: 'POST', headers,
+      body: JSON.stringify({ namespace, name, registry: 'docker.io', is_private: false,
+        description: 'Tracery community hub: agent activity graphs, live tracing and self-hosted storage.',
+        full_description: 'Source and documentation: https://github.com/Atriarch-Systems/tracery\n\nOriginal Tracery code is Apache-2.0. Third-party licenses apply. The image includes runtime notices and matching Alpine sources at /usr/share/tracery/sources.tar.gz; extraction instructions are in /usr/share/tracery/SOURCES.txt. Release evidence: https://github.com/Atriarch-Systems/tracery/releases\n\nInitial images support linux/amd64. See the source README for authentication and persistent storage setup.' }),
+    });
+  }
+  if (!response.ok) throw Error(`Cannot access/create Docker Hub repository: ${response.status}; check namespace permissions`);
+  const repo = await response.json();
+  if (repo.is_private !== false) throw Error('Target repository is private; refusing to change its visibility');
+  if (repo.permissions?.write !== true) throw Error('Docker Hub account lacks repository write permission');
+  const publicResponse = await request(url);
+  if (!publicResponse.ok || (await publicResponse.json()).is_private !== false) throw Error('Repository is not anonymously accessible');
+}

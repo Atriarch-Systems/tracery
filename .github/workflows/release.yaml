@@ -39,7 +39,7 @@ jobs:
           NODE
       - run: npm ci
       - run: npm run license:check
-      - run: node --test scripts/release-license-gate.test.mjs
+      - run: node --test scripts/release-license-gate.test.mjs scripts/release-docker-repository.test.mjs
       - run: npx playwright install --with-deps chromium
       - run: npm run build && npm test && npm run test:plugin
       - name: Test and retain actual npm tarballs
@@ -137,8 +137,11 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: Check public Docker repository and immutable version
+      - name: Ensure public Docker repository and immutable version
         run: node scripts/release-docker-check.mjs
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Publish tested npm tarballs in dependency order
         run: node scripts/release-npm.mjs artifacts/npm
         env:
