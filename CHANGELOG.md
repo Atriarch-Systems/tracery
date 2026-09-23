@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Make the client flush-concurrency regression deterministic: control timer ticks
+  and transport completion instead of assuming eleven sends finish within 500 ms.
+
 - Make source builds the active hub/plugin quick start; mark npm, PyPI and
   prebuilt Docker distribution as pending. Add the missing local image build
   step and correct Docker smoke commands for explicit local authentication opt-out.

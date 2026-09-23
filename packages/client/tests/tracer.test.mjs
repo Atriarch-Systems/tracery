@@ -190,7 +190,10 @@ test('flow.end() ends the root op once, defaulting status to success', async () 
   assert.equal(typeof ends[0].durationMs, 'number');
 });
 
-test('flush() is re-entrant: overlapping timer ticks never run transport.send concurrently', async () => {
+test('flush() is re-entrant: overlapping timer ticks never run transport.send concurrently', async (t) => {
+  t.mock.timers.enable({ apis: ['setInterval'] });
+  let releaseSend;
+  const sendGate = new Promise((resolve) => { releaseSend = resolve; });
   let inFlight = 0;
   let maxInFlight = 0;
   const delivered = [];
@@ -198,29 +201,38 @@ test('flush() is re-entrant: overlapping timer ticks never run transport.send co
     async send(events) {
       inFlight++;
       maxInFlight = Math.max(maxInFlight, inFlight);
-      await sleep(40); // much slower than flushIntervalMs below
+      await sendGate;
       delivered.push(...events);
       inFlight--;
     },
   };
-  // maxBatch: 1 + a slow send means, without a re-entrancy guard, each 10ms
-  // timer tick starts another overlapping drain against the still-queued events.
   const tracer = new ActivityTracer({ transport, flushIntervalMs: 10, maxBatch: 1 });
+  t.after(async () => {
+    releaseSend();
+    await tracer.close();
+  });
   const flow = tracer.startFlow({}); // 1 event
   for (let i = 0; i < 5; i++) {
     const op = flow.start({ node: `tool:${i}`, name: 'tool.call' });
     op.end();
   } // 10 more events; 11 total
 
-  // Let many timer ticks land (10ms apart) while sends are still slowly
-  // draining (40ms apiece) — this is what gives an unguarded flush() the
-  // chance to start overlapping drains against the still-queued events.
-  await sleep(500);
-
+  // Hold the first send open while repeated timer ticks try to start drains.
+  // No wall-clock deadline: delayed Windows timers must not look like lost events.
+  t.mock.timers.tick(10);
+  assert.equal(inFlight, 1, 'the interval must start the first send');
+  for (let i = 0; i < 10; i++) t.mock.timers.tick(10);
+  const pendingFlush = tracer.flush();
   assert.equal(maxInFlight, 1, 'transport.send must never run concurrently with itself');
-  assert.equal(delivered.length, 11, 'every queued event must have been delivered');
+  assert.equal(delivered.length, 0, 'the blocked transport has not delivered any events');
 
-  await tracer.close();
+  releaseSend();
+  await pendingFlush;
+  assert.equal(maxInFlight, 1, 'all batches must remain serialized');
+  assert.equal(inFlight, 0, 'flush must await the final send');
+  assert.equal(delivered.length, 11, 'every queued event must have been delivered');
+  assert.deepEqual(delivered.map(event => event.seq), Array.from({ length: 11 }, (_, i) => i),
+    'events must arrive exactly once and in emission order');
 });
 
 test('close() waits for a flush already in progress rather than returning while sends are still in flight', async () => {
