@@ -19,7 +19,7 @@ export async function ensureDockerRepository({ image, username, token }, request
       method: 'POST', headers,
       body: JSON.stringify({ namespace, name, registry: 'docker.io', is_private: false,
         description: 'Tracery community hub: agent activity graphs, live tracing and self-hosted storage.',
-        full_description: 'Source and documentation: https://github.com/Atriarch-Systems/tracery\n\nOriginal Tracery code is Apache-2.0. Third-party licenses apply. The image includes runtime notices and matching Alpine sources at /usr/share/tracery/sources.tar.gz; extraction instructions are in /usr/share/tracery/SOURCES.txt. Release evidence: https://github.com/Atriarch-Systems/tracery/releases\n\nInitial images support linux/amd64. See the source README for authentication and persistent storage setup.' }),
+        full_description: 'Source and documentation: https://github.com/Atriarch-Systems/tracery\n\nOriginal Tracery code is Apache-2.0. Third-party licenses apply. The image includes runtime notices and matching Alpine sources at /usr/share/tracery/sources.tar.gz; extraction instructions are in /usr/share/tracery/SOURCES.txt. Release evidence: https://github.com/Atriarch-Systems/tracery/releases\n\nImages support linux/amd64 and linux/arm64. Version and latest tags select the native platform; explicit -amd64 and -arm64 tags are also available. See the source README for authentication and persistent storage setup.' }),
     });
   }
   if (!response.ok) throw Error(`Cannot access/create Docker Hub repository: ${response.status}; check namespace permissions`);

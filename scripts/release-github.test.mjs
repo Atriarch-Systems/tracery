@@ -54,5 +54,9 @@ test('GitHub release stays draft until every asset is uploaded or verified', asy
       assert(options.binary, 'a mismatch must not publish the draft');
       return Buffer.from('different');
     }, retry, [{ file, name: 'evidence.txt' }]), /differs/);
-  } finally { rmSync(directory, { recursive: true, force: true }); }
+  } finally {
+    assert.equal(path.dirname(path.resolve(directory)), path.resolve(tmpdir()));
+    assert(path.basename(directory).startsWith('tracery-release-test-'));
+    rmSync(directory, { recursive: true, force: true });
+  }
 });
