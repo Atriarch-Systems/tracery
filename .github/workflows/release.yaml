@@ -64,9 +64,13 @@ jobs:
           trivy fs --scanners license,secret --license-full --skip-version-check --format json --output artifacts/reports/npm-scan.json artifacts/unpacked
           node scripts/release-license-gate.mjs artifacts/reports/npm-scan.json
           trivy fs --scanners license --include-dev-deps --offline-scan --skip-version-check --skip-dirs .git --skip-dirs artifacts --format cyclonedx --output artifacts/reports/source-sbom.cdx.json .
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+        with:
+          driver: docker
+          version: v0.37.1
       - name: Build and test the image with matching sources
         run: |
-          docker build --platform linux/amd64 --provenance=false -f apps/hub/Dockerfile -t "$LOCAL_IMAGE" .
+          docker buildx build --load --platform linux/amd64 --provenance=false -f apps/hub/Dockerfile -t "$LOCAL_IMAGE" .
           node scripts/release-image-check.mjs "$LOCAL_IMAGE" artifacts/container
       - name: Gate final image and record its SBOM
         run: |
