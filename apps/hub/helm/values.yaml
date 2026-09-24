@@ -3,7 +3,7 @@
 # file only documents the Helm-specific shape.
 
 image:
-  repository: atriarch/tracery-hub
+  repository: atriarchsystems/tracery-hub
   # Defaults to .Chart.AppVersion when unset.
   tag: ""
   pullPolicy: IfNotPresent

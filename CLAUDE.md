@@ -40,7 +40,7 @@ loaded through `TRACERY_EXTENSIONS_MODULE`) -- see `docs/SPEC.md` §7 and
 ```bash
 npm ci && npm run build && npm test            # all workspaces
 python -m pip install -e clients/python[dev] && python -m pytest -q clients/python
-docker build -f apps/hub/Dockerfile -t atriarch/tracery-hub .
+docker build -f apps/hub/Dockerfile -t atriarchsystems/tracery-hub .
 node scripts/demo.mjs                           # end-to-end against a running hub
 ```
 

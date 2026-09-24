@@ -1,6 +1,6 @@
 # Tracery Hub (SPEC.md §6 "Packaging"). Build from the REPO ROOT:
 #
-#   docker build -f apps/hub/Dockerfile -t atriarch/tracery-hub:dev .
+#   docker build -f apps/hub/Dockerfile -t atriarchsystems/tracery-hub:dev .
 #
 # Multi-stage: builds the npm workspaces this image actually needs
 # (@atriarch-systems/tracery-core + @atriarch-systems/tracery-hub), builds the hosted UI in

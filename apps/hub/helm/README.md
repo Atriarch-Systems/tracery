@@ -13,7 +13,7 @@ helm install tracery-hub apps/hub/helm \
 
 ## What this chart deploys
 
-- **Deployment** running `atriarch/tracery-hub`, liveness on `/healthz` and
+- **Deployment** running `atriarchsystems/tracery-hub`, liveness on `/healthz` and
   readiness on `/readyz`, a non-root `securityContext` on both pod and
   container, resource requests/limits.
 - **Service** (ClusterIP by default) on `service.port` (default `8971`).
@@ -97,7 +97,7 @@ apiKeys:
 
 | Key | Default | Description |
 | --- | --- | --- |
-| `image.repository` | `atriarch/tracery-hub` | Image repository. |
+| `image.repository` | `atriarchsystems/tracery-hub` | Image repository. |
 | `image.tag` | `""` (→ `.Chart.AppVersion`) | Image tag. |
 | `image.pullPolicy` | `IfNotPresent` | Image pull policy. |
 | `imagePullSecrets` | `[]` | Pull secrets for a private registry. |

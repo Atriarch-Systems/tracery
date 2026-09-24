@@ -420,7 +420,7 @@ repo, executed by the integration workstream:
 
 ## 9. Decisions owed to Dan
 
-- Product name and npm org. Working name "Tracery", scope `@atriarch-systems/tracery-*`, hub image `atriarch/tracery-hub`.
+- Product name and npm org. Working name "Tracery", scope `@atriarch-systems/tracery-*`, hub image `atriarchsystems/tracery-hub`.
 - Commercial/license terms for Tracery Cloud and self-hosted enterprise -- now entirely
   the private `tracery-cloud` repository's concern, not this one's.
 - Whether to publish to npmjs.com or only the internal Nexus.

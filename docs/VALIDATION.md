@@ -176,8 +176,8 @@ Stop the hub from 2.1 (Ctrl-C in its terminal) once this passes.
 ### 2.3 Docker path
 
 ```sh
-docker build -f apps/hub/Dockerfile -t atriarch/tracery-hub:validate .
-docker run --rm -d --name tracery-hub-validate -p 127.0.0.1:18971:8971 -e TRACERY_AUTH=none atriarch/tracery-hub:validate
+docker build -f apps/hub/Dockerfile -t atriarchsystems/tracery-hub:validate .
+docker run --rm -d --name tracery-hub-validate -p 127.0.0.1:18971:8971 -e TRACERY_AUTH=none atriarchsystems/tracery-hub:validate
 ```
 
 (Port `18971` here is arbitrary and chosen to avoid colliding with anything

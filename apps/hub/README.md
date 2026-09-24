@@ -276,8 +276,8 @@ Build from the **repository root** (the image needs `packages/core` and,
 optionally, `apps/hub/web`):
 
 ```
-docker build -f apps/hub/Dockerfile -t atriarch/tracery-hub:dev .
-docker run --rm -p 127.0.0.1:8971:8971 -e TRACERY_AUTH=none atriarch/tracery-hub:dev
+docker build -f apps/hub/Dockerfile -t atriarchsystems/tracery-hub:dev .
+docker run --rm -p 127.0.0.1:8971:8971 -e TRACERY_AUTH=none atriarchsystems/tracery-hub:dev
 ```
 
 The local example explicitly opts out of authentication and publishes the port
@@ -287,7 +287,7 @@ configure a real key:
 ```
 docker run --rm -p 8971:8971 \
   -e TRACERY_API_KEYS='[{"id":"me","key":"CHANGE_ME","workspace":"default","roles":["ingest","read","admin"]}]' \
-  atriarch/tracery-hub:dev
+  atriarchsystems/tracery-hub:dev
 ```
 
 or with compose (also root-context; its services configure a keys file):

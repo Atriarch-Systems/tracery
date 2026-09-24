@@ -19,6 +19,8 @@
 - Prepare core/client/React/hub 0.1.1 and visualizer 0.3.1. Python remains 0.1.0.
 - Packages are published under the @atriarch-systems npm scope (the org that
   exists); the visualizer's package name changes with it.
+- Container images publish as atriarchsystems/tracery-hub on Docker Hub (the
+  org that exists; Docker Hub namespaces cannot contain hyphens).
 
 - Make the client flush-concurrency regression deterministic: control timer ticks
   and transport completion instead of assuming eleven sends finish within 500 ms.

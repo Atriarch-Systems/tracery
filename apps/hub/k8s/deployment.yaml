@@ -26,7 +26,7 @@ spec:
         runAsNonRoot: true
       containers:
         - name: hub
-          image: atriarch/tracery-hub:0.1.0
+          image: atriarchsystems/tracery-hub:0.1.0
           imagePullPolicy: IfNotPresent
           ports:
             - name: http

@@ -16,7 +16,7 @@ services:
     build:
       context: ../..
       dockerfile: apps/hub/Dockerfile
-    image: atriarch/tracery-hub:dev
+    image: atriarchsystems/tracery-hub:dev
     restart: unless-stopped
     ports:
       - "8971:8971"
@@ -65,7 +65,7 @@ services:
     build:
       context: ../..
       dockerfile: apps/hub/Dockerfile
-    image: atriarch/tracery-hub:dev
+    image: atriarchsystems/tracery-hub:dev
     restart: unless-stopped
     profiles: ["postgres"]
     depends_on:

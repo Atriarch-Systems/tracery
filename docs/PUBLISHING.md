@@ -21,7 +21,7 @@ Create an organization or repository **Actions variable**, not a secret:
 
 | Variable | Value |
 | --- | --- |
-| `DOCKERHUB_IMAGE` | The confirmed namespace and repository, for example `atriarch/tracery-hub`. Do not include a registry hostname or tag. |
+| `DOCKERHUB_IMAGE` | The confirmed namespace and repository, for example `atriarchsystems/tracery-hub`. Do not include a registry hostname or tag. |
 
 The workflow creates the configured Docker Hub repository with **Public**
 visibility if it does not exist. The Docker account must be allowed to create

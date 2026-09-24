@@ -38,8 +38,8 @@ Clone the repository above first and run these commands at its root. No public
 Tracery image is available to pull yet; Docker builds it locally:
 
 ```sh
-docker build -f apps/hub/Dockerfile -t atriarch/tracery-hub:dev .   # from the repo root
-docker run --rm -p 127.0.0.1:8971:8971 -e TRACERY_AUTH=none atriarch/tracery-hub:dev
+docker build -f apps/hub/Dockerfile -t atriarchsystems/tracery-hub:dev .   # from the repo root
+docker run --rm -p 127.0.0.1:8971:8971 -e TRACERY_AUTH=none atriarchsystems/tracery-hub:dev
 ```
 
 The local example explicitly disables authentication and publishes only on
@@ -48,7 +48,7 @@ loopback. For network access, configure real keys:
 ```sh
 docker run --rm -p 8971:8971 \
   -e TRACERY_API_KEYS='[{"id":"me","key":"CHANGE_ME","workspace":"default","roles":["ingest","read","admin"]}]' \
-  atriarch/tracery-hub:dev
+  atriarchsystems/tracery-hub:dev
 ```
 
 This mode keeps everything in memory (`TRACERY_STORE=memory`, the default);

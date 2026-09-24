@@ -2,7 +2,7 @@
 
 > **v0.1.0 is available from source. npm/PyPI packages and Docker images are not published yet.**
 > The current checkout prepares v0.1.1; see [Publishing](docs/PUBLISHING.md) for the GitHub Actions release and credential setup.
-> `npx @atriarch-systems/tracery-hub` and `docker pull atriarch/tracery-hub` will not work
+> `npx @atriarch-systems/tracery-hub` and `docker pull atriarchsystems/tracery-hub` will not work
 > until registry publication. Use the commands below (Node.js >=22.13), or try the
 > [hosted demo](https://atriarch.systems/demos/tracery/). See [release notes](CHANGELOG.md).
 
@@ -96,10 +96,10 @@ second person or process should reach, run it as a container instead with
 real keys. Build the image locally first, from the repository root:
 
 ```sh
-docker build -f apps/hub/Dockerfile -t atriarch/tracery-hub:dev .
+docker build -f apps/hub/Dockerfile -t atriarchsystems/tracery-hub:dev .
 docker run -d --name tracery-hub -p 8971:8971 \
   -e TRACERY_API_KEYS='[{"id":"me","key":"CHANGE_ME","workspace":"default","roles":["ingest","read","admin"]}]' \
-  atriarch/tracery-hub:dev
+  atriarchsystems/tracery-hub:dev
 ```
 
 (containers require keys or an explicit runtime authentication opt-out; see `apps/hub/README.md`) Running on a
