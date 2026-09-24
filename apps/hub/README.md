@@ -1,11 +1,11 @@
-# @atriarch/tracery-hub
+# @atriarch-systems/tracery-hub
 
 > **Source release:** npm packages and prebuilt Docker images are not published yet.
 > Follow the [source checkout/build instructions](../../README.md) first; run the
 > commands below from the repository root.
 
 Standalone server for Tracery (see [`../../docs/SPEC.md`](../../docs/SPEC.md)
-§6). Apps push events with a client SDK (`@atriarch/tracery-client` or the
+§6). Apps push events with a client SDK (`@atriarch-systems/tracery-client` or the
 Python `atriarch-tracery`); the hub stores, sorts, serves and draws. Nothing
 renders in the producing app.
 
@@ -185,7 +185,7 @@ Three `EventStore` implementations, selected by `TRACERY_STORE`:
   flow/trace reduction is kept as an in-memory index, updated incrementally
   on every write (core's single-flow `buildFlow`, exactly like `MemoryStore` --
   see below), so reads never touch disk. This keeps `SqliteStore` behaviourally
-  identical to `MemoryStore` (both run the exact same `@atriarch/tracery-core`
+  identical to `MemoryStore` (both run the exact same `@atriarch-systems/tracery-core`
   reduction) while adding durability across restarts. It bounds memory use to
   what `TRACERY_MAX_EVENTS_PER_WORKSPACE` allows.
 - **`postgres`**: the `pg` package against `TRACERY_POSTGRES_URL`. Same

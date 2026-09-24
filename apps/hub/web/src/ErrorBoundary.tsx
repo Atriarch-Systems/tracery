@@ -3,7 +3,7 @@
  * malformed event (an out-of-range `ts`, SPEC.md §2 `validateEvent` only
  * requires it be a finite number) or a projection bug (two flows collapsing
  * onto one namespaced node id in trace/ancestors scope) used to throw from
- * deep inside `@atriarch/tracery-react`/`@atriarch/tracery-visualizer`. Both
+ * deep inside `@atriarch-systems/tracery-react`/`@atriarch-systems/tracery-visualizer`. Both
  * are now defended at their source (`Inspector.formatTs`, the visualizer's
  * `reconcile`), but this boundary is the backstop: without it, any throw in
  * the explorer subtree unmounts `main.tsx`'s whole `createRoot` and blanks

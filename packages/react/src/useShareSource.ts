@@ -3,7 +3,7 @@
  * share mode: `<ActivityExplorer source={useShareSource(baseUrl, token)}
  * readOnly lockedTarget={source.target && { type: source.target.type, id:
  * source.target.id }} />`. No API key, ever -- the token is the only
- * credential (`@atriarch/tracery-client`'s `ShareClient`).
+ * credential (`@atriarch-systems/tracery-client`'s `ShareClient`).
  *
  * Fetches `GET .../meta` once to learn the share's target/mode/label, then
  * hands the rest to `./share-feed-engine.js`: a `'snapshot'` share gets one
@@ -12,8 +12,8 @@
  * polling `GET .../events?after=`, same as `useHubSource`).
  */
 import { useEffect, useState } from 'react';
-import { ShareClient, type ActivityFrame } from '@atriarch/tracery-client';
-import { Journal, buildFlows, type Flow } from '@atriarch/tracery-core';
+import { ShareClient, type ActivityFrame } from '@atriarch-systems/tracery-client';
+import { Journal, buildFlows, type Flow } from '@atriarch-systems/tracery-core';
 import { initialFeedState, type FeedState } from './feed.js';
 import { startShareFeed } from './share-feed-engine.js';
 import type { ActivitySource } from './source.js';

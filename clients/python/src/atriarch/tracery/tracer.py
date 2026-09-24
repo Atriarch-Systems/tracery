@@ -1,5 +1,5 @@
 """ActivityTracer, Flow and Op: the Python emitter SDK (mirrors the TypeScript
-``@atriarch/tracery-client`` tracer.ts, snake_cased). See docs/SPEC.md §5.
+``@atriarch-systems/tracery-client`` tracer.ts, snake_cased). See docs/SPEC.md §5.
 """
 
 from __future__ import annotations

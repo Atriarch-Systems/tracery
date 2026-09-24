@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { orderFlows, latestFlowId, latestFlows } from '../dist/flow-order.js';
-import { buildSampleFlows, sampleFlowIds } from '@atriarch/tracery-core/fixtures';
+import { buildSampleFlows, sampleFlowIds } from '@atriarch-systems/tracery-core/fixtures';
 
 const flows = buildSampleFlows();
 

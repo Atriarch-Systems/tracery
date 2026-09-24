@@ -1,4 +1,4 @@
-# @atriarch/tracery-visualizer
+# @atriarch-systems/tracery-visualizer
 
 A React 18/19 component for live activity graphs. One generic node card, configured by the consumer. There are no agent names, node-kind registries, network connections, or invocation reducers in the library.
 
@@ -6,7 +6,7 @@ This is an independent npm package inside Agent Kit. It is not part of the Pytho
 
 ```tsx
 import { ActivityGraph, type ActivityNode, type ActivityEdge,
-  type NodePresentation } from '@atriarch/tracery-visualizer';
+  type NodePresentation } from '@atriarch-systems/tracery-visualizer';
 
 // This catalog belongs to the application, not Agent Kit.
 const catalog = {
@@ -68,7 +68,7 @@ Unset fields fall back to `DEFAULT_GRAPH_THEME` (the exact look you get by
 omitting `theme` entirely), so a partial override only touches what it names:
 
 ```tsx
-import { ActivityGraph, DEFAULT_GRAPH_THEME, type GraphTheme } from '@atriarch/tracery-visualizer';
+import { ActivityGraph, DEFAULT_GRAPH_THEME, type GraphTheme } from '@atriarch-systems/tracery-visualizer';
 
 const oceanGraph: Partial<GraphTheme> = {
   ...DEFAULT_GRAPH_THEME,

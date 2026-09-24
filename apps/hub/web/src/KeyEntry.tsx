@@ -41,7 +41,7 @@ export function KeyEntry({ onReady, ssoAvailable }: KeyEntryProps) {
           configuration if that's you.
         </p>
         <p style={{ fontSize: 11, color: '#5c6479', margin: 0 }}>
-          No account, no key to manage: <code>npx @atriarch/tracery-hub</code>{' '}
+          No account, no key to manage: <code>npx @atriarch-systems/tracery-hub</code>{' '}
           on <code>127.0.0.1</code> starts with auth off and skips this
           screen entirely.
         </p>

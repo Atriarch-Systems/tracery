@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
-import { Journal } from '@atriarch/tracery-core';
-import type { ActivityEvent } from '@atriarch/tracery-core';
-import { ActivityExplorer, useJournalSource } from '@atriarch/tracery-react';
+import { Journal } from '@atriarch-systems/tracery-core';
+import type { ActivityEvent } from '@atriarch-systems/tracery-core';
+import { ActivityExplorer, useJournalSource } from '@atriarch-systems/tracery-react';
 import { SCENARIOS, runSchedule, rootFlowId, type Scenario } from './scenarios.js';
 import { sendToHub } from './sendToHub.js';
 

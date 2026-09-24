@@ -11,8 +11,8 @@
     "preview": "vite preview --port 4313 --strictPort"
   },
   "dependencies": {
-    "@atriarch/tracery-core": "^0.1.1",
-    "@atriarch/tracery-react": "^0.1.1",
+    "@atriarch-systems/tracery-core": "^0.1.1",
+    "@atriarch-systems/tracery-react": "^0.1.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },

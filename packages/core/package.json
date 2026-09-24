@@ -1,5 +1,5 @@
 {
-  "name": "@atriarch/tracery-core",
+  "name": "@atriarch-systems/tracery-core",
   "version": "0.1.1",
   "license": "Apache-2.0",
   "description": "Tracery wire contract, validation, journal, flow reducers, trace assembly and visualizer projection. No DOM, no React.",

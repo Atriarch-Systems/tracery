@@ -11,12 +11,12 @@ the wire contract; a change there is a versioned contract change with a golden t
 
 | Path | Package | What |
 | --- | --- | --- |
-| `packages/core` | `@atriarch/tracery-core` | contract, validation, journal, flows, traces, projection. No DOM, no React. |
-| `packages/visualizer` | `@atriarch/tracery-visualizer` | canvas component (moved here from atriarch-agentkit). |
-| `packages/react` | `@atriarch/tracery-react` | `ActivityExplorer` composite + live-source hooks. |
-| `packages/client` | `@atriarch/tracery-client` | TS emitter SDK + hub read client. |
+| `packages/core` | `@atriarch-systems/tracery-core` | contract, validation, journal, flows, traces, projection. No DOM, no React. |
+| `packages/visualizer` | `@atriarch-systems/tracery-visualizer` | canvas component (moved here from atriarch-agentkit). |
+| `packages/react` | `@atriarch-systems/tracery-react` | `ActivityExplorer` composite + live-source hooks. |
+| `packages/client` | `@atriarch-systems/tracery-client` | TS emitter SDK + hub read client. |
 | `clients/python` | `atriarch-tracery` | Python emitter SDK, stdlib only, `atriarch.tracery`. |
-| `apps/hub` | `@atriarch/tracery-hub` | Fastify server, stores, live feed, hosted UI, Docker, k8s. |
+| `apps/hub` | `@atriarch-systems/tracery-hub` | Fastify server, stores, live feed, hosted UI, Docker, k8s. |
 
 Tracery Cloud (accounts, SSO, audit log, RBAC, managed retention/backups) is
 a private `tracery-cloud` repository, not part of this checkout. It plugs

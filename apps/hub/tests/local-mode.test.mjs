@@ -1,12 +1,12 @@
-// "Local mode" (task: `npx @atriarch/tracery-hub` with no env): authMode
+// "Local mode" (task: `npx @atriarch-systems/tracery-hub` with no env): authMode
 // 'none' treats every request as a full-access principal on the single
 // "default" workspace, with no key ever checked. Covers every HTTP route,
 // the single-workspace rejection, GET /v1/info in both auth modes and both
 // editions, and that /v1/info is documented in the OpenAPI doc.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ACTIVITY_CONTRACT_VERSION } from '@atriarch/tracery-core/contract';
-import { sampleTraceEvents, sampleFlowIds } from '@atriarch/tracery-core/fixtures';
+import { ACTIVITY_CONTRACT_VERSION } from '@atriarch-systems/tracery-core/contract';
+import { sampleTraceEvents, sampleFlowIds } from '@atriarch-systems/tracery-core/fixtures';
 import { createTestServer } from './route-helpers.mjs';
 
 /** authMode 'none': no `apiKeys` configured at all -- see `route-helpers.mjs`'s `testConfig`. */

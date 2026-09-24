@@ -1,7 +1,7 @@
 // Pure mapping from a Claude Code hook payload to Tracery events.
 //
 // No I/O, no node: imports beyond node:path (for a display label). Every event
-// this produces must validate against @atriarch/tracery-core's validateEvent
+// this produces must validate against @atriarch-systems/tracery-core's validateEvent
 // (see plugins/claude-code/tests/map.test.mjs).
 //
 // State shape (persisted per session_id by hooks/emit.mjs):

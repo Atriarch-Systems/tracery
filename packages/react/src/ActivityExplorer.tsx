@@ -6,16 +6,16 @@
  * `Enter`-activating) a node that belongs to a different flow's group drills
  * into that flow.
  *
- * The graph is canvas-drawn (`@atriarch/tracery-visualizer`), so alongside
+ * The graph is canvas-drawn (`@atriarch-systems/tracery-visualizer`), so alongside
  * it this component also renders a small accessible node list per group --
  * the same selection/activation affordance as clicking/double-clicking a
  * card, reachable by keyboard and by automated testing without canvas hit
  * testing (`data-testid="node-item"`).
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityGraph, placeBranches } from '@atriarch/tracery-visualizer';
-import type { ActivityGraphHandle, ActivityGroup, Placement } from '@atriarch/tracery-visualizer';
-import type { ActivityNode, NodeData, NodePresentation, NodeRecord, Flow, Scope } from '@atriarch/tracery-core';
+import { ActivityGraph, placeBranches } from '@atriarch-systems/tracery-visualizer';
+import type { ActivityGraphHandle, ActivityGroup, Placement } from '@atriarch-systems/tracery-visualizer';
+import type { ActivityNode, NodeData, NodePresentation, NodeRecord, Flow, Scope } from '@atriarch-systems/tracery-core';
 import type { ReactNode, CSSProperties, Ref } from 'react';
 import type { ActivitySource } from './source.js';
 import { useProjection } from './useProjection.js';

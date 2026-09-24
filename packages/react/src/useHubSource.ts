@@ -16,8 +16,8 @@
  * delivered the events.
  */
 import { useEffect, useState } from 'react';
-import type { ActivityFrame } from '@atriarch/tracery-client';
-import { Journal, buildFlows, type Flow } from '@atriarch/tracery-core';
+import type { ActivityFrame } from '@atriarch-systems/tracery-client';
+import { Journal, buildFlows, type Flow } from '@atriarch-systems/tracery-core';
 import { initialFeedState, type FeedState } from './feed.js';
 import { startHubFeed } from './hub-feed-engine.js';
 import type { ActivitySource } from './source.js';

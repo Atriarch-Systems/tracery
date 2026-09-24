@@ -7,8 +7,8 @@
  * so a public share viewer never receives producer-supplied context, only
  * its shape.
  */
-import type { ActivityContext, ActivityFrame, StoredEvent } from '@atriarch/tracery-core/contract';
-import type { OpRecord, TimelineEntry } from '@atriarch/tracery-core';
+import type { ActivityContext, ActivityFrame, StoredEvent } from '@atriarch-systems/tracery-core/contract';
+import type { OpRecord, TimelineEntry } from '@atriarch-systems/tracery-core';
 import type { FlowSummary, TraceSummary } from '../store/types.js';
 
 /** `extends ActivityContext` (which is `{ readonly [key: string]: ActivityJson }`) so a `RedactedContext` value type-checks anywhere an `ActivityContext` is expected -- every field here (`true`, a `string[]`, a `number`) is itself valid `ActivityJson`. */

@@ -27,11 +27,11 @@ before writing code. Rules for every workstream:
 ## A — core reducers
 
 Owns: `packages/core`.
-Deliver: `package.json` (`@atriarch/tracery-core` 0.1.0, Apache-2.0), `tsconfig.json`
+Deliver: `package.json` (`@atriarch-systems/tracery-core` 0.1.0, Apache-2.0), `tsconfig.json`
 extending `../../tsconfig.base.json`, `src/` implementing SPEC §1–§2:
 `contract.ts` (given), `validate.ts`, `journal.ts`, `flows.ts`, `trace.ts`,
 `project.ts`, `catalog.ts`, `index.ts`. Type-only dependency on
-`@atriarch/tracery-visualizer/types`.
+`@atriarch-systems/tracery-visualizer/types`.
 Tests (`tests/*.test.mjs`): validation accept/reject matrix; dedupe; ordering by
 ts/seq; op lifecycle table; end-without-start marks partial; flow status matrix;
 trace resolution incl. parent arriving late, explicit `trace`, missing parent,

@@ -1,5 +1,5 @@
 {
-  "name": "@atriarch/tracery-client",
+  "name": "@atriarch-systems/tracery-client",
   "version": "0.1.1",
   "license": "Apache-2.0",
   "description": "Tracery emitter SDK: ActivityTracer, transports and a hub read client.",
@@ -20,7 +20,7 @@
     "prepack": "npm run build"
   },
   "dependencies": {
-    "@atriarch/tracery-core": "^0.1.1"
+    "@atriarch-systems/tracery-core": "^0.1.1"
   },
   "devDependencies": {
     "typescript": "^5.6.0"

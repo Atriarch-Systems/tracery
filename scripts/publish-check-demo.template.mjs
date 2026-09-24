@@ -3,11 +3,11 @@
 // acceptance 4) but with two TypeScript-client children instead of one TS +
 // one Python child -- the Python SDK is verified separately by
 // scripts/publish-check-python.mjs -- and imports only from
-// '@atriarch/tracery-*' + 'ws' (never a relative path back into this repo),
+// '@atriarch-systems/tracery-*' + 'ws' (never a relative path back into this repo),
 // so it only proves what the installed tarballs themselves can do.
 import WebSocket from 'ws';
-import { ActivityTracer, httpTransport, HubClient } from '@atriarch/tracery-client';
-import { buildFlows, project } from '@atriarch/tracery-core';
+import { ActivityTracer, httpTransport, HubClient } from '@atriarch-systems/tracery-client';
+import { buildFlows, project } from '@atriarch-systems/tracery-core';
 
 const HUB_URL = process.env.TRACERY_HUB_URL;
 const API_KEY = process.env.TRACERY_API_KEY || '';

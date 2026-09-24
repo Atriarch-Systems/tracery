@@ -12,7 +12,7 @@
  * used as the fallback key so a just-arrived partial flow is protected like
  * any other young flow instead of being swept on the very next tick.
  */
-import type { Flow } from '@atriarch/tracery-core';
+import type { Flow } from '@atriarch-systems/tracery-core';
 
 export interface SweepCandidate {
   readonly flow: Flow;

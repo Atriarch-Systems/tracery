@@ -173,7 +173,7 @@ test('a session with a subagent produces two flows in the hub, linked parent to 
   }
 });
 
-// Task ("local mode"): the one-command quick start is `npx @atriarch/tracery-hub`
+// Task ("local mode"): the one-command quick start is `npx @atriarch-systems/tracery-hub`
 // (no env at all -- loopback-only, auth off) then the plugin with only
 // TRACERY_HUB_URL set. No TRACERY_API_KEYS on the hub side, no api_key on the
 // plugin side, and it still lands a real flow.

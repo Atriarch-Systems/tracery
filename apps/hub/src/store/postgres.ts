@@ -8,7 +8,7 @@
  * - Events are the durable source of truth, one row per event, in an
  *   `events` table.
  * - Flow/trace reduction is kept as an in-memory index (the exact same
- *   `@atriarch/tracery-core` `buildFlow`/`buildFlows`/`assembleTrace`
+ *   `@atriarch-systems/tracery-core` `buildFlow`/`buildFlows`/`assembleTrace`
  *   reduction `MemoryStore` and `SqliteStore` use) AND materialised into a
  *   `flows` table, one row per flow, kept current incrementally on every
  *   write -- so `listFlows`/`flowSummary` are genuinely SQL-backed (indexed
@@ -35,8 +35,8 @@
  */
 import pg from 'pg';
 import type { Pool, PoolClient } from 'pg';
-import { buildFlow, buildFlows, assembleTrace, type Flow } from '@atriarch/tracery-core';
-import type { ActivityEvent, ActivityFrame, StoredEvent } from '@atriarch/tracery-core/contract';
+import { buildFlow, buildFlows, assembleTrace, type Flow } from '@atriarch-systems/tracery-core';
+import type { ActivityEvent, ActivityFrame, StoredEvent } from '@atriarch-systems/tracery-core/contract';
 import { buildFrame } from './frame.js';
 import { resolveTraceIds } from './trace-ids.js';
 import { isSweepProtected, isOverRetention, orderSweepCandidates, type SweepCandidate } from './sweep.js';

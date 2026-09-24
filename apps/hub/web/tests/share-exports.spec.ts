@@ -15,7 +15,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { ACTIVITY_CONTRACT_VERSION } from '@atriarch/tracery-core';
+import { ACTIVITY_CONTRACT_VERSION } from '@atriarch-systems/tracery-core';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const hubRoot = path.resolve(__dirname, '../../'); // apps/hub

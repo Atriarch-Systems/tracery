@@ -68,7 +68,7 @@ sub_flow.end()
 sub_tracer.close()
 ```
 
-The hub (or `project()` in `@atriarch/tracery-core`) resolves the two flows
+The hub (or `project()` in `@atriarch-systems/tracery-core`) resolves the two flows
 into one trace, with a `spawn` edge from the parent's `llm:main` op to the
 subagent's root node.
 

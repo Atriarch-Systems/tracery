@@ -33,7 +33,7 @@ function resolveExtensionsSpecifier(spec) {
 // TRACERY_EXTENSIONS_MODULE -- an npm package name (resolved the ordinary
 // Node way) or an absolute/relative path to a built ESM module -- that
 // exports an async-or-sync `createExtensions(config)` returning a
-// `HubExtensions` object (`@atriarch/tracery-hub`'s `HubContext`/
+// `HubExtensions` object (`@atriarch-systems/tracery-hub`'s `HubContext`/
 // `HubExtensions` types, from this package's own "." export). Nothing in
 // this package ships such a module; Tracery Cloud's `@atriarch/
 // tracery-cloud-ee` (private `tracery-cloud` repo) is one example. Unset by
@@ -79,7 +79,7 @@ try {
 const address = await created.app.listen({ port: config.port, host: config.host });
 
 // Task ("local mode"): exactly one banner line naming the auth mode -- never
-// a minted/printed key. `authMode: 'none'` (the `npx @atriarch/tracery-hub`
+// a minted/printed key. `authMode: 'none'` (the `npx @atriarch-systems/tracery-hub`
 // default on a loopback host) reads "local mode, no auth"; `'keys'` says so
 // plainly instead.
 const authNote =

@@ -6,13 +6,13 @@
  * this spec serves the real built UI (`vite preview`) but fakes the hub's
  * WebSocket with core's fixture trace instead of a live server. See
  * `explorer.real-hub.spec.ts` for the same assertions against an actual
- * `@atriarch/tracery-hub` process, which self-skips until that exists.
+ * `@atriarch-systems/tracery-hub` process, which self-skips until that exists.
  */
 import { test, expect, type Page } from '@playwright/test';
 import { preview, type PreviewServer } from 'vite';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { sampleTraceEvents, sampleFlowIds } from '@atriarch/tracery-core/fixtures';
+import { sampleTraceEvents, sampleFlowIds } from '@atriarch-systems/tracery-core/fixtures';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const webRoot = path.resolve(__dirname, '..');
@@ -564,7 +564,7 @@ test('GET /v1/info reporting auth "none" skips key entry, connects with no API k
 });
 
 // Theming (task: settings UI): the gear button in the explorer header opens
-// a panel with a preset picker (`@atriarch/tracery-react`'s `PRESET_NAMES`);
+// a panel with a preset picker (`@atriarch-systems/tracery-react`'s `PRESET_NAMES`);
 // switching presets must actually repaint the explorer (checked here via the
 // `--tracery-accent` CSS custom property on the explorer's root element,
 // which `ActivityExplorer`'s `rootStyle` sets from the resolved theme) and

@@ -13,8 +13,8 @@
  * loop's slowest branch finishes, a short pause and a new loop starts with
  * fresh flow/op/event ids so the explorer keeps showing new activity.
  */
-import { ACTIVITY_CONTRACT_VERSION, type ActivityEvent } from '@atriarch/tracery-core';
-import type { Journal } from '@atriarch/tracery-core';
+import { ACTIVITY_CONTRACT_VERSION, type ActivityEvent } from '@atriarch-systems/tracery-core';
+import type { Journal } from '@atriarch-systems/tracery-core';
 
 const orchestrator = { id: 'agent:orchestrator', name: 'Orchestrator', kind: 'agent' } as const;
 const research1Actor = { id: 'subagent:research-1', name: 'Research Agent 1', kind: 'subagent' } as const;

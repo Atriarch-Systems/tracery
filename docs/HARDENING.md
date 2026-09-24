@@ -38,7 +38,7 @@ explicitly skipped with a stated reason).
 
 ---
 
-## Core (`@atriarch/tracery-core`)
+## Core (`@atriarch-systems/tracery-core`)
 
 10 findings: 4 confirmed and fixed, 4 refuted, 2 lows fixed (of 3).
 
@@ -65,7 +65,7 @@ explicitly skipped with a stated reason).
 - core-9 -- skipped: `maxIdLength` is enforced only on `event.id`, not on flow/op/node ids. Fixing this would change the contract's wire-acceptance surface (rejecting previously-accepted input), which is a real behavior change, not a small fix; left for a deliberate follow-up with its own golden-test update.
 - core-10 -- partially addressed as a byproduct: the never-throws and same-actor-merge guarantees are now covered by the regression tests added for core-1 and core-2. Coverage for `__proto__` context keys, post-eviction resend, and the cross-cutting edge/node-closure invariant was not added (out of scope for this pass; see core-4/core-6 above).
 
-Test result: `npm test -w @atriarch/tracery-core` -- 131/131 pass.
+Test result: `npm test -w @atriarch-systems/tracery-core` -- 131/131 pass.
 
 ---
 
@@ -131,8 +131,8 @@ Test result: `packages/visualizer` 27/27, `packages/react` 43/43, `apps/hub/web`
 ### Lows
 
 - sdk-11 -- fixed: `live()` swallowed exceptions thrown by the consumer's own `onFrame` callback as if the frame itself were malformed. Now parses JSON and calls `onFrame` in separate try blocks, reports the consumer's exception via `onError`, and does not advance the cursor if the handler failed (so a reconnect replays the frame). Test: `packages/client/tests/hub-client.test.mjs`.
-- sdk-12 -- skipped: no test asserts emitted events validate against core, or that the tracer survives a throwing transport. Adding this cleanly needs a new cross-package test dependency on `@atriarch/tracery-core`'s validator plus mirrored TS/Python throwing-transport tests -- real test-coverage engineering, not a small fix.
-- sdk-13 -- fixed: `packages/client/package.json` pinned `@atriarch/tracery-core` from `"*"` to `"^0.1.0"` so a future contract-version bump requires an explicit client release.
+- sdk-12 -- skipped: no test asserts emitted events validate against core, or that the tracer survives a throwing transport. Adding this cleanly needs a new cross-package test dependency on `@atriarch-systems/tracery-core`'s validator plus mirrored TS/Python throwing-transport tests -- real test-coverage engineering, not a small fix.
+- sdk-13 -- fixed: `packages/client/package.json` pinned `@atriarch-systems/tracery-core` from `"*"` to `"^0.1.0"` so a future contract-version bump requires an explicit client release.
 
 Test result: `packages/client` 31/31, `clients/python` (pytest) 27/27 -- all pass. Each new regression test was confirmed to fail against the pre-fix code before the fix landed, except sdk-1's revert-check, which the sandbox's code-execution guard refused to re-run once the leaky code was reintroduced (see the JSON audit trail); that fix was instead verified by full-suite pass plus a manual trace of `urllib`'s `HTTPRedirectHandler` semantics.
 
@@ -209,7 +209,7 @@ Test result: community suite 83/83, ee suite 57/57 (unowned, unmodified, run onl
 - ee-11 -- skipped: flow-list scope filtering runs after the store paginates, so a scoped key can get short or empty pages while `nextBefore` implies more exist. Correct fix (push scope into the store query, or loop pages inside the `onSend` hook) is a real pagination behavior change, not a small patch.
 - ee-15 -- skipped: audit `flows` are captured from the raw, unvalidated request body (before `validateBatch`/`validateEvent` run) and from non-flow `:id` params. Properly fixing this means recording from the *accepted* events after ingest, which requires a change in `apps/hub/src/routes/events.ts` -- outside the owned directory. A same-file patch would only address the size/DoS half, not the stated defect, so it was skipped rather than presented as a partial fix.
 
-Test result: `npm run test:ee -w @atriarch/tracery-hub` -- 57/57 pass, including 18 new/rewritten regression tests across `rbac`, `index`, `audit`, and `license` test files.
+Test result: `npm run test:ee -w @atriarch-systems/tracery-hub` -- 57/57 pass, including 18 new/rewritten regression tests across `rbac`, `index`, `audit`, and `license` test files.
 
 ---
 

@@ -8,8 +8,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createElement } from 'react';
 import { renderToString } from 'react-dom/server';
-import { Journal } from '@atriarch/tracery-core';
-import { sampleTraceEvents, sampleFlowIds } from '@atriarch/tracery-core/fixtures';
+import { Journal } from '@atriarch-systems/tracery-core';
+import { sampleTraceEvents, sampleFlowIds } from '@atriarch-systems/tracery-core/fixtures';
 import { ActivityExplorer } from '../dist/ActivityExplorer.js';
 import { useJournalSource } from '../dist/useJournalSource.js';
 

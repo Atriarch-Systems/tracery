@@ -8,8 +8,8 @@
  * worth sending anyone.
  */
 import { useMemo } from 'react';
-import { ActivityExplorer, type LockedTarget } from '@atriarch/tracery-react';
-import { Journal, buildFlows, type StoredEvent } from '@atriarch/tracery-core';
+import { ActivityExplorer, type LockedTarget } from '@atriarch-systems/tracery-react';
+import { Journal, buildFlows, type StoredEvent } from '@atriarch-systems/tracery-core';
 import { Footer } from './Footer.js';
 
 interface EmbeddedMeta {

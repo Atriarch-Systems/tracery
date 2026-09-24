@@ -1,9 +1,9 @@
 /**
- * Wraps `@atriarch/tracery-core`'s `project()` as a memoized hook (SPEC.md
+ * Wraps `@atriarch-systems/tracery-core`'s `project()` as a memoized hook (SPEC.md
  * §4 `useProjection(source, scope, options)`).
  */
 import { useMemo } from 'react';
-import { project, type Flow, type NodeRecord, type NodePresentation, type Projection, type Scope } from '@atriarch/tracery-core';
+import { project, type Flow, type NodeRecord, type NodePresentation, type Projection, type Scope } from '@atriarch-systems/tracery-core';
 import type { ActivitySource } from './source.js';
 import { scopeKey } from './scope.js';
 

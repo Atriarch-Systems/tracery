@@ -6,7 +6,7 @@
  * the wire contract's dedupe-by-id rule (SPEC.md §1) would otherwise treat a
  * second click's identical schedule as a no-op resend.
  */
-import { ACTIVITY_CONTRACT_VERSION, type ActivityEvent } from '@atriarch/tracery-core';
+import { ACTIVITY_CONTRACT_VERSION, type ActivityEvent } from '@atriarch-systems/tracery-core';
 
 export interface ScheduledStep {
   readonly at: number;

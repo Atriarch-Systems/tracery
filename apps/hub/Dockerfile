@@ -3,7 +3,7 @@
 #   docker build -f apps/hub/Dockerfile -t atriarch/tracery-hub:dev .
 #
 # Multi-stage: builds the npm workspaces this image actually needs
-# (@atriarch/tracery-core + @atriarch/tracery-hub), builds the hosted UI in
+# (@atriarch-systems/tracery-core + @atriarch-systems/tracery-hub), builds the hosted UI in
 # apps/hub/web when that directory exists (workstream E), and ships a final
 # pinned Alpine/Node runtime with production dependencies and matching OS sources.
 
@@ -21,7 +21,7 @@ RUN npm ci
 
 # Build all server and UI packages in dependency order. Core ships self-contained
 # data declarations and never imports the renderer at runtime.
-RUN npm run build -w @atriarch/tracery-visualizer -w @atriarch/tracery-core -w @atriarch/tracery-client -w @atriarch/tracery-react -w @atriarch/tracery-hub
+RUN npm run build -w @atriarch-systems/tracery-visualizer -w @atriarch-systems/tracery-core -w @atriarch-systems/tracery-client -w @atriarch-systems/tracery-react -w @atriarch-systems/tracery-hub
 
 # Hosted UI (apps/hub/web, workstream E) is optional: when its package.json
 # is present it is also an npm workspace (see the root package.json), so the
@@ -31,7 +31,7 @@ RUN npm run build -w @atriarch/tracery-visualizer -w @atriarch/tracery-core -w @
 # page (apps/hub/src/routes/ui.ts) at runtime.
 RUN if [ -f apps/hub/web/package.json ]; then \
       echo "building apps/hub/web"; \
-      npm run build -w @atriarch/tracery-hub-web; \
+      npm run build -w @atriarch-systems/tracery-hub-web; \
     else \
       echo "apps/hub/web not present yet; shipping without a hosted UI"; \
       mkdir -p apps/hub/web/dist; \
@@ -62,7 +62,7 @@ COPY --from=sources /out/ /usr/share/tracery/
 RUN addgroup -S tracery && adduser -S tracery -G tracery
 
 # TRACERY_HOST=0.0.0.0: config.ts's local-mode default (127.0.0.1) is a
-# Node-process convenience (`npx @atriarch/tracery-hub`), not a container one
+# Node-process convenience (`npx @atriarch-systems/tracery-hub`), not a container one
 # -- a container needs to accept connections from outside its network
 # namespace, so this image binds all interfaces explicitly.
 #

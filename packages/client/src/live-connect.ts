@@ -6,7 +6,7 @@
  * jitter, or the "stable connection resets the floor" rule. Callers differ
  * only in how they build the socket URL for a given resume cursor.
  */
-import type { ActivityFrame } from '@atriarch/tracery-core';
+import type { ActivityFrame } from '@atriarch-systems/tracery-core';
 
 export type LiveDisposer = () => void;
 

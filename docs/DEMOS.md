@@ -104,7 +104,7 @@ TRACERY_HUB_URL=http://127.0.0.1:8971 claude --plugin-dir plugins/claude-code
 
 ## 2. npm library (no server)
 
-**What it demonstrates**: `@atriarch/tracery-core` + `@atriarch/tracery-react`
+**What it demonstrates**: `@atriarch-systems/tracery-core` + `@atriarch-systems/tracery-react`
 embedded directly in a page with no hub and no network at all — the
 "library" usage mode. `examples/embedded` creates an in-process `Journal`,
 runs a scripted synthetic agent (an orchestrator that plans, searches, and
@@ -174,7 +174,7 @@ silently — see `apps/hub/README.md` "Cross-origin requests").
 
 ## 3. Standalone hub
 
-**What it demonstrates**: `@atriarch/tracery-hub` as the aggregation point
+**What it demonstrates**: `@atriarch-systems/tracery-hub` as the aggregation point
 for multiple producers — a TypeScript client and a Python client both
 spawning subagent flows from one parent, resolved into a single trace and
 served to any number of viewers through the hosted UI. `scripts/demo.mjs`

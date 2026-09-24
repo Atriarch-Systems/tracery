@@ -1,5 +1,5 @@
 /**
- * SPEC.md §8 acceptance 5, run against a real `@atriarch/tracery-hub`
+ * SPEC.md §8 acceptance 5, run against a real `@atriarch-systems/tracery-hub`
  * (workstream D, `apps/hub`) serving this app's built UI at `/ui` -- the
  * scenario `explorer.mocked.spec.ts` fakes with a WebSocket mock. This spec
  * self-skips (the whole `describe` block) until `apps/hub/dist` and
@@ -33,8 +33,8 @@ import { createServer as createNetServer } from 'node:net';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { sampleTraceEvents, sampleFlowIds } from '@atriarch/tracery-core/fixtures';
-import { ACTIVITY_CONTRACT_VERSION } from '@atriarch/tracery-core';
+import { sampleTraceEvents, sampleFlowIds } from '@atriarch-systems/tracery-core/fixtures';
+import { ACTIVITY_CONTRACT_VERSION } from '@atriarch-systems/tracery-core';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const hubRoot = path.resolve(__dirname, '../../'); // apps/hub

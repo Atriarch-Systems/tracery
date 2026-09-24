@@ -2,12 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createElement } from 'react';
 import { renderToString } from 'react-dom/server';
-import { Journal } from '@atriarch/tracery-core';
-import { sampleTraceEvents } from '@atriarch/tracery-core/fixtures';
+import { Journal } from '@atriarch-systems/tracery-core';
+import { sampleTraceEvents } from '@atriarch-systems/tracery-core/fixtures';
 import { ActivityExplorer } from '../dist/ActivityExplorer.js';
 import { useJournalSource } from '../dist/useJournalSource.js';
 import { THEME_PRESETS, PRESET_NAMES, resolveThemeInput } from '../dist/themes.js';
-import { DEFAULT_GRAPH_THEME } from '@atriarch/tracery-visualizer';
+import { DEFAULT_GRAPH_THEME } from '@atriarch-systems/tracery-visualizer';
 
 const journal = new Journal();
 journal.append(sampleTraceEvents);

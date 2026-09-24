@@ -10,7 +10,7 @@
  * window, disabled storage, or a quota error must degrade to "use the
  * default" rather than crash the app).
  */
-import { THEME_PRESETS, PRESET_NAMES, type ActivityTheme } from '@atriarch/tracery-react';
+import { THEME_PRESETS, PRESET_NAMES, type ActivityTheme } from '@atriarch-systems/tracery-react';
 
 export interface ThemeOverrides {
   /** Chrome `--tracery-accent`. */

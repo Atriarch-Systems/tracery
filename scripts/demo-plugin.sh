@@ -11,7 +11,7 @@
 #
 # TRACERY_API_KEY defaults to the demo hub's fixed key (tdk_a7f3c9e2b1d4).
 # Task ("local mode"): to target a local-mode hub instead (one started with
-# `npx @atriarch/tracery-hub` and no TRACERY_API_KEYS -- auth off), set
+# `npx @atriarch-systems/tracery-hub` and no TRACERY_API_KEYS -- auth off), set
 # TRACERY_API_KEY explicitly to an empty string: `TRACERY_API_KEY= scripts/demo-plugin.sh`.
 # (Note the `-` with no `:`, not `:-`, below -- only a truly *unset*
 # TRACERY_API_KEY falls back to the demo key; an explicitly empty one opts

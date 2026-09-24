@@ -13,7 +13,7 @@ or managed backups; verify those against the operated service before advertising
 
 ## How Cloud plugs into the open hub
 
-The open-source hub (`@atriarch/tracery-hub`, `apps/hub`) has exactly one
+The open-source hub (`@atriarch-systems/tracery-hub`, `apps/hub`) has exactly one
 integration point for anything beyond what ships in this repository: the
 `HubExtensions` interface (`apps/hub/src/server-context.ts`), loaded at
 startup via the `TRACERY_EXTENSIONS_MODULE` environment variable

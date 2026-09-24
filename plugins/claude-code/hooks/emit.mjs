@@ -167,7 +167,7 @@ async function appendToSpool(spoolPath, events) {
 }
 
 function batchHeaders(apiKey) {
-  // Local hub (task: "local mode", e.g. `npx @atriarch/tracery-hub` with no
+  // Local hub (task: "local mode", e.g. `npx @atriarch-systems/tracery-hub` with no
   // TRACERY_API_KEYS): needs no credential at all -- omit Authorization
   // entirely rather than send an empty "Bearer ".
   const headers = { 'content-type': 'application/json' };
@@ -339,7 +339,7 @@ async function main() {
   const config = readConfig(env);
 
   // `api_key` is optional (task: "local mode" -- a hub started with no
-  // TRACERY_API_KEYS runs with auth off, e.g. `npx @atriarch/tracery-hub`);
+  // TRACERY_API_KEYS runs with auth off, e.g. `npx @atriarch-systems/tracery-hub`);
   // only `hub_url` is required. With no `hub_url` at all: silent no-op, the
   // common case for anyone who installed the plugin but hasn't set it up yet.
   const hasHubUrl = config.hubUrl.length > 0;

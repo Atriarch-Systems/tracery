@@ -23,7 +23,7 @@ Then open the printed URL. Two sample flows are included:
 To try the "send to a hub" half: start a hub in another terminal --
 
 ```
-npx @atriarch/tracery-hub
+npx @atriarch-systems/tracery-hub
 ```
 
 -- check **Also send to a hub**, leave the URL at its default
@@ -37,7 +37,7 @@ a key with the `ingest` role.
 `setTimeout` delays rather than fired all at once, so the graph visibly
 grows the same way a real agent's activity would. `src/sendToHub.ts` posts
 them to `POST /v1/events` (SPEC.md §6) with a plain `fetch()` -- see there
-for why this example doesn't use `@atriarch/tracery-client`'s `ActivityTracer`
+for why this example doesn't use `@atriarch-systems/tracery-client`'s `ActivityTracer`
 builder API for this.
 
 For cross-origin hub delivery, set `TRACERY_ALLOWED_ORIGINS` to this page's exact

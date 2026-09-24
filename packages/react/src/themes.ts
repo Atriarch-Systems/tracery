@@ -9,7 +9,7 @@ import type { ActivityTheme } from './style.js';
 
 export const THEME_PRESETS: Record<string, ActivityTheme> = {
   // The exact current defaults: chrome DEFAULTS from style.ts + DEFAULT_GRAPH_THEME
-  // from @atriarch/tracery-visualizer, spelled out literally so this object's shape
+  // from @atriarch-systems/tracery-visualizer, spelled out literally so this object's shape
   // is directly comparable in a test without importing internals.
   dark: {
     bg: '#12141c',

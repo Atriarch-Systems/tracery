@@ -6,7 +6,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { ACTIVITY_CONTRACT_VERSION } from '@atriarch/tracery-core/contract';
+import { ACTIVITY_CONTRACT_VERSION } from '@atriarch-systems/tracery-core/contract';
 import { createTestServer, bearer, makeUiDir } from './route-helpers.mjs';
 
 const KEYS = [{ id: 'alice', key: 'key-alice', workspace: 'default', roles: ['ingest', 'read'] }];

@@ -10,7 +10,7 @@
  * invoke more than once -- StrictMode double-invokes, or a discarded and
  * replayed update -- so a pure updater must never do that).
  */
-import { HubClient, type ActivityFrame, type StoredEvent } from '@atriarch/tracery-client';
+import { HubClient, type ActivityFrame, type StoredEvent } from '@atriarch-systems/tracery-client';
 import { feedReducer, initialFeedState, shouldPoll, type FeedState } from './feed.js';
 
 export interface HubFeedEngineOptions {

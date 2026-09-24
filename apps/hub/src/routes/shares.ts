@@ -9,8 +9,8 @@
  */
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { WebSocket } from 'ws';
-import { buildFlow, buildFlows, assembleTrace } from '@atriarch/tracery-core';
-import type { ActivityFrame, StoredEvent } from '@atriarch/tracery-core/contract';
+import { buildFlow, buildFlows, assembleTrace } from '@atriarch-systems/tracery-core';
+import type { ActivityFrame, StoredEvent } from '@atriarch-systems/tracery-core/contract';
 import type { HubContext } from '../server-context.js';
 import type { AuthContext } from '../auth.js';
 import { errorBody } from './errors.js';

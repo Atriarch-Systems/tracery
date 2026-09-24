@@ -6,8 +6,8 @@
  * with `rejected[]` naming exactly which failed and why.
  */
 import type { FastifyInstance } from 'fastify';
-import { validateBatch, validateEvent } from '@atriarch/tracery-core';
-import { ACTIVITY_CONTRACT_VERSION, ACTIVITY_LIMITS, type ActivityBatchResult, type ActivityEvent } from '@atriarch/tracery-core/contract';
+import { validateBatch, validateEvent } from '@atriarch-systems/tracery-core';
+import { ACTIVITY_CONTRACT_VERSION, ACTIVITY_LIMITS, type ActivityBatchResult, type ActivityEvent } from '@atriarch-systems/tracery-core/contract';
 import type { HubContext } from '../server-context.js';
 import { errorBody } from './errors.js';
 

@@ -1,4 +1,4 @@
-import type { ActivityFrame, StoredEvent } from '@atriarch/tracery-core';
+import type { ActivityFrame, StoredEvent } from '@atriarch-systems/tracery-core';
 import type { FlowSummary, ListFlowsQuery, ListFlowsResult, Trace } from './hub-types.stub.js';
 import { connectLive, type LiveConnectOptions, type LiveDisposer as LiveConnectDisposer, type LiveStatusEvent as LiveConnectStatusEvent } from './live-connect.js';
 import type { ShareMode, ShareTarget, ShareSummary, CreateShareOptions, CreateShareResult } from './share-types.js';

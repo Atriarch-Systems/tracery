@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ACTIVITY_CONTRACT_VERSION } from '@atriarch/tracery-core/contract';
-import { sampleTraceEvents, sampleFlowIds } from '@atriarch/tracery-core/fixtures';
+import { ACTIVITY_CONTRACT_VERSION } from '@atriarch-systems/tracery-core/contract';
+import { sampleTraceEvents, sampleFlowIds } from '@atriarch-systems/tracery-core/fixtures';
 import { createTestServer, bearer, makeUiDir } from './route-helpers.mjs';
 
 const KEYS = [

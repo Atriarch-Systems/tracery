@@ -9,7 +9,7 @@ import websocketPlugin from '@fastify/websocket';
 import corsPlugin from '@fastify/cors';
 import { allowsBrowserRequest } from './origin.js';
 import swaggerPlugin from '@fastify/swagger';
-import { ACTIVITY_LIMITS } from '@atriarch/tracery-core/contract';
+import { ACTIVITY_LIMITS } from '@atriarch-systems/tracery-core/contract';
 import { authenticate, localModeAuth, AuthError, type AuthContext } from './auth.js';
 import { hubVersion, type ApiKeyConfig, type Config, type Role } from './config.js';
 import { MemoryStore } from './store/memory.js';

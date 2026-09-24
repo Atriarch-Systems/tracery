@@ -43,7 +43,7 @@ export interface CaptureOptions {
 }
 
 export const TRACERY_MARK_TEXT = 'Tracery';
-/** `--tracery-accent`'s default (packages/react/src/style.ts's `DEFAULTS.accent`) -- kept as a plain literal here since this package has no dependency on `@atriarch/tracery-react`. */
+/** `--tracery-accent`'s default (packages/react/src/style.ts's `DEFAULTS.accent`) -- kept as a plain literal here since this package has no dependency on `@atriarch-systems/tracery-react`. */
 export const TRACERY_MARK_COLOR = '#7c9cff';
 const MARK_MARGIN_PX = 10;
 const MARK_FONT_PX = 12;

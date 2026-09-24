@@ -1,5 +1,5 @@
 /**
- * In-process source: the app owns a `Journal` (from `@atriarch/tracery-core`)
+ * In-process source: the app owns a `Journal` (from `@atriarch-systems/tracery-core`)
  * and appends events to it itself (SPEC.md §4 `useJournalSource(journal)`).
  * `Journal` has no change notification of its own, so this hook re-derives
  * flows on a light poll; it always recomputes at least once synchronously
@@ -8,7 +8,7 @@
  * renders correctly on the first pass.
  */
 import { useEffect, useMemo, useState } from 'react';
-import { buildFlows, type Journal } from '@atriarch/tracery-core';
+import { buildFlows, type Journal } from '@atriarch-systems/tracery-core';
 import type { ActivitySource } from './source.js';
 
 export interface UseJournalSourceOptions {

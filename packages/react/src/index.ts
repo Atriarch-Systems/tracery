@@ -3,8 +3,8 @@ export type { ActivityExplorerProps, LockedTarget } from './ActivityExplorer.js'
 
 // Re-exported so a host page (docs/SHARING.md "Image export": a "Download
 // image" button calling `graphRef.current?.toImage()`) does not need its own
-// direct dependency on @atriarch/tracery-visualizer just for this one type.
-export type { ActivityGraphHandle } from '@atriarch/tracery-visualizer';
+// direct dependency on @atriarch-systems/tracery-visualizer just for this one type.
+export type { ActivityGraphHandle } from '@atriarch-systems/tracery-visualizer';
 
 export { Inspector } from './Inspector.js';
 export type { InspectorSelection } from './Inspector.js';

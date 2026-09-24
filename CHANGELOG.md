@@ -17,6 +17,8 @@
 - Release workflow reads the npmjs.com token from NPMJS_TOKEN (was NPM_TOKEN) so
   it cannot be confused with the internal Nexus registry's credentials.
 - Prepare core/client/React/hub 0.1.1 and visualizer 0.3.1. Python remains 0.1.0.
+- Packages are published under the @atriarch-systems npm scope (the org that
+  exists); the visualizer's package name changes with it.
 
 - Make the client flush-concurrency regression deterministic: control timer ticks
   and transport completion instead of assuming eleven sends finish within 500 ms.
@@ -44,7 +46,7 @@ does not reset independent package or wire-contract versions.
   use now requires an explicit opt-out and should publish its port on loopback.
 - Ship renderer-free core projection declarations that compile in an isolated
   TypeScript consumer. Import ActivityGraphProps/ActivityGraphHandle from
-  @atriarch/tracery-visualizer, rather than the core package.
+  @atriarch-systems/tracery-visualizer, rather than the core package.
 - Freeze animation-test clocks to eliminate the default-theme CI race.
 - Upgrade @fastify/static to 10.1.4; the updated npm dependency audit reports no findings.
 

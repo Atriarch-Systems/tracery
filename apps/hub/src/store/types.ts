@@ -1,12 +1,12 @@
 /**
  * The hub's storage engine contract (SPEC.md §6 "Storage"). Two
  * implementations ship: `MemoryStore` (default, bounded) and `SqliteStore`
- * (`node:sqlite`, WAL). Both build on `@atriarch/tracery-core`'s
+ * (`node:sqlite`, WAL). Both build on `@atriarch-systems/tracery-core`'s
  * `buildFlows`/`assembleTrace` for every reduction -- never reimplemented
  * here.
  */
-import type { ActivityEvent, ActivityFrame, StoredEvent } from '@atriarch/tracery-core/contract';
-import type { EdgeRecord, Flow, FlowStatus, NodeRecord, OpRecord } from '@atriarch/tracery-core';
+import type { ActivityEvent, ActivityFrame, StoredEvent } from '@atriarch-systems/tracery-core/contract';
+import type { EdgeRecord, Flow, FlowStatus, NodeRecord, OpRecord } from '@atriarch-systems/tracery-core';
 
 /** `Flow`, with `Map`s replaced by JSON-serialisable `Record`s -- the wire shape for `GET /v1/flows*`. */
 export interface FlowSummary {
@@ -44,7 +44,7 @@ export function toFlowSummary(flow: Flow): FlowSummary {
 
 /**
  * The inverse of `toFlowSummary`: rebuilds a core `Flow` (with `ops`/`nodes`
- * as `Map`s, as `@atriarch/tracery-core`'s `assembleTrace`/`ancestors`
+ * as `Map`s, as `@atriarch-systems/tracery-core`'s `assembleTrace`/`ancestors`
  * require) from its JSON wire shape. Used by `SqliteStore` to reload its
  * in-memory flow index from a persisted `FlowSummary` row instead of
  * re-deriving every flow from its whole event history on boot.

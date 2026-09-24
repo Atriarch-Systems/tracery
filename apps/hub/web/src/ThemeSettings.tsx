@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { PRESET_NAMES } from '@atriarch/tracery-react';
+import { PRESET_NAMES } from '@atriarch-systems/tracery-react';
 import { resolveActivityTheme, type ThemeChoice } from './theme-storage.js';
 
 export interface ThemeSettingsProps {

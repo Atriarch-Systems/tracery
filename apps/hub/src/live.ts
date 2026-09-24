@@ -6,7 +6,7 @@
  */
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { WebSocket } from 'ws';
-import type { ActivityFrame, StoredEvent } from '@atriarch/tracery-core/contract';
+import type { ActivityFrame, StoredEvent } from '@atriarch-systems/tracery-core/contract';
 import { authenticate, localModeAuth, AuthError, type AuthContext } from './auth.js';
 import type { ApiKeyConfig, AuthMode } from './config.js';
 import type { EventStore } from './store/types.js';

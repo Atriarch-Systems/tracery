@@ -5,7 +5,7 @@
  * of rejecting the ingest.
  *
  * Flow state is materialised incrementally (hub-2): `append`/`deleteFlow`
- * only re-reduce the flow(s) actually touched, via `@atriarch/tracery-core`'s
+ * only re-reduce the flow(s) actually touched, via `@atriarch-systems/tracery-core`'s
  * single-flow `buildFlow` fast path, and only re-resolve trace ids (an
  * O(#flows) walk over `{id, link}` pairs -- see `./trace-ids.js`) rather than
  * re-running `buildFlows`/`assembleTrace` over the workspace's full retained
@@ -14,8 +14,8 @@
  * never reimplemented at the event-reduction level -- without ingest cost
  * scaling with the number of events already retained.
  */
-import { buildFlow, assembleTrace, type Flow } from '@atriarch/tracery-core';
-import type { ActivityEvent, StoredEvent } from '@atriarch/tracery-core/contract';
+import { buildFlow, assembleTrace, type Flow } from '@atriarch-systems/tracery-core';
+import type { ActivityEvent, StoredEvent } from '@atriarch-systems/tracery-core/contract';
 import { buildFrame } from './frame.js';
 import { resolveTraceIds } from './trace-ids.js';
 import { isSweepProtected, isOverRetention, orderSweepCandidates, type SweepCandidate } from './sweep.js';
@@ -161,7 +161,7 @@ export class MemoryStore implements EventStore, ShareStore {
     return { floorCursor: state.floorCursor };
   }
 
-  async flowEvents(workspace: string, flowId: string, after?: number): Promise<import('@atriarch/tracery-core/contract').ActivityFrame> {
+  async flowEvents(workspace: string, flowId: string, after?: number): Promise<import('@atriarch-systems/tracery-core/contract').ActivityFrame> {
     const state = this.state(workspace);
     const scoped = state.eventsByFlow.get(flowId) ?? [];
     return buildFrame(scoped, this.cursor, this.floorInfo(state), after);
@@ -176,13 +176,13 @@ export class MemoryStore implements EventStore, ShareStore {
     return events;
   }
 
-  async traceFrame(workspace: string, traceId: string, after?: number): Promise<import('@atriarch/tracery-core/contract').ActivityFrame> {
+  async traceFrame(workspace: string, traceId: string, after?: number): Promise<import('@atriarch-systems/tracery-core/contract').ActivityFrame> {
     const scoped = await this.traceEvents(workspace, traceId);
     const state = this.state(workspace);
     return buildFrame(scoped, this.cursor, this.floorInfo(state), after);
   }
 
-  async workspaceFrame(workspace: string, after?: number): Promise<import('@atriarch/tracery-core/contract').ActivityFrame> {
+  async workspaceFrame(workspace: string, after?: number): Promise<import('@atriarch-systems/tracery-core/contract').ActivityFrame> {
     const state = this.state(workspace);
     return buildFrame(state.events, this.cursor, this.floorInfo(state), after);
   }

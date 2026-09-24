@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { MemoryStore } from '../dist/store/memory.js';
 import { SqliteStore } from '../dist/store/sqlite.js';
-import { ACTIVITY_CONTRACT_VERSION } from '@atriarch/tracery-core/contract';
+import { ACTIVITY_CONTRACT_VERSION } from '@atriarch-systems/tracery-core/contract';
 
 export function evt(overrides) {
   return {

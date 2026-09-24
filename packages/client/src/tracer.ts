@@ -4,8 +4,8 @@ import type {
   ActivityEvent,
   ActivityLink,
   ActivityStatus,
-} from '@atriarch/tracery-core';
-import { ACTIVITY_CONTRACT_VERSION } from '@atriarch/tracery-core';
+} from '@atriarch-systems/tracery-core';
+import { ACTIVITY_CONTRACT_VERSION } from '@atriarch-systems/tracery-core';
 import { ulid } from './ulid.js';
 import type { ActivityTransport, Clock } from './types.js';
 import { defaultClock } from './types.js';

@@ -2,7 +2,7 @@
  * Trace id resolution (SPEC.md §1 "Trace resolution"), operating only on
  * already-reduced flows' `{ id, link }` -- never on the raw event log.
  *
- * `@atriarch/tracery-core`'s `buildFlows` computes this internally but does
+ * `@atriarch-systems/tracery-core`'s `buildFlows` computes this internally but does
  * not export it standalone, and re-running `buildFlows` over a workspace's
  * entire event log on every append/delete is exactly the O(events) cost
  * hub-2 removes (see `memory.ts`/`sqlite.ts`). This is the same algorithm
@@ -12,7 +12,7 @@
  * O(events) -- and can be re-run after every incremental flow update without
  * reintroducing a whole-workspace event reduction.
  */
-import type { Flow } from '@atriarch/tracery-core';
+import type { Flow } from '@atriarch-systems/tracery-core';
 
 export type LinkedFlow = Pick<Flow, 'id' | 'link'>;
 

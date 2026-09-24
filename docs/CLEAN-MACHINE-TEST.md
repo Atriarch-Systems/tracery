@@ -76,7 +76,7 @@ PASS:
   traces. It removes its temporary consumer and stops its hub when finished.
 
 This proves tarball installation, not registry availability. Do not run
-`npx @atriarch/tracery-hub` yet: the public package is not published.
+`npx @atriarch-systems/tracery-hub` yet: the public package is not published.
 
 ## 3. Manual explorer check
 
@@ -184,7 +184,7 @@ were actually published before this step. Use the final version/namespace if it
 changed during release preparation.
 
 ```sh
-npx --yes @atriarch/tracery-hub@0.1.1
+npx --yes @atriarch-systems/tracery-hub@0.1.1
 ```
 
 PASS: <http://127.0.0.1:8971/ui/> loads from the registry-installed package. Stop

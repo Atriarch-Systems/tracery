@@ -1,10 +1,10 @@
 {
-  "name": "@atriarch/tracery-hub-web",
+  "name": "@atriarch-systems/tracery-hub-web",
   "version": "0.1.1",
   "private": true,
   "license": "Apache-2.0",
   "type": "module",
-  "description": "Hosted explorer for @atriarch/tracery-hub (SPEC.md §6 \"Hosted UI\"): key entry, flow/trace deep links, ActivityExplorer full-screen. Built to dist/ and served by the hub at /ui.",
+  "description": "Hosted explorer for @atriarch-systems/tracery-hub (SPEC.md §6 \"Hosted UI\"): key entry, flow/trace deep links, ActivityExplorer full-screen. Built to dist/ and served by the hub at /ui.",
   "scripts": {
     "dev": "vite",
     "build": "tsc -p tsconfig.json --noEmit && vite build && vite build --config vite.viewer.config.ts",
@@ -12,9 +12,9 @@
     "test": "playwright test"
   },
   "dependencies": {
-    "@atriarch/tracery-client": "^0.1.1",
-    "@atriarch/tracery-core": "^0.1.1",
-    "@atriarch/tracery-react": "^0.1.1",
+    "@atriarch-systems/tracery-client": "^0.1.1",
+    "@atriarch-systems/tracery-core": "^0.1.1",
+    "@atriarch-systems/tracery-react": "^0.1.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },

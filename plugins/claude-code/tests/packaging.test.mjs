@@ -178,7 +178,7 @@ function runEmit(rawPayload, env, dataDir) {
 // that was actually captured from a live Claude Code 2.1.258 session (i.e.
 // lacks `_fixture_note`), in a plausible session order, then checks two
 // things about what actually reaches the spool: every event validates
-// against @atriarch/tracery-core's validateEvent, and none of the raw
+// against @atriarch-systems/tracery-core's validateEvent, and none of the raw
 // command/prompt/file-content/tool-output text from those real payloads
 // leaked into it verbatim.
 test('emit.mjs run against every REAL captured fixture emits only valid, leak-free events', async () => {

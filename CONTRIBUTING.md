@@ -43,7 +43,7 @@ npm run dev -w tracery-example-generator
 Or start the hub in a separate terminal:
 
 ```sh
-npm start -w @atriarch/tracery-hub
+npm start -w @atriarch-systems/tracery-hub
 ```
 
 With no `TRACERY_*` configuration, the hub listens on `127.0.0.1:8971`, uses
@@ -72,11 +72,11 @@ dependencies can require administrator privileges.
 For a focused package check, after building the workspaces:
 
 ```sh
-npm test -w @atriarch/tracery-core
-npm test -w @atriarch/tracery-client
-npm test -w @atriarch/tracery-visualizer
-npm test -w @atriarch/tracery-react
-npm test -w @atriarch/tracery-hub
+npm test -w @atriarch-systems/tracery-core
+npm test -w @atriarch-systems/tracery-client
+npm test -w @atriarch-systems/tracery-visualizer
+npm test -w @atriarch-systems/tracery-react
+npm test -w @atriarch-systems/tracery-hub
 ```
 
 For Python, create and activate a virtual environment using your shell's normal

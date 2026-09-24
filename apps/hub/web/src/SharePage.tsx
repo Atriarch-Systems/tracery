@@ -4,7 +4,7 @@
  * `index.html` (with its injected OG tags) loads in the browser. No key
  * entry, no session -- `useShareSource` needs only the token.
  */
-import { ActivityExplorer, useShareSource, type ConnectionStatus } from '@atriarch/tracery-react';
+import { ActivityExplorer, useShareSource, type ConnectionStatus } from '@atriarch-systems/tracery-react';
 import { ExplorerErrorBoundary } from './ErrorBoundary.js';
 import { Footer } from './Footer.js';
 

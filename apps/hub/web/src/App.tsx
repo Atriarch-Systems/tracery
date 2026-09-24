@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityExplorer, useHubSource } from '@atriarch/tracery-react';
-import type { ActivityGraphHandle } from '@atriarch/tracery-react';
-import type { Scope } from '@atriarch/tracery-core';
+import { ActivityExplorer, useHubSource } from '@atriarch-systems/tracery-react';
+import type { ActivityGraphHandle } from '@atriarch-systems/tracery-react';
+import type { Scope } from '@atriarch-systems/tracery-core';
 import { ShareDialog, type ShareTargetRef } from './ShareDialog.js';
 import { useRoute, type Route } from './router.js';
 import { KeyEntry } from './KeyEntry.js';

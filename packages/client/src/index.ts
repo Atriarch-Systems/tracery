@@ -52,7 +52,7 @@ export { connectLive } from './live-connect.js';
 export type { LiveConnectOptions } from './live-connect.js';
 
 // Re-exported for convenience so consumers rarely need to import
-// '@atriarch/tracery-core' directly for everyday SDK use.
+// '@atriarch-systems/tracery-core' directly for everyday SDK use.
 export type {
   ActivityActor,
   ActivityBatch,
@@ -65,5 +65,5 @@ export type {
   ActivityLink,
   ActivityStatus,
   StoredEvent,
-} from '@atriarch/tracery-core';
-export { ACTIVITY_CONTRACT_VERSION, ACTIVITY_LIMITS } from '@atriarch/tracery-core';
+} from '@atriarch-systems/tracery-core';
+export { ACTIVITY_CONTRACT_VERSION, ACTIVITY_LIMITS } from '@atriarch-systems/tracery-core';

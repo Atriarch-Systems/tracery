@@ -5,7 +5,7 @@
  * "Context hidden by the sharer" notice instead of the raw (already
  * redacted, so harmless, but uninformative) JSON blob.
  */
-import type { ActivityContext } from '@atriarch/tracery-core';
+import type { ActivityContext } from '@atriarch-systems/tracery-core';
 
 export interface RedactedContextShape {
   readonly _redacted: true;

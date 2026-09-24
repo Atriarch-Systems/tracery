@@ -17,7 +17,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ACTIVITY_CONTRACT_VERSION, type ActivityEvent } from '@atriarch/tracery-core/contract';
+import { ACTIVITY_CONTRACT_VERSION, type ActivityEvent } from '@atriarch-systems/tracery-core/contract';
 import { createServer } from './server.js';
 import type { CreatedServer, HubExtensions } from './server.js';
 import type { Config } from './config.js';

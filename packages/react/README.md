@@ -1,20 +1,20 @@
-# @atriarch/tracery-react
+# @atriarch-systems/tracery-react
 
 `ActivityExplorer`: a composite React explorer (connection status, flow
 picker, guided activity graph, inspector, group legend) plus the hooks that
-feed it. Built on `@atriarch/tracery-core` (reducers, projection) and
-`@atriarch/tracery-visualizer` (the canvas). See
+feed it. Built on `@atriarch-systems/tracery-core` (reducers, projection) and
+`@atriarch-systems/tracery-visualizer` (the canvas). See
 [`../../docs/SPEC.md`](../../docs/SPEC.md) §4 for the full contract; this
 README is a usage guide.
 
 ```
-npm install @atriarch/tracery-react
+npm install @atriarch-systems/tracery-react
 ```
 
 ## Embedding: point it at a hub
 
 ```tsx
-import { ActivityExplorer, useHubSource } from '@atriarch/tracery-react';
+import { ActivityExplorer, useHubSource } from '@atriarch-systems/tracery-react';
 
 function MyPage() {
   const source = useHubSource({
@@ -31,10 +31,10 @@ function MyPage() {
 }
 ```
 
-`useHubSource` opens `WS /v1/live` (via `@atriarch/tracery-client`'s
+`useHubSource` opens `WS /v1/live` (via `@atriarch-systems/tracery-client`'s
 `HubClient`, which already resumes from the last cursor it saw with
 exponential backoff) and reduces every frame into `Flow`s with
-`@atriarch/tracery-core`. If the socket keeps failing -- two consecutive
+`@atriarch-systems/tracery-core`. If the socket keeps failing -- two consecutive
 close/error events -- it falls back to polling `GET
 /v1/flows/:id/events?after=` (or, scoped to a trace with no single flow,
 `GET /v1/traces/:id/events`, a full refetch each tick since that endpoint has
@@ -45,8 +45,8 @@ one flow or trace instead of the workspace.
 
 ```tsx
 import { useMemo } from 'react';
-import { Journal } from '@atriarch/tracery-core';
-import { ActivityExplorer, useJournalSource } from '@atriarch/tracery-react';
+import { Journal } from '@atriarch-systems/tracery-core';
+import { ActivityExplorer, useJournalSource } from '@atriarch-systems/tracery-react';
 
 function MyPage() {
   const journal = useMemo(() => new Journal({ maxEvents: 20_000 }), []);
@@ -64,7 +64,7 @@ function MyPage() {
 `useJournalSource` re-derives `Flow`s from the journal on a light poll
 (default 250ms) since `Journal` has no change notification of its own. It
 always computes its first render synchronously, so a journal that is already
-populated (for example, `@atriarch/tracery-core/fixtures`'
+populated (for example, `@atriarch-systems/tracery-core/fixtures`'
 `sampleTraceEvents`) renders correctly on the very first pass -- including
 under `react-dom/server`.
 
@@ -119,7 +119,7 @@ interface ActivityExplorerProps {
 - **Styling** is inline objects reading `var(--tracery-bg|fg|accent|muted|error, <dark default>)`;
   no Tailwind, no stylesheet. Pass `theme` to set those variables on the
   explorer's root element, or set them yourself further up the DOM tree.
-  `theme.graph` (a `Partial<GraphTheme>` from `@atriarch/tracery-visualizer`)
+  `theme.graph` (a `Partial<GraphTheme>` from `@atriarch-systems/tracery-visualizer`)
   is forwarded to the inner `ActivityGraph` for canvas node/edge/group colors
   -- kept as its own nested field rather than flattened in, since chrome CSS
   variables and canvas colors are different rendering surfaces.
@@ -132,7 +132,7 @@ and listed in display order via `PRESET_NAMES`: `dark` (the built-in default,
 pixel-identical to passing no `theme`), `light`, `high-contrast` and `ocean`.
 
 ```tsx
-import { ActivityExplorer, THEME_PRESETS, resolveThemeInput, useHubSource } from '@atriarch/tracery-react';
+import { ActivityExplorer, THEME_PRESETS, resolveThemeInput, useHubSource } from '@atriarch-systems/tracery-react';
 
 function MyPage() {
   const source = useHubSource({ baseUrl: 'https://tracery.example.com', apiKey: 'read-key' });
@@ -176,7 +176,7 @@ interface ActivitySource {
 testable without a browser (`tests/feed.test.mjs`):
 
 ```ts
-import { feedReducer, initialFeedState, reconnectAfter, shouldPoll } from '@atriarch/tracery-react';
+import { feedReducer, initialFeedState, reconnectAfter, shouldPoll } from '@atriarch-systems/tracery-react';
 
 let state = initialFeedState();
 state = feedReducer(state, { type: 'frame', frame: someSnapshotFrame });   // -> live
@@ -187,7 +187,7 @@ reconnectAfter(state);   // cursor to resume from
 ```
 
 `useHubSource` itself owns the actual `WebSocket` (via
-`@atriarch/tracery-client`'s `HubClient.live`, wrapped to count
+`@atriarch-systems/tracery-client`'s `HubClient.live`, wrapped to count
 close/error events) and the poll `setInterval`; the reducer only ever sees
 `frame` / `disconnect` / `poll-ok` / `poll-error` / `reset` actions.
 
@@ -198,7 +198,7 @@ close/error events) and the poll `setInterval`; the reducer only ever sees
 both pure and exported for reuse:
 
 ```ts
-import { computeScope, activatedFlow, scopeModeForKey } from '@atriarch/tracery-react';
+import { computeScope, activatedFlow, scopeModeForKey } from '@atriarch-systems/tracery-react';
 
 computeScope('trace', 'flow:research-1', flows);   // -> { mode: 'trace', trace: <resolved trace id> }
 scopeModeForKey('3');                               // -> 'trace'
@@ -213,7 +213,7 @@ npm test        # node --test tests/*.test.mjs (runs against dist/, build first)
 ```
 
 Tests cover: `react-dom/server` rendering `ActivityExplorer` (via
-`useJournalSource` with `@atriarch/tracery-core/fixtures`' sample trace)
+`useJournalSource` with `@atriarch-systems/tracery-core/fixtures`' sample trace)
 without throwing, including its flow labels; the feed reducer's full state
 machine (snapshot, events, heartbeat, disconnect, reconnect cursor, stale
 snapshot -> `truncated`, fallback to polling after two failures, recovery);

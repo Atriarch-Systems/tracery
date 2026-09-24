@@ -9,12 +9,12 @@ import { fileURLToPath } from 'node:url';
 test('core declarations compile with no renderer, React, DOM, or ambient types installed', () => {
   const dir = mkdtempSync(path.join(tmpdir(), 'tracery-core-types-'));
   try {
-    const pkg = path.join(dir, 'node_modules/@atriarch/tracery-core');
+    const pkg = path.join(dir, 'node_modules/@atriarch-systems/tracery-core');
     mkdirSync(pkg, { recursive: true });
     cpSync(new URL('../dist/', import.meta.url), path.join(pkg, 'dist'), { recursive: true });
     cpSync(new URL('../package.json', import.meta.url), path.join(pkg, 'package.json'));
     writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ type: 'module' }));
-    writeFileSync(path.join(dir, 'consumer.ts'), "import { Journal, project, type ActivityNode } from '@atriarch/tracery-core';\nconst node: ActivityNode = { id: 'a', label: 'A' };\nnew Journal().append([]); project(new Map(), { mode: 'flow', flow: 'f' });\n");
+    writeFileSync(path.join(dir, 'consumer.ts'), "import { Journal, project, type ActivityNode } from '@atriarch-systems/tracery-core';\nconst node: ActivityNode = { id: 'a', label: 'A' };\nnew Journal().append([]); project(new Map(), { mode: 'flow', flow: 'f' });\n");
     writeFileSync(path.join(dir, 'tsconfig.json'), JSON.stringify({ compilerOptions: {
       module: 'NodeNext', target: 'ES2022', strict: true, noEmit: true, skipLibCheck: false, lib: ['ES2022'], types: [],
     }, files: ['consumer.ts'] }));

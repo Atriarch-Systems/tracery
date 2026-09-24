@@ -120,7 +120,7 @@ jobs:
           case "$ARCH:$daemon_arch" in amd64:x86_64|amd64:amd64|arm64:aarch64|arm64:arm64) ;; *) echo 'Docker daemon architecture does not match runner'; exit 1 ;; esac
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with: { node-version: '22.23.2' }
-      - run: npm ci && npm run build -w @atriarch/tracery-core -w @atriarch/tracery-client
+      - run: npm ci && npm run build -w @atriarch-systems/tracery-core -w @atriarch-systems/tracery-client
       - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
         with: { driver: docker, version: v0.37.1 }
       - name: Build and natively test the image with matching sources

@@ -21,15 +21,15 @@
  * Env: TRACERY_HUB_URL (default http://127.0.0.1:8971), TRACERY_API_KEY
  * (falls back to --key). Task ("local mode"): both are optional against a
  * hub running with no TRACERY_API_KEYS configured (`authMode: 'none'`, e.g.
- * `npx @atriarch/tracery-hub` with no env) -- there is no dev key to look
+ * `npx @atriarch-systems/tracery-hub` with no env) -- there is no dev key to look
  * for any more, so omitting both simply runs unauthenticated.
  */
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import WebSocket from 'ws';
-import { ActivityTracer, httpTransport, HubClient } from '@atriarch/tracery-client';
-import { ACTIVITY_CONTRACT_VERSION, buildFlows, project } from '@atriarch/tracery-core';
+import { ActivityTracer, httpTransport, HubClient } from '@atriarch-systems/tracery-client';
+import { ACTIVITY_CONTRACT_VERSION, buildFlows, project } from '@atriarch-systems/tracery-core';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

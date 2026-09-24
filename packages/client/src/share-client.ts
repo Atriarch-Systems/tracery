@@ -5,7 +5,7 @@
  * scoped to exactly the one flow or trace the share names, via
  * `/v1/shares/:token/*` instead of `/v1/flows*`/`/v1/traces*`.
  */
-import type { ActivityFrame, StoredEvent } from '@atriarch/tracery-core';
+import type { ActivityFrame, StoredEvent } from '@atriarch-systems/tracery-core';
 import type { FlowSummary, Trace } from './hub-types.stub.js';
 import type { ShareMeta } from './share-types.js';
 import { connectLive, type LiveConnectOptions, type LiveDisposer } from './live-connect.js';

@@ -3,7 +3,7 @@
  * `node:sqlite` (`DatabaseSync`, WAL mode). Events are the durable source of
  * truth, persisted one row per event. Flow/trace reduction is kept as an
  * in-memory index (identical algorithm to `MemoryStore`, built from
- * `@atriarch/tracery-core`'s `buildFlow`/`buildFlows` and `assembleTrace`)
+ * `@atriarch-systems/tracery-core`'s `buildFlow`/`buildFlows` and `assembleTrace`)
  * so `listFlows` and friends never touch disk on the read path -- but unlike
  * `MemoryStore`, that index is ALSO materialised into a `flows` table (hub-22),
  * one row per flow, kept current incrementally on every write the exact same
@@ -32,8 +32,8 @@
 import { DatabaseSync } from 'node:sqlite';
 import fs from 'node:fs';
 import path from 'node:path';
-import { buildFlow, buildFlows, assembleTrace, type Flow } from '@atriarch/tracery-core';
-import type { ActivityEvent, ActivityFrame, StoredEvent } from '@atriarch/tracery-core/contract';
+import { buildFlow, buildFlows, assembleTrace, type Flow } from '@atriarch-systems/tracery-core';
+import type { ActivityEvent, ActivityFrame, StoredEvent } from '@atriarch-systems/tracery-core/contract';
 import { buildFrame } from './frame.js';
 import { resolveTraceIds } from './trace-ids.js';
 import { isSweepProtected, isOverRetention, orderSweepCandidates, type SweepCandidate } from './sweep.js';

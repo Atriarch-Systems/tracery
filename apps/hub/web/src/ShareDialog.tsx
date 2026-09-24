@@ -9,8 +9,8 @@
  * useless), and manage/revoke this key's existing shares.
  */
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
-import { HubClient, type CreateShareOptions, type ShareSummary } from '@atriarch/tracery-client';
-import type { ActivityGraphHandle } from '@atriarch/tracery-react';
+import { HubClient, type CreateShareOptions, type ShareSummary } from '@atriarch-systems/tracery-client';
+import type { ActivityGraphHandle } from '@atriarch-systems/tracery-react';
 import type { HubSession } from './session.js';
 
 export interface ShareTargetRef {

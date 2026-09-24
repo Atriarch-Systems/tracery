@@ -1,13 +1,13 @@
 /**
  * Posts a batch of pre-built wire events to a running hub's ingest endpoint
  * (SPEC.md §6 `POST /v1/events`). This uses a raw fetch rather than
- * @atriarch/tracery-client's ActivityTracer/Flow/Op builder API on purpose:
+ * @atriarch-systems/tracery-client's ActivityTracer/Flow/Op builder API on purpose:
  * this generator already has complete, pre-built ActivityEvent objects (the
  * same shape scripts/demo.mjs and scripts/capture-hero.mjs push), not a
  * live call to build incrementally, so replaying them verbatim is both
  * simpler and a more honest illustration of the wire contract itself.
  */
-import type { ActivityEvent } from '@atriarch/tracery-core';
+import type { ActivityEvent } from '@atriarch-systems/tracery-core';
 
 export interface SendResult {
   readonly ok: boolean;

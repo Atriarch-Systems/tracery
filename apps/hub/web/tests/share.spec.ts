@@ -16,7 +16,7 @@ import { createServer as createNetServer } from 'node:net';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ACTIVITY_CONTRACT_VERSION } from '@atriarch/tracery-core';
+import { ACTIVITY_CONTRACT_VERSION } from '@atriarch-systems/tracery-core';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const hubRoot = path.resolve(__dirname, '../../'); // apps/hub

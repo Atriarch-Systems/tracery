@@ -16,7 +16,7 @@
  * `trace`) has no SPEC.md §6 endpoint to refetch from, so claiming `polling`
  * there would describe a timer that will never fetch anything again.
  */
-import type { ActivityFrame } from '@atriarch/tracery-client';
+import type { ActivityFrame } from '@atriarch-systems/tracery-client';
 
 export type FeedStatus = 'connecting' | 'live' | 'reconnecting' | 'polling' | 'offline';
 

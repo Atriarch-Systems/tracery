@@ -115,11 +115,11 @@ open http://127.0.0.1:8971/ui/               # hosted explorer -- opens straight
 ### TypeScript
 
 ```sh
-npm install @atriarch/tracery-client
+npm install @atriarch-systems/tracery-client
 ```
 
 ```ts
-import { ActivityTracer, httpTransport } from '@atriarch/tracery-client';
+import { ActivityTracer, httpTransport } from '@atriarch-systems/tracery-client';
 
 const tracer = new ActivityTracer({
   // apiKey is optional against a local-mode hub (§1 above); pass one with
@@ -196,15 +196,15 @@ parent — no explicit `parent=` plumbing needed. Full API:
 
 ## 3. Embed the explorer
 
-Point `@atriarch/tracery-react`'s `ActivityExplorer` at the hub you started
+Point `@atriarch-systems/tracery-react`'s `ActivityExplorer` at the hub you started
 in step 1 — no server code of your own:
 
 ```sh
-npm install @atriarch/tracery-react
+npm install @atriarch-systems/tracery-react
 ```
 
 ```tsx
-import { ActivityExplorer, useHubSource } from '@atriarch/tracery-react';
+import { ActivityExplorer, useHubSource } from '@atriarch-systems/tracery-react';
 
 function ActivityPage() {
   const source = useHubSource({

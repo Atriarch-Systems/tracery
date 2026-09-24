@@ -1,6 +1,6 @@
 # tracery-hub
 
-Helm chart for [`@atriarch/tracery-hub`](../README.md) (SPEC.md §6), the
+Helm chart for [`@atriarch-systems/tracery-hub`](../README.md) (SPEC.md §6), the
 standalone Tracery activity-graph server. This is an alternative to the
 plain manifests in [`../k8s/`](../k8s/) -- pick one, not both, for a given
 release.

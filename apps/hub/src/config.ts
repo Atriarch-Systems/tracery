@@ -1,6 +1,6 @@
 /**
  * Environment-variable configuration for the hub (SPEC.md §6 "Hub"). Every
- * value has a default, so `node bin/hub.mjs` (`npx @atriarch/tracery-hub`)
+ * value has a default, so `node bin/hub.mjs` (`npx @atriarch-systems/tracery-hub`)
  * with no env at all works out of the box: an in-memory store, bound to
  * `127.0.0.1`, `authMode: 'none'` -- no key is ever minted or printed (see
  * `AuthMode` and `resolveAuthMode`).
@@ -17,7 +17,7 @@ export type StoreKind = 'memory' | 'sqlite' | 'postgres';
 export type Role = 'ingest' | 'read' | 'admin';
 
 /**
- * "Local mode" (task: npx @atriarch/tracery-hub with no env): `'none'` means
+ * "Local mode" (task: npx @atriarch-systems/tracery-hub with no env): `'none'` means
  * every request is a full-access principal on the single `default` workspace
  * with no key ever checked (see `auth.ts`'s `localModeAuth`); `'keys'` is the
  * original SPEC.md §6 API-key behavior, unchanged. Resolved once at config
@@ -254,7 +254,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     }
   }
   const store = parseStoreKind(env.TRACERY_STORE);
-  // Task ("local mode"): `npx @atriarch/tracery-hub` with no env at all must
+  // Task ("local mode"): `npx @atriarch-systems/tracery-hub` with no env at all must
   // bind loopback-only and run with auth off, never mint or print a key --
   // see resolveAuthMode below. Containers (Dockerfile) set TRACERY_HOST=
   // 0.0.0.0 explicitly.

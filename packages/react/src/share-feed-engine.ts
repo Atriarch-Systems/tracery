@@ -11,7 +11,7 @@
  *   `offline` branch here the way `hub-feed-engine.ts` has for a source with
  *   neither a `flow` nor a `trace`.
  */
-import { ShareClient, type ActivityFrame } from '@atriarch/tracery-client';
+import { ShareClient, type ActivityFrame } from '@atriarch-systems/tracery-client';
 import { feedReducer, initialFeedState, shouldPoll, type FeedState } from './feed.js';
 import { instrumentedWebSocket } from './hub-feed-engine.js';
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Part of this package's `prepack` (SPEC.md §6 "Packaging"): `npm pack` /
-// `npm publish` of @atriarch/tracery-hub must ship the hosted UI
+// `npm publish` of @atriarch-systems/tracery-hub must ship the hosted UI
 // (web/dist) so `bin/hub.mjs`'s defaultUiDir() finds something once
 // installed into a consumer's node_modules -- even from a clean checkout
 // where apps/hub/web was never built. If web/dist is already there (the
@@ -38,15 +38,15 @@ const res = spawnSync(
     'run',
     'build',
     '-w',
-    '@atriarch/tracery-core',
+    '@atriarch-systems/tracery-core',
     '-w',
-    '@atriarch/tracery-visualizer',
+    '@atriarch-systems/tracery-visualizer',
     '-w',
-    '@atriarch/tracery-client',
+    '@atriarch-systems/tracery-client',
     '-w',
-    '@atriarch/tracery-react',
+    '@atriarch-systems/tracery-react',
     '-w',
-    '@atriarch/tracery-hub-web',
+    '@atriarch-systems/tracery-hub-web',
   ],
   // stdio: route both the nested build's stdout AND stderr to OUR stderr
   // (fd 2) -- see the file-level comment above for why stdout must stay

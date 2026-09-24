@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from 'react';
-import { Journal } from '@atriarch/tracery-core';
-import { ActivityExplorer, useJournalSource } from '@atriarch/tracery-react';
+import { Journal } from '@atriarch-systems/tracery-core';
+import { ActivityExplorer, useJournalSource } from '@atriarch-systems/tracery-react';
 import { runScenario } from './scenario.js';
 
 export function App() {

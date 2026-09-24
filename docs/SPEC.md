@@ -8,9 +8,9 @@ and the whole tree renders as one trace.
 
 Three ways to use it:
 
-1. **Library.** Import `@atriarch/tracery-core` + `@atriarch/tracery-react` and
+1. **Library.** Import `@atriarch-systems/tracery-core` + `@atriarch-systems/tracery-react` and
    render the graph in your own app from your own event stream.
-2. **Hub.** Run `@atriarch/tracery-hub` as a container. Apps push events with a
+2. **Hub.** Run `@atriarch-systems/tracery-hub` as a container. Apps push events with a
    client SDK; the hub stores, sorts, serves and draws. Nothing renders in the app.
 3. **Both.** Embed the React explorer in your app but point it at the hub.
 
@@ -25,12 +25,12 @@ Three ways to use it:
 ## Repository layout
 
 ```
-packages/core          @atriarch/tracery-core        contract, validation, journal, reducers, trace assembly (no DOM, no React)
-packages/visualizer    @atriarch/tracery-visualizer  the canvas component (moved from agentkit, Apache-2.0)
-packages/react         @atriarch/tracery-react       ActivityExplorer composite + hooks (live feed, hub client)
-packages/client        @atriarch/tracery-client      TS emitter SDK (batching HTTP transport) + hub read client
+packages/core          @atriarch-systems/tracery-core        contract, validation, journal, reducers, trace assembly (no DOM, no React)
+packages/visualizer    @atriarch-systems/tracery-visualizer  the canvas component (moved from agentkit, Apache-2.0)
+packages/react         @atriarch-systems/tracery-react       ActivityExplorer composite + hooks (live feed, hub client)
+packages/client        @atriarch-systems/tracery-client      TS emitter SDK (batching HTTP transport) + hub read client
 clients/python         atriarch-tracery               Python emitter SDK, stdlib only, namespace package atriarch.tracery
-apps/hub               @atriarch/tracery-hub         standalone server + hosted UI (apps/hub/web) + Dockerfile + k8s
+apps/hub               @atriarch-systems/tracery-hub         standalone server + hosted UI (apps/hub/web) + Dockerfile + k8s
 docs/                  SPEC.md (this), PLAN.md (workstreams), CLOUD.md
 ```
 
@@ -115,7 +115,7 @@ Cycles in links are broken by treating the first flow seen as the root.
 
 The Virali adapter is a follow-up in the Virali repo, not part of this repo.
 
-## 2. Core reducers (`@atriarch/tracery-core`)
+## 2. Core reducers (`@atriarch-systems/tracery-core`)
 
 All pure, renderer-free, importable in Node and browsers.
 
@@ -185,11 +185,11 @@ Projection rules:
 - `catalog` lets the caller map `kind` to `NodePresentation`; a default catalog
   ships (`agent`, `subagent`, `llm`, `tool`, `memory`, `guard`, `human`, `service`, fallback).
 
-`@atriarch/tracery-core` ships self-contained, renderer-free projection types.
+`@atriarch-systems/tracery-core` ships self-contained, renderer-free projection types.
 A build check keeps them identical to the visualizer data contract. Import React
-graph props and capture handles from `@atriarch/tracery-visualizer`.
+graph props and capture handles from `@atriarch-systems/tracery-visualizer`.
 
-## 3. Visualizer (`@atriarch/tracery-visualizer`) additions
+## 3. Visualizer (`@atriarch-systems/tracery-visualizer`) additions
 
 Keep the existing contract (`VISUALIZER_CONTRACT_VERSION` becomes 2). Add:
 
@@ -205,7 +205,7 @@ Keep the existing contract (`VISUALIZER_CONTRACT_VERSION` becomes 2). Add:
 - Tests for each; SSR test still passes; `npm pack` produces a tarball that Virali
   can drop into `vendor/` unchanged in shape.
 
-## 4. React explorer (`@atriarch/tracery-react`)
+## 4. React explorer (`@atriarch-systems/tracery-react`)
 
 ```tsx
 <ActivityExplorer
@@ -232,7 +232,7 @@ journal), `useProjection(source, scope, options)`.
 
 ## 5. Client SDKs
 
-### TypeScript (`@atriarch/tracery-client`)
+### TypeScript (`@atriarch-systems/tracery-client`)
 
 ```ts
 const tracer = new ActivityTracer({ transport: httpTransport({ baseUrl, apiKey, workspace }),
@@ -248,7 +248,7 @@ flow.end(); await tracer.flush(); await tracer.close();
 Transports: `httpTransport` (batches, retries with backoff, never throws into
 the caller, drops with a counter when the queue exceeds `maxQueue`),
 `memoryTransport` (tests), `journalTransport(journal)` (in-process, feeds
-`@atriarch/tracery-core` directly for the library-only path). Ids are ULIDs
+`@atriarch-systems/tracery-core` directly for the library-only path). Ids are ULIDs
 generated locally (no dependency; implement the 26-char Crockford ULID).
 
 `HubClient` (read side): `listFlows`, `getFlow`, `getTrace`, `events(flow, after)`,
@@ -264,7 +264,7 @@ carry the current flow/op so nested calls get `parentOp` without plumbing.
 `flow.spawn_link(op)` returns a dict for a subagent. No third-party deps.
 Type hints, `py.typed`, PEP-420 namespace (no `atriarch/__init__.py`).
 
-## 6. Hub (`@atriarch/tracery-hub`)
+## 6. Hub (`@atriarch-systems/tracery-hub`)
 
 Fastify 5 on Node 22. Configuration by environment variables (documented in
 `apps/hub/README.md`), with an in-memory loopback-only local default for the Node process. Containers
@@ -304,7 +304,7 @@ Two modes, resolved once at boot into `authMode: 'none' | 'keys'`:
   Requests never see another workspace's data.
 - **`'none'`** ("local mode" -- no keys configured, and `TRACERY_HOST`
   resolves to a loopback address: `127.0.0.1`, `::1`, `localhost`; this is
-  the default, so `npx @atriarch/tracery-hub`/`node bin/hub.mjs` with no env
+  the default, so `npx @atriarch-systems/tracery-hub`/`node bin/hub.mjs` with no env
   at all lands here): every request and WS connection is a full-access
   principal on the single `default` workspace, no key ever checked or
   printed. A batch/query naming any other workspace is rejected with 400.
@@ -348,7 +348,7 @@ store; if the cursor is older than what the store holds, a `snapshot` with
 
 ### Hosted UI (`apps/hub/web`)
 
-Vite + React 19 + `@atriarch/tracery-react`. Built to `apps/hub/web/dist` and
+Vite + React 19 + `@atriarch-systems/tracery-react`. Built to `apps/hub/web/dist` and
 served by the hub as static files. First load asks for a read key (kept in
 `sessionStorage`), then shows the workspace's flows. Deep links:
 `/ui/flows/:id`, `/ui/traces/:id`.
@@ -360,7 +360,7 @@ served by the hub as static files. First load asks for a read key (kept in
   `HEALTHCHECK` on `/healthz`.
 - `apps/hub/docker-compose.yaml`: hub + volume, example keys file.
 - `apps/hub/k8s/`: Deployment, Service, PVC, example Secret; plain manifests (Kustomize-friendly).
-- `npx @atriarch/tracery-hub` starts the server (bin entry).
+- `npx @atriarch-systems/tracery-hub` starts the server (bin entry).
 
 ## 7. Extensions and Tracery Cloud
 
@@ -420,7 +420,7 @@ repo, executed by the integration workstream:
 
 ## 9. Decisions owed to Dan
 
-- Product name and npm org. Working name "Tracery", scope `@atriarch/tracery-*`, hub image `atriarch/tracery-hub`.
+- Product name and npm org. Working name "Tracery", scope `@atriarch-systems/tracery-*`, hub image `atriarch/tracery-hub`.
 - Commercial/license terms for Tracery Cloud and self-hosted enterprise -- now entirely
   the private `tracery-cloud` repository's concern, not this one's.
 - Whether to publish to npmjs.com or only the internal Nexus.

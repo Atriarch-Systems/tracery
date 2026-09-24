@@ -4,17 +4,17 @@
  *
  * Proves that the five npm packages this repo publishes actually work once
  * they leave the workspace: builds everything, `npm pack`s
- * @atriarch/tracery-{core,visualizer,client,react,hub}, installs all five
+ * @atriarch-systems/tracery-{core,visualizer,client,react,hub}, installs all five
  * tarballs at once into a brand-new temp project (so internal
- * "@atriarch/..." dependencies resolve to each other's tarball instead of
+ * "@atriarch-systems/..." dependencies resolve to each other's tarball instead of
  * the npm registry -- see docs/PUBLISHING.md for why every internal
  * dependency needs a real semver range rather than "*"), then from that temp
  * project only (no workspace imports, no relative paths back into this
  * repo):
  *
- *   (a) imports @atriarch/tracery-core and @atriarch/tracery-client
- *       directly, and server-renders @atriarch/tracery-react's
- *       ActivityExplorer (which pulls in @atriarch/tracery-visualizer) over
+ *   (a) imports @atriarch-systems/tracery-core and @atriarch-systems/tracery-client
+ *       directly, and server-renders @atriarch-systems/tracery-react's
+ *       ActivityExplorer (which pulls in @atriarch-systems/tracery-visualizer) over
  *       tracery-core's own fixtures via react-dom/server;
  *   (b) starts the hub with `npx tracery-hub` (no env beyond a random port),
  *       and confirms GET /v1/info reports `auth: "none"` and GET /ui/
@@ -242,24 +242,24 @@ async function main() {
   section('3a. import checks (installed packages only)');
 
   const coreCheckSrc = `
-    import { ACTIVITY_CONTRACT_VERSION, Journal, buildFlows, project } from '@atriarch/tracery-core';
+    import { ACTIVITY_CONTRACT_VERSION, Journal, buildFlows, project } from '@atriarch-systems/tracery-core';
     if (typeof ACTIVITY_CONTRACT_VERSION !== 'number') throw new Error('ACTIVITY_CONTRACT_VERSION missing');
     const j = new Journal();
     if (typeof j.append !== 'function') throw new Error('Journal.append missing');
     console.log('core-ok');
   `;
   const coreRes = runCapture(process.execPath, ['--input-type=module', '-e', coreCheckSrc], { cwd: tempProjectDir, shell: false });
-  check('import @atriarch/tracery-core', coreRes.status === 0 && coreRes.stdout.includes('core-ok'), coreRes.stderr?.trim());
+  check('import @atriarch-systems/tracery-core', coreRes.status === 0 && coreRes.stdout.includes('core-ok'), coreRes.stderr?.trim());
 
   const clientCheckSrc = `
-    import { ActivityTracer, httpTransport, HubClient } from '@atriarch/tracery-client';
+    import { ActivityTracer, httpTransport, HubClient } from '@atriarch-systems/tracery-client';
     if (typeof ActivityTracer !== 'function') throw new Error('ActivityTracer missing');
     if (typeof httpTransport !== 'function') throw new Error('httpTransport missing');
     if (typeof HubClient !== 'function') throw new Error('HubClient missing');
     console.log('client-ok');
   `;
   const clientRes = runCapture(process.execPath, ['--input-type=module', '-e', clientCheckSrc], { cwd: tempProjectDir, shell: false });
-  check('import @atriarch/tracery-client', clientRes.status === 0 && clientRes.stdout.includes('client-ok'), clientRes.stderr?.trim());
+  check('import @atriarch-systems/tracery-client', clientRes.status === 0 && clientRes.stdout.includes('client-ok'), clientRes.stderr?.trim());
 
   // react + visualizer: SSR-render ActivityExplorer over core's fixtures,
   // the same pattern as packages/react/tests/explorer-ssr.test.mjs, but
@@ -267,9 +267,9 @@ async function main() {
   const ssrCheckSrc = `
     import { createElement } from 'react';
     import { renderToString } from 'react-dom/server';
-    import { Journal } from '@atriarch/tracery-core';
-    import { sampleTraceEvents } from '@atriarch/tracery-core/fixtures';
-    import { ActivityExplorer, useJournalSource } from '@atriarch/tracery-react';
+    import { Journal } from '@atriarch-systems/tracery-core';
+    import { sampleTraceEvents } from '@atriarch-systems/tracery-core/fixtures';
+    import { ActivityExplorer, useJournalSource } from '@atriarch-systems/tracery-react';
 
     const journal = new Journal();
     journal.append(sampleTraceEvents);
@@ -286,7 +286,7 @@ async function main() {
   `;
   const ssrRes = runCapture(process.execPath, ['--input-type=module', '-e', ssrCheckSrc], { cwd: tempProjectDir, shell: false });
   check(
-    'SSR-render @atriarch/tracery-react ActivityExplorer (pulls in @atriarch/tracery-visualizer) over core fixtures',
+    'SSR-render @atriarch-systems/tracery-react ActivityExplorer (pulls in @atriarch-systems/tracery-visualizer) over core fixtures',
     ssrRes.status === 0 && ssrRes.stdout.includes('ssr-ok'),
     ssrRes.stderr?.trim(),
   );

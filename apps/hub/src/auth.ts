@@ -31,7 +31,7 @@ export const LOCAL_MODE_WORKSPACE = 'default';
 const LOCAL_MODE_ROLES: readonly Role[] = ['ingest', 'read', 'admin'];
 
 /**
- * `config.authMode === 'none'` (task: "local mode", `npx @atriarch/tracery-hub`
+ * `config.authMode === 'none'` (task: "local mode", `npx @atriarch-systems/tracery-hub`
  * with no env): every request and WS connection is a full-access principal on
  * the single `default` workspace -- no key, no header, no `Authorization`
  * ever consulted. `requireAuth`/`registerLive` call this instead of

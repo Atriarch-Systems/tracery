@@ -1,5 +1,5 @@
 /**
- * Public entry point for `@atriarch/tracery-hub` as a *library*, not just a
+ * Public entry point for `@atriarch-systems/tracery-hub` as a *library*, not just a
  * binary (`bin/hub.mjs`). This is what an extensions module -- most notably
  * Tracery Cloud's `@atriarch/tracery-cloud-ee` in the private
  * `tracery-cloud` repo -- imports to build a `HubExtensions` object and to

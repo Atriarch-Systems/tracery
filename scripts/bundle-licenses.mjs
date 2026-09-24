@@ -25,7 +25,7 @@ export function bundleLicenses() {
           if (fs.existsSync(manifest)) {
             const pkg = JSON.parse(fs.readFileSync(manifest, 'utf8'));
             if (pkg.name && pkg.version) {
-              if (!pkg.name.startsWith('@atriarch/')) packages.set(pkg.name + '@' + pkg.version, { dir, pkg });
+              if (!pkg.name.startsWith('@atriarch-systems/')) packages.set(pkg.name + '@' + pkg.version, { dir, pkg });
               break;
             }
           }

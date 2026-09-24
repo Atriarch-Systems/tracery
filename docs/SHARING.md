@@ -147,7 +147,7 @@ TRACERY_PUBLIC_URL=https://tracery.example.com
 
 Every share dialog (and the explorer's own header) offers "Download
 image": `ActivityGraphHandle.toImage({ scale?, background?, mark? })`
-(`@atriarch/tracery-visualizer`) fits the current view, waits a frame, and
+(`@atriarch-systems/tracery-visualizer`) fits the current view, waits a frame, and
 renders the live canvas onto an offscreen one at `scale` (default 2×)
 resolution, optionally over a solid `background` (the graph canvas itself
 is transparent) and with a small "Tracery" mark in the accent color drawn
@@ -181,12 +181,12 @@ The export 404s with a clear `viewer_not_built` message if
 
 ## Client and React API
 
-- `@atriarch/tracery-client`: `HubClient.shares.{create,list,revoke,uploadPreview}`
+- `@atriarch-systems/tracery-client`: `HubClient.shares.{create,list,revoke,uploadPreview}`
   for the authenticated routes, and a standalone `ShareClient(token)` —
   `.meta()`, `.flow()`, `.trace()`, `.events(after?)`, `.previewUrl()`,
   `.live(onFrame)` — for the public ones. `ShareClient` sends no
   credential of any kind; the token in its URLs is the whole story.
-- `@atriarch/tracery-react`: `useShareSource(baseUrl, token)` returns an
+- `@atriarch-systems/tracery-react`: `useShareSource(baseUrl, token)` returns an
   `ActivitySource` (plus `target`, `mode`, `label`, `includeContext`,
   `notFound`) driven by `ShareClient` — one fetch for a snapshot share, a
   live WebSocket (falling back to polling) for a live one.

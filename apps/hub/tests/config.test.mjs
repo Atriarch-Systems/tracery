@@ -9,7 +9,7 @@ test('loadConfig: every documented default applies when the environment is empty
   const config = loadConfig({});
   assert.equal(config.port, 8971);
   // Task ("local mode"): the default host is loopback-only, not 0.0.0.0 --
-  // `npx @atriarch/tracery-hub` with no env must bind 127.0.0.1 and run with
+  // `npx @atriarch-systems/tracery-hub` with no env must bind 127.0.0.1 and run with
   // auth off (authMode 'none'), never mint or print a key. The Dockerfile
   // sets TRACERY_HOST=0.0.0.0 explicitly for the container case.
   assert.equal(config.host, '127.0.0.1');

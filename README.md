@@ -2,7 +2,7 @@
 
 > **v0.1.0 is available from source. npm/PyPI packages and Docker images are not published yet.**
 > The current checkout prepares v0.1.1; see [Publishing](docs/PUBLISHING.md) for the GitHub Actions release and credential setup.
-> `npx @atriarch/tracery-hub` and `docker pull atriarch/tracery-hub` will not work
+> `npx @atriarch-systems/tracery-hub` and `docker pull atriarch/tracery-hub` will not work
 > until registry publication. Use the commands below (Node.js >=22.13), or try the
 > [hosted demo](https://atriarch.systems/demos/tracery/). See [release notes](CHANGELOG.md).
 
@@ -41,10 +41,10 @@ for the full specification.
 
 ## Usage modes
 
-1. **Library** — embed `@atriarch/tracery-core` + `@atriarch/tracery-react`
+1. **Library** — embed `@atriarch-systems/tracery-core` + `@atriarch-systems/tracery-react`
    directly in your own app and render the graph from your own event stream.
    No server to run.
-2. **Hub** — run `@atriarch/tracery-hub` as a container. Apps push events
+2. **Hub** — run `@atriarch-systems/tracery-hub` as a container. Apps push events
    with a client SDK (TypeScript or Python); the hub stores, sorts, serves
    and draws. Nothing renders in the producing app.
 3. **Both** — embed the React explorer in your app, but point it at a
@@ -59,13 +59,13 @@ For v0.1.0, try the source examples below. This install command becomes availabl
 after npm publication:
 
 ```
-npm install @atriarch/tracery-core @atriarch/tracery-react
+npm install @atriarch-systems/tracery-core @atriarch-systems/tracery-react
 ```
 
 ```tsx
 import { useMemo } from 'react';
-import { Journal } from '@atriarch/tracery-core';
-import { ActivityExplorer, useJournalSource } from '@atriarch/tracery-react';
+import { Journal } from '@atriarch-systems/tracery-core';
+import { ActivityExplorer, useJournalSource } from '@atriarch-systems/tracery-react';
 
 function MyPage() {
   const journal = useMemo(() => new Journal({ maxEvents: 20_000 }), []);
@@ -112,11 +112,11 @@ The following SDK install command requires the pending npm publication. For now,
 run the examples in this built checkout.
 
 ```
-npm install @atriarch/tracery-client
+npm install @atriarch-systems/tracery-client
 ```
 
 ```ts
-import { ActivityTracer, httpTransport } from '@atriarch/tracery-client';
+import { ActivityTracer, httpTransport } from '@atriarch-systems/tracery-client';
 
 const tracer = new ActivityTracer({
   // apiKey is optional against a local-mode hub (see above); against a hub
@@ -138,11 +138,11 @@ Or from Python, install from the checkout: `python -m pip install ./clients/pyth
 This install command becomes available after npm publication:
 
 ```
-npm install @atriarch/tracery-react
+npm install @atriarch-systems/tracery-react
 ```
 
 ```tsx
-import { ActivityExplorer, useHubSource } from '@atriarch/tracery-react';
+import { ActivityExplorer, useHubSource } from '@atriarch-systems/tracery-react';
 
 function MyPage() {
   // apiKey is optional against a local-mode hub (node apps/hub/bin/hub.mjs, see above).
@@ -213,13 +213,13 @@ redaction rules, expiry/revocation, rate limits, Open Graph previews, and
 
 | Package | Path | Version | License |
 | --- | --- | --- | --- |
-| `@atriarch/tracery-core` | `packages/core` | 0.1.1 | Apache-2.0 |
-| `@atriarch/tracery-visualizer` | `packages/visualizer` | 0.3.1 | Apache-2.0 |
-| `@atriarch/tracery-client` | `packages/client` | 0.1.1 | Apache-2.0 |
-| `@atriarch/tracery-react` | `packages/react` | 0.1.1 | Apache-2.0 |
+| `@atriarch-systems/tracery-core` | `packages/core` | 0.1.1 | Apache-2.0 |
+| `@atriarch-systems/tracery-visualizer` | `packages/visualizer` | 0.3.1 | Apache-2.0 |
+| `@atriarch-systems/tracery-client` | `packages/client` | 0.1.1 | Apache-2.0 |
+| `@atriarch-systems/tracery-react` | `packages/react` | 0.1.1 | Apache-2.0 |
 | `atriarch-tracery` (Python, `atriarch.tracery`) | `clients/python` | 0.1.0 | Apache-2.0 |
-| `@atriarch/tracery-hub` | `apps/hub` | 0.1.1 | Apache-2.0 |
-| `@atriarch/tracery-hub-web` (hosted UI, not published) | `apps/hub/web` | 0.1.1 | Apache-2.0 |
+| `@atriarch-systems/tracery-hub` | `apps/hub` | 0.1.1 | Apache-2.0 |
+| `@atriarch-systems/tracery-hub-web` (hosted UI, not published) | `apps/hub/web` | 0.1.1 | Apache-2.0 |
 | `tracery` (Claude Code plugin) | `plugins/claude-code` | 0.1.0 | Apache-2.0 |
 
 ## Event model

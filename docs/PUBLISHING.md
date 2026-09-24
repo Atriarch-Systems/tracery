@@ -13,7 +13,7 @@ restricted to `Atriarch-Systems/tracery`:
 
 | Secret | Value to obtain |
 | --- | --- |
-| `NPMJS_TOKEN` | An npmjs.com granular access token with read/write permission to the `@atriarch` scope and **Bypass 2FA** enabled for non-interactive publishing (see "Trusted Publishing: not available" below for why Bypass 2FA is required here). The token's owner must have publication rights to that scope. Use the shortest practical expiration and rotate it. |
+| `NPMJS_TOKEN` | An npmjs.com granular access token with read/write permission to the `@atriarch-systems` scope and **Bypass 2FA** enabled for non-interactive publishing (see "Trusted Publishing: not available" below for why Bypass 2FA is required here). The token's owner must have publication rights to that scope. Use the shortest practical expiration and rotate it. |
 | `DOCKERHUB_USERNAME` | The Docker ID of the account that owns the access token and can push to the target repository; this can differ from the organization namespace. |
 | `DOCKERHUB_TOKEN` | That Docker account's access token with read/write access to the target repository. Delete permission is unnecessary. |
 
@@ -27,7 +27,7 @@ The workflow creates the configured Docker Hub repository with **Public**
 visibility if it does not exist. The Docker account must be allowed to create
 repositories in that namespace as well as push images. An existing private
 repository causes a failure; its visibility is never changed automatically.
-Confirm that the `@atriarch` npm scope belongs to your account or organization.
+Confirm that the `@atriarch-systems` npm scope belongs to your account or organization.
 Organization administration permissions on an npm token are not a substitute
 for package/scope publication permissions.
 
@@ -52,7 +52,7 @@ but are planned for future releases." This org's release workflow therefore cann
 use it, the `NPMJS_TOKEN` granular token with Bypass 2FA is the intended mechanism,
 and that warning is expected. Keep the token's blast radius small:
 
-- Scope it to the `@atriarch` scope only, never "all packages". After the first
+- Scope it to the `@atriarch-systems` scope only, never "all packages". After the first
   publish, narrow it again to the five published packages; npm allows
   package-level restriction only once the packages exist.
 - Set expiration to 30–90 days and rotate on schedule.

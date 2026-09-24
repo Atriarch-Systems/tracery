@@ -1,4 +1,4 @@
-# @atriarch/tracery-core
+# @atriarch-systems/tracery-core
 
 Contract, validation, journal, flow reducers, trace assembly and visualizer
 projection for Tracery. Pure TypeScript, no DOM, no React, no I/O.
@@ -6,17 +6,17 @@ Runs in Node and browsers. See [`../../docs/SPEC.md`](../../docs/SPEC.md) §1–
 for the full semantics; this README is a usage guide.
 
 ```
-npm install @atriarch/tracery-core
+npm install @atriarch-systems/tracery-core
 ```
 
 ```ts
-import { validateEvent, validateBatch } from '@atriarch/tracery-core';
-import { Journal } from '@atriarch/tracery-core';
-import { buildFlows, buildFlow } from '@atriarch/tracery-core';
-import { assembleTrace, ancestors } from '@atriarch/tracery-core';
-import { project } from '@atriarch/tracery-core';
-import { sampleTraceEvents, buildSampleFlows } from '@atriarch/tracery-core/fixtures';
-import type { ActivityEvent } from '@atriarch/tracery-core/contract';
+import { validateEvent, validateBatch } from '@atriarch-systems/tracery-core';
+import { Journal } from '@atriarch-systems/tracery-core';
+import { buildFlows, buildFlow } from '@atriarch-systems/tracery-core';
+import { assembleTrace, ancestors } from '@atriarch-systems/tracery-core';
+import { project } from '@atriarch-systems/tracery-core';
+import { sampleTraceEvents, buildSampleFlows } from '@atriarch-systems/tracery-core/fixtures';
+import type { ActivityEvent } from '@atriarch-systems/tracery-core/contract';
 ```
 
 Subpath exports: `.` (everything), `./contract` (wire types only, no logic),
@@ -78,7 +78,7 @@ ancestors(flows, 'flow:research-1'); // root-first parent chain, excluding the f
 ## Projecting to the visualizer
 
 ```tsx
-import { ActivityGraph } from '@atriarch/tracery-visualizer';
+import { ActivityGraph } from '@atriarch-systems/tracery-visualizer';
 
 // This flow's own graph: raw node ids.
 const { nodes, edges, groups } = project(flows, { mode: 'flow', flow: 'flow:parent' });
@@ -117,7 +117,7 @@ project(flows, { mode: 'trace', trace: flows.get('flow:parent').trace });
 
 ## Fixtures
 
-`@atriarch/tracery-core/fixtures` exports a deterministic ~40-event sample
+`@atriarch-systems/tracery-core/fixtures` exports a deterministic ~40-event sample
 trace: `agent:orchestrator` plans, searches, checks a guard, gets human
 approval, then spawns `subagent:research-1` and `subagent:research-2` from the
 same search op. Each subagent plans, searches, writes memory and reports back;
@@ -127,7 +127,7 @@ timestamps, safe to assert against byte-for-byte; used by this package's own
 tests, by other workstreams, and by `scripts/demo.mjs`.
 
 ```ts
-import { sampleTraceEvents, sampleFlowIds, buildSampleFlows } from '@atriarch/tracery-core/fixtures';
+import { sampleTraceEvents, sampleFlowIds, buildSampleFlows } from '@atriarch-systems/tracery-core/fixtures';
 
 const flows = buildSampleFlows();          // ReadonlyMap<string, Flow>, 3 flows
 flows.get(sampleFlowIds.research2).status; // 'error'

@@ -81,7 +81,7 @@ One script, `hooks/emit.mjs`, is registered for twelve hook events in
 `map.mjs` has no I/O and imports nothing but `node:path`; `emit.mjs` imports
 only `node:*` builtins plus `map.mjs`. Neither imports from `packages/*` at
 runtime -- only the plugin's own tests do, to validate emitted events against
-`@atriarch/tracery-core`.
+`@atriarch-systems/tracery-core`.
 
 ## Event mapping
 

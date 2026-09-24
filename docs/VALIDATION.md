@@ -145,9 +145,9 @@ curl -s http://127.0.0.1:8971/ui/ | grep -o '<title>[^<]*'
 
 Observe: `<title>Tracery`. If instead you see a page mentioning "UI not
 built," the hosted UI (`apps/hub/web`) was never built — run `npm run build
--w @atriarch/tracery-hub-web` (needs `@atriarch/tracery-core`,
-`@atriarch/tracery-client`, `@atriarch/tracery-react`,
-`@atriarch/tracery-visualizer` already built first, or just `npm run build`
+-w @atriarch-systems/tracery-hub-web` (needs `@atriarch-systems/tracery-core`,
+`@atriarch-systems/tracery-client`, `@atriarch-systems/tracery-react`,
+`@atriarch-systems/tracery-visualizer` already built first, or just `npm run build`
 from the repo root) and retry.
 
 **2.1 no-env hub + /v1/info + /ui/: PASS / FAIL** ______

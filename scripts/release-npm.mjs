@@ -6,7 +6,7 @@ import path from 'node:path';
 
 const directory = path.resolve(process.argv[2] ?? 'artifacts/npm');
 const packages = JSON.parse(readFileSync(path.join(directory, 'packages.json'), 'utf8'));
-const expected = ['core', 'visualizer', 'client', 'react', 'hub'].map(name => `@atriarch/tracery-${name}`);
+const expected = ['core', 'visualizer', 'client', 'react', 'hub'].map(name => `@atriarch-systems/tracery-${name}`);
 if (JSON.stringify(packages.map(pkg => pkg.name)) !== JSON.stringify(expected)) throw new Error('Unexpected package set/order');
 for (const pkg of packages) {
   if (!/^[a-z0-9.-]+\.tgz$/.test(pkg.filename)) throw new Error('Invalid tarball filename');

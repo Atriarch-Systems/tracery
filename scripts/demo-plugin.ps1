@@ -12,7 +12,7 @@ Env overrides: TRACERY_HUB_URL, TRACERY_API_KEY, TRACERY_WORKSPACE
 
 TRACERY_API_KEY defaults to the demo hub's fixed key (tdk_a7f3c9e2b1d4). Task
 ("local mode"): to target a local-mode hub instead (one started with
-`npx @atriarch/tracery-hub` and no TRACERY_API_KEYS -- auth off), set it to
+`npx @atriarch-systems/tracery-hub` and no TRACERY_API_KEYS -- auth off), set it to
 an explicitly empty string: `$env:TRACERY_API_KEY = ''` before running this.
 #>
 $ErrorActionPreference = 'Stop'

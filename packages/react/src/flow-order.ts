@@ -2,7 +2,7 @@
  * Pure flow-picker ordering (SPEC.md §4 "flow picker (latest N flows, active
  * ones first, 'follow latest' default)"). No React, no I/O.
  */
-import type { Flow } from '@atriarch/tracery-core';
+import type { Flow } from '@atriarch-systems/tracery-core';
 
 /** Active flows (status `running`) first, then newest-started first. Stable on id as a final tiebreak. */
 export function orderFlows(flows: ReadonlyMap<string, Flow>): Flow[] {
