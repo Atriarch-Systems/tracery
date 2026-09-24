@@ -180,12 +180,12 @@ jobs:
           path: artifacts
       - name: Verify all artifacts and required publication settings
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPMJS_TOKEN }}
           DOCKER_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
           DOCKER_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
         run: |
           set -euo pipefail
-          test -n "$NODE_AUTH_TOKEN" || { echo 'Missing NPM_TOKEN'; exit 1; }
+          test -n "$NODE_AUTH_TOKEN" || { echo 'Missing NPMJS_TOKEN'; exit 1; }
           test -n "$DOCKER_USERNAME" || { echo 'Missing DOCKERHUB_USERNAME'; exit 1; }
           test -n "$DOCKER_TOKEN" || { echo 'Missing DOCKERHUB_TOKEN'; exit 1; }
           [[ "$DOCKERHUB_IMAGE" =~ ^[a-z0-9][a-z0-9_-]*/[a-z0-9][a-z0-9._-]*$ ]] || { echo 'Set DOCKERHUB_IMAGE to namespace/repository'; exit 1; }
@@ -221,7 +221,7 @@ jobs:
       - name: Publish tested npm tarballs in dependency order
         run: node scripts/release-npm.mjs artifacts/npm
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPMJS_TOKEN }}
       - name: Publish tested architecture images and multi-platform tags
         run: node scripts/release-docker-publish.mjs
       - name: Publish GitHub release and evidence

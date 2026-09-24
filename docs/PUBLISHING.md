@@ -13,7 +13,7 @@ restricted to `Atriarch-Systems/tracery`:
 
 | Secret | Value to obtain |
 | --- | --- |
-| `NPM_TOKEN` | An npm granular access token with read/write permission to the `@atriarch` scope and **Bypass 2FA** enabled for non-interactive publishing. The token's owner must have publication rights to that scope. Use the shortest practical expiration and rotate it. |
+| `NPMJS_TOKEN` | An npmjs.com granular access token with read/write permission to the `@atriarch` scope and **Bypass 2FA** enabled for non-interactive publishing. The token's owner must have publication rights to that scope. Use the shortest practical expiration and rotate it. |
 | `DOCKERHUB_USERNAME` | The Docker ID of the account that owns the access token and can push to the target repository; this can differ from the organization namespace. |
 | `DOCKERHUB_TOKEN` | That Docker account's access token with read/write access to the target repository. Delete permission is unnecessary. |
 

@@ -14,6 +14,8 @@
 - Remove unused npm/Corepack/Yarn from the runtime image and pin upstream images.
 - Reject unreviewed final-artifact licenses, secrets and high/critical
   vulnerability findings before publication.
+- Release workflow reads the npmjs.com token from NPMJS_TOKEN (was NPM_TOKEN) so
+  it cannot be confused with the internal Nexus registry's credentials.
 - Prepare core/client/React/hub 0.1.1 and visualizer 0.3.1. Python remains 0.1.0.
 
 - Make the client flush-concurrency regression deterministic: control timer ticks
