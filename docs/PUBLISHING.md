@@ -140,8 +140,51 @@ GitHub release assets include npm tarballs, source/report evidence and separatel
 named `container-amd64-*` and `container-arm64-*` source archives, inventories and
 reports. Saved image archives remain in Actions and are distributed through Docker
 Hub. `SHA256SUMS` records the original artifact paths, including those image archives.
-The workflow does not publish Python/PyPI, GHCR, private enterprise images, or
-deploy the hosted website.
+The workflow does not publish Python/PyPI (see "PyPI (manual)" below), GHCR,
+private enterprise images, or deploy the hosted website.
+
+## PyPI (manual)
+
+The release workflow never uploads to PyPI. The Python client is published by
+hand from a maintainer's machine, after the npm/Docker release or independently
+of it. It lives in `clients/python`, with distribution name `atriarch-tracery`,
+import name `atriarch.tracery`, and its version in
+`clients/python/pyproject.toml` — currently `0.1.0`, intentionally independent
+of the npm packages' `0.1.1`.
+
+One-time account setup:
+
+- A PyPI account with 2FA enabled; PyPI requires it for project maintainers.
+- An API token. It must be **account-scoped for the first upload**, because
+  project-scoped tokens can only be created for projects that already exist.
+  After the first successful upload, create a project-scoped token for
+  `atriarch-tracery` and delete the account-scoped one.
+- Tooling: `python -m pip install build twine`.
+
+Before uploading, run `npm run publish:check:python`. It builds the wheel,
+installs it into a fresh virtual environment and imports it
+(`scripts/publish-check-python.mjs`). The name `atriarch-tracery` is unclaimed
+until the first upload claims it. PyPI never allows re-uploading a version
+number, not even one that has been yanked, so bump
+`clients/python/pyproject.toml` deliberately before uploading.
+
+From the repository root:
+
+```bash
+python -m build clients/python
+python -m twine check clients/python/dist/*
+python -m twine upload clients/python/dist/*
+```
+
+`twine upload` prompts for a username and password: use `__token__` as the
+username and the full `pypi-...` token as the password. Non-interactively, set
+`TWINE_USERNAME=__token__` and `TWINE_PASSWORD` to the token instead.
+
+After the first upload succeeds, change the Python install line in
+[README.md](../README.md) from the checkout form
+(`python -m pip install ./clients/python`) to `pip install atriarch-tracery`,
+and make the same change in `clients/python/README.md`. That is a follow-up to
+the first upload, not a preparation step.
 
 ## Retries and partial publication
 
