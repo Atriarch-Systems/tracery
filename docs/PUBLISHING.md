@@ -13,7 +13,7 @@ restricted to `Atriarch-Systems/tracery`:
 
 | Secret | Value to obtain |
 | --- | --- |
-| `NPMJS_TOKEN` | An npmjs.com granular access token with read/write permission to the `@atriarch` scope and **Bypass 2FA** enabled for non-interactive publishing. The token's owner must have publication rights to that scope. Use the shortest practical expiration and rotate it. |
+| `NPMJS_TOKEN` | An npmjs.com granular access token with read/write permission to the `@atriarch` scope and **Bypass 2FA** enabled for non-interactive publishing (see "Trusted Publishing: not available" below for why Bypass 2FA is required here). The token's owner must have publication rights to that scope. Use the shortest practical expiration and rotate it. |
 | `DOCKERHUB_USERNAME` | The Docker ID of the account that owns the access token and can push to the target repository; this can differ from the organization namespace. |
 | `DOCKERHUB_TOKEN` | That Docker account's access token with read/write access to the target repository. Delete permission is unnecessary. |
 
@@ -40,6 +40,30 @@ self-hosted runners**, so this workflow uses a granular token. See the official
 [npm trusted-publishing requirements](https://docs.npmjs.com/trusted-publishers/),
 [npm token setup](https://docs.npmjs.com/creating-and-viewing-access-tokens/), and
 [Docker access-token setup](https://docs.docker.com/security/access-tokens/).
+
+### Trusted Publishing: not available, same reason
+
+npm's Trusted Publishing — the CI job logging in over OIDC instead of presenting a
+stored token — is what npmjs.com points you to when you create a granular token
+with **Bypass 2FA** enabled, and it is the warning shown on the token creation
+page. Per the [trusted-publishing requirements](https://docs.npmjs.com/trusted-publishers/)
+it needs GitHub-hosted runners: "self-hosted runners are not currently supported
+but are planned for future releases." This org's release workflow therefore cannot
+use it, the `NPMJS_TOKEN` granular token with Bypass 2FA is the intended mechanism,
+and that warning is expected. Keep the token's blast radius small:
+
+- Scope it to the `@atriarch` scope only, never "all packages". After the first
+  publish, narrow it again to the five published packages; npm allows
+  package-level restriction only once the packages exist.
+- Set expiration to 30–90 days and rotate on schedule.
+- Store it only as the `Atriarch-Systems` organization Actions secret
+  `NPMJS_TOKEN`, with repository access limited to `tracery`.
+- The workflow reads it only in the publication job, after every artifact
+  checksum and the `npm whoami` check.
+
+Revisit this if the org ever adds a GitHub-hosted runner reserved for the
+publication job: that would enable both Trusted Publishing and provenance
+attestations.
 
 ## Release from the GitHub UI
 
