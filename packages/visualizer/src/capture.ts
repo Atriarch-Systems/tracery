@@ -1,7 +1,7 @@
 /**
  * `ActivityGraph.toImage` (docs/SHARING.md "Image export"): renders the
  * live canvas at its current view onto an offscreen canvas, scaled up, with
- * an optional small "Tracery" mark in the accent colour. The actual pixel
+ * an optional small "Tracery Graph" mark in the accent colour. The actual pixel
  * work (`renderCapture`) is a pure function over a minimal canvas-like
  * interface so it is unit-testable in plain Node with a fake canvas/context
  * -- no real rendering, no DOM -- while `ActivityGraph.tsx` supplies the
@@ -38,11 +38,11 @@ export interface CaptureOptions {
   readonly scale?: number;
   /** Painted behind the captured frame before `drawImage`, since the live canvas itself is transparent (`ActivityGraph`'s `backgroundColor="rgba(0,0,0,0)"`). Omit for a transparent PNG. */
   readonly background?: string;
-  /** Draws the small "Tracery" mark in the bottom-right corner, in the accent colour. Default true. */
+  /** Draws the small "Tracery Graph" mark in the bottom-right corner, in the accent colour. Default true. */
   readonly mark?: boolean;
 }
 
-export const TRACERY_MARK_TEXT = 'Tracery';
+export const TRACERY_MARK_TEXT = 'Tracery Graph';
 /** `--tracery-accent`'s default (packages/react/src/style.ts's `DEFAULTS.accent`) -- kept as a plain literal here since this package has no dependency on `@atriarch-systems/tracery-react`. */
 export const TRACERY_MARK_COLOR = '#7c9cff';
 const MARK_MARGIN_PX = 10;

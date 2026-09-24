@@ -5,13 +5,13 @@ basis for distribution; it is not a legal opinion or a guarantee of ownership.
 
 ## Application and commercial use
 
-Tracery's original code is Apache-2.0. The locked JavaScript application
+Tracery Graph's original code is Apache-2.0. The locked JavaScript application
 dependencies reviewed here have permissive licenses; no GPL, LGPL, AGPL or SSPL
 application dependency was found. Keep the package license gate and browser
 notice generation enabled. Atriarch's ownership confirmation covers the original
 visualizer code, not the separately licensed packages it uses.
 
-Nothing identified in this review requires the independent Tracery application
+Nothing identified in this review requires the independent Tracery Graph application
 or private managed-service implementation to be relicensed under the GPL.
 Commercial hosting and distribution still require respecting third-party
 notices and any applicable source obligations. This review covers the public
@@ -52,7 +52,7 @@ They do still have their own redistribution obligations.
 
 The [GCC Runtime Library Exception](https://www.gnu.org/licenses/gcc-exception-3.1.html)
 permits qualifying independent programs to use the runtime under their own
-licenses. Tracery copies the official, unmodified Node runtime and dynamically
+licenses. Tracery Graph copies the official, unmodified Node runtime and dynamically
 linked Alpine runtime libraries; it does not modify GCC or use proprietary GCC
 compiler plugins. Including the library sources avoids relying on that exception
 as a reason to omit the libraries' own source material.

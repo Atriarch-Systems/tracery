@@ -60,7 +60,7 @@ export function App() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', fontFamily: 'system-ui, sans-serif', color: '#e7e9f2' }}>
       <header style={{ padding: '10px 16px', borderBottom: '1px solid #262a3a', background: '#181b26' }}>
-        <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Tracery event generator</div>
+        <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Tracery Graph event generator</div>
         <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12 }}>
           <label style={labelStyle}>
             Sample flow
@@ -107,7 +107,7 @@ export function App() {
       </header>
 
       <div style={{ flex: '1 1 auto', minHeight: 0 }}>
-        <ActivityExplorer source={source} ariaLabel="Tracery event generator explorer" />
+        <ActivityExplorer source={source} ariaLabel="Tracery Graph event generator explorer" />
       </div>
     </div>
   );

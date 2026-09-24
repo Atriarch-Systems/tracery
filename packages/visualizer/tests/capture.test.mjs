@@ -69,10 +69,11 @@ test('a `background` fills the output before the source is drawn; omitting it dr
   assert.equal(noBg.calls.filter((c) => c[0] === 'fillRect').length, 0);
 });
 
-test('mark defaults to on: draws "Tracery" bottom-right in the accent colour', () => {
+test('mark defaults to on: draws "Tracery Graph" bottom-right in the accent colour', () => {
   const canvas = renderCapture({ width: 200, height: 100 }, createFakeCanvas([]));
   const fillTextCalls = canvas.calls.filter((c) => c[0] === 'fillText');
   assert.equal(fillTextCalls.length, 1);
+  assert.equal(TRACERY_MARK_TEXT, 'Tracery Graph');
   assert.equal(fillTextCalls[0][1], TRACERY_MARK_TEXT);
   const [, , x, y] = fillTextCalls[0];
   assert.ok(x < canvas.width && x > canvas.width * 0.5, 'expected the mark near the right edge');

@@ -1,13 +1,13 @@
-# Contributing to Tracery
+# Contributing to Tracery Graph
 
-Tracery turns agent activity into live, inspectable graphs. Bug reports,
+Tracery Graph turns agent activity into live, inspectable graphs. Bug reports,
 documentation improvements, examples, tests, and focused code changes are welcome.
 You can work on the library, SDKs, plugin, or self-hosted hub without access to
 Tracery Cloud or any private infrastructure.
 
 ## Before you start
 
-Search the [issues](https://github.com/Atriarch-Systems/tracery/issues) for related
+Search the [issues](https://github.com/Atriarch-Systems/tracery-graph/issues) for related
 work. For a substantial feature or a public API change, open an issue describing
 the problem and proposed behavior before implementing it. Small fixes can go
 straight to a pull request.
@@ -127,7 +127,7 @@ Discuss changes respectfully and focus feedback on the code and the problem.
 
 ## Licensing and attribution
 
-Tracery's original code is licensed under [Apache-2.0](LICENSE). Unless explicitly
+Tracery Graph's original code is licensed under [Apache-2.0](LICENSE). Unless explicitly
 stated otherwise, contributions intentionally submitted for inclusion are under
 that license, as described in its Section 5. Only contribute work you have the
 right to submit, including any necessary employer authorization.
@@ -141,7 +141,7 @@ See [licensing and redistribution](docs/LICENSING.md).
 
 ## Reporting a security issue
 
-Use [GitHub's private vulnerability reporting form](https://github.com/Atriarch-Systems/tracery/security/advisories/new).
+Use [GitHub's private vulnerability reporting form](https://github.com/Atriarch-Systems/tracery-graph/security/advisories/new).
 See [SECURITY.md](SECURITY.md). Do not put exploit details or private traces in public issues.
 
 Fork PR jobs are skipped on the shared self-hosted runners. A maintainer reviews

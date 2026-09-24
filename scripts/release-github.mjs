@@ -20,7 +20,7 @@ export async function ensureReleaseTag(api, tag, sha) {
   if (!/^v0\.\d+\.\d+$/.test(tag ?? '') || !/^[0-9a-f]{40}$/.test(sha ?? '')) throw Error('Invalid release tag or commit');
   let ref = await api(`/git/ref/tags/${tag}`, { missing: true });
   if (!ref) {
-    const annotated = await api('/git/tags', { method: 'POST', body: { tag, message: `Tracery ${tag}`, object: sha, type: 'commit' } });
+    const annotated = await api('/git/tags', { method: 'POST', body: { tag, message: `Tracery Graph ${tag}`, object: sha, type: 'commit' } });
     ref = await api('/git/refs', { method: 'POST', body: { ref: `refs/tags/${tag}`, sha: annotated.sha } });
   }
   let object = ref.object;
@@ -30,7 +30,7 @@ export async function ensureReleaseTag(api, tag, sha) {
 export async function ensureDraftRelease(api, tag, sha) {
   await ensureReleaseTag(api, tag, sha);
   return await api(`/releases/tags/${tag}`, { missing: true }) ?? await api('/releases', {
-    method: 'POST', body: { tag_name: tag, target_commitish: sha, name: `Tracery ${tag}`, generate_release_notes: true, draft: true },
+    method: 'POST', body: { tag_name: tag, target_commitish: sha, name: `Tracery Graph ${tag}`, generate_release_notes: true, draft: true },
   });
 }
 export function releaseFiles(directory = 'artifacts') {

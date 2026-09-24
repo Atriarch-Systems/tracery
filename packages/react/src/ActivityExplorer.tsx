@@ -44,7 +44,7 @@ export interface ActivityExplorerProps {
    * access or a picker over data the viewer was never given (there is no
    * write action in this component today, but a host page uses this to
    * decide whether to show its own "Share"/"Delete" affordances too) and
-   * renders a small "Shared from Tracery · Open in Tracery" footer line.
+   * renders a small "Shared from Tracery Graph · Open in Tracery Graph" footer line.
    */
   readonly readOnly?: boolean;
   /**
@@ -80,7 +80,7 @@ export interface ActivityExplorerProps {
 }
 
 const SCOPE_MODES: readonly ScopeMode[] = ['flow', 'ancestors', 'trace'];
-const TRACERY_HOMEPAGE = 'https://github.com/atriarch-systems/tracery';
+const TRACERY_HOMEPAGE = 'https://github.com/Atriarch-Systems/tracery-graph';
 
 function scopeModesFor(lockedTarget: LockedTarget | undefined): readonly ScopeMode[] {
   if (!lockedTarget) return SCOPE_MODES;
@@ -254,7 +254,7 @@ export function ActivityExplorer(props: ActivityExplorerProps) {
       // `document.body` on first load never reached this handler otherwise).
       tabIndex={0}
       role="group"
-      aria-label={ariaLabel ?? 'Tracery activity explorer'}
+      aria-label={ariaLabel ?? 'Tracery Graph activity explorer'}
       onKeyDown={(event) => {
         if (!isScopeShortcutTarget(event.target as { tagName?: string; isContentEditable?: boolean }, event.ctrlKey || event.metaKey || event.altKey)) return;
         const next = scopeModeForKey(event.key);
@@ -416,9 +416,9 @@ export function ActivityExplorer(props: ActivityExplorerProps) {
             textAlign: 'center',
           }}
         >
-          Shared from Tracery ·{' '}
+          Shared from Tracery Graph ·{' '}
           <a href={TRACERY_HOMEPAGE} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--tracery-accent, #7c9cff)' }}>
-            Open in Tracery
+            Open in Tracery Graph
           </a>
         </div>
       )}

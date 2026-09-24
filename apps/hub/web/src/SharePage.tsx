@@ -69,7 +69,7 @@ export function SharePage({ token }: { readonly token: string }) {
           fontSize: 13,
         }}
       >
-        <strong>Tracery</strong>
+        <strong>Tracery Graph</strong>
         <span data-testid="share-label">{source.label ?? 'Shared view'}</span>
         <span data-testid="share-mode" style={{ color: '#8892a6' }}>
           {source.mode ?? '…'}
@@ -87,7 +87,7 @@ export function SharePage({ token }: { readonly token: string }) {
       </header>
       <div style={{ flex: '1 1 auto', minHeight: 0 }}>
         <ExplorerErrorBoundary>
-          <ActivityExplorer source={source} readOnly lockedTarget={lockedTarget} ariaLabel="Shared Tracery view" />
+          <ActivityExplorer source={source} readOnly lockedTarget={lockedTarget} ariaLabel="Shared Tracery Graph view" />
         </ExplorerErrorBoundary>
       </div>
       <Footer />

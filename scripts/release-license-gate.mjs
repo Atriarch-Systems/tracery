@@ -4,7 +4,7 @@ import { pathToFileURL } from 'node:url';
 
 const permissive = new Set(['MIT', 'ISC', 'Apache-2.0', 'BSD-2-Clause', 'BSD-3-Clause', '0BSD', 'Unlicense', 'MS-PL', 'Zlib', 'BlueOak-1.0.0', 'CC0-1.0']);
 // These are findings in Node's single, preserved upstream notice file. Autoconf
-// output exceptions do not make the independent Node/Tracery application GPL.
+// output exceptions do not make the independent Node/Tracery Graph application GPL.
 const nodeNotices = new Set(['GPL-2.0-with-autoconf-exception', 'GPL-3.0-with-autoconf-exception', 'Artistic-2.0', 'ICU', 'LicenseRef-C-Ares', 'NAIST-2003', 'Unicode-3.0', 'Unicode-DFS-2016', 'BSD-2-Clause-FreeBSD']);
 const canonical = packages => JSON.stringify(packages.map(p => ({ name: p.name, version: p.version, license: p.license, origin: p.origin, aportsCommit: p.aportsCommit })).sort((a, b) => a.name.localeCompare(b.name)));
 

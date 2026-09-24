@@ -1,4 +1,4 @@
-# Tracery Hub (SPEC.md §6 "Packaging"). Build from the REPO ROOT:
+# Tracery Graph Hub (SPEC.md §6 "Packaging"). Build from the REPO ROOT:
 #
 #   docker build -f apps/hub/Dockerfile -t atriarchsystems/tracery-hub:dev .
 #

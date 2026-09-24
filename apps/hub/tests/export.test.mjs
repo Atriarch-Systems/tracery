@@ -41,7 +41,7 @@ function makeUiDirWithViewer() {
   const dir = makeUiDir();
   fs.writeFileSync(
     path.join(dir, 'viewer.html'),
-    '<!doctype html><html><head><title>Tracery viewer</title></head><body><div id="root"></div>' +
+    '<!doctype html><html><head><title>Tracery Graph viewer</title></head><body><div id="root"></div>' +
       '<script id="tracery-data" type="application/json">{"meta":null,"events":[]}</script>' +
       '<script type="module">/* inlined app */</script></body></html>',
   );

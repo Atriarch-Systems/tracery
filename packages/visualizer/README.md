@@ -192,4 +192,4 @@ notices when distributing them. These acknowledgments do not replace their licen
 
 ## Support
 
-☕ Tracery is free and open source. If it saves you time, [buy me a coffee](https://ko-fi.com/demonslyr).
+☕ Tracery Graph is free and open source. If it saves you time, [buy me a coffee](https://ko-fi.com/demonslyr).

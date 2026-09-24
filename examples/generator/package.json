@@ -4,7 +4,7 @@
   "private": true,
   "license": "Apache-2.0",
   "type": "module",
-  "description": "Tracery event generator: pick a sample flow, watch it draw itself in-process, or send the same events to a running hub.",
+  "description": "Tracery Graph event generator: pick a sample flow, watch it draw itself in-process, or send the same events to a running hub.",
   "scripts": {
     "dev": "vite",
     "build": "tsc -p tsconfig.json --noEmit && vite build",

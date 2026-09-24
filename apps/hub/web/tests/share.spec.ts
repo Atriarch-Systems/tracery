@@ -183,8 +183,8 @@ test.describe('sharing', () => {
     await expect(viewerPage.getByTestId('header-connection-status')).toHaveCount(0);
     // No flow picker in share mode (docs/SHARING.md "no flow picker").
     await expect(viewerPage.getByTestId('flow-picker')).toHaveCount(0);
-    // The read-only footer names Tracery and links back to it.
-    await expect(viewerPage.getByTestId('share-footer')).toContainText('Shared from Tracery');
+    // The read-only footer names Tracery Graph and links back to it.
+    await expect(viewerPage.getByTestId('share-footer')).toContainText('Shared from Tracery Graph');
 
     // Select the node to open the inspector, which should show the redacted-context notice.
     const nodeItem = viewerPage.getByTestId('node-item').first();
@@ -229,7 +229,7 @@ test.describe('sharing', () => {
       expect(nodeList).not.toBeNull();
 
       // Both footers stacked at the bottom of the page: the explorer's own
-      // read-only "Shared from Tracery" line, and the hub's static footer.
+      // read-only "Shared from Tracery Graph" line, and the hub's static footer.
       const footers = page.locator('[data-testid="share-footer"], [data-testid="hub-footer"]');
       const footerCount = await footers.count();
       expect(footerCount).toBeGreaterThan(0);

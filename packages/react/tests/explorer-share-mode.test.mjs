@@ -1,5 +1,5 @@
 // ActivityExplorer's share mode (docs/SHARING.md): readOnly renders the
-// "Shared from Tracery · Open in Tracery" footer; lockedTarget hides the
+// "Shared from Tracery Graph · Open in Tracery Graph" footer; lockedTarget hides the
 // flow picker and restricts the scope switch to what the target's data can
 // answer. Server-rendered (react-dom/server), same style as
 // explorer-ssr.test.mjs, using a plain journal source seeded with the shared
@@ -24,12 +24,12 @@ function renderShare(extraProps) {
   return renderToString(createElement(Harness));
 }
 
-test('readOnly renders the "Shared from Tracery" footer linking to the Tracery repo', () => {
+test('readOnly renders the "Shared from Tracery Graph" footer linking to the Tracery Graph repo', () => {
   const markup = renderShare({});
   assert.match(markup, /share-footer/);
-  assert.match(markup, /Shared from Tracery/);
-  assert.match(markup, /Open in Tracery/);
-  assert.match(markup, /href="https:\/\/github\.com\/atriarch-systems\/tracery"/);
+  assert.match(markup, /Shared from Tracery Graph/);
+  assert.match(markup, /Open in Tracery Graph/);
+  assert.match(markup, /href="https:\/\/github\.com\/Atriarch-Systems\/tracery-graph"/);
 });
 
 test('without readOnly, no share footer is rendered', () => {

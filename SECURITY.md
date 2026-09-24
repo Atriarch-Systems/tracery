@@ -1,6 +1,6 @@
 # Security policy
 
-Report vulnerabilities privately through [GitHub's Report a vulnerability form](https://github.com/Atriarch-Systems/tracery/security/advisories/new).
+Report vulnerabilities privately through [GitHub's Report a vulnerability form](https://github.com/Atriarch-Systems/tracery-graph/security/advisories/new).
 Do not include credentials, private traces, or exploit details in public issues.
 Include the revision/version, deployment mode, reproduction, and expected impact.
 There is no guaranteed response time. The latest 0.x source release is the supported baseline;

@@ -1,4 +1,4 @@
-# Claude Code hooks: reference for the Tracery plugin
+# Claude Code hooks: reference for the Tracery Graph plugin
 
 Researched 2026-09-16 against the official docs (sources at the end). Facts the
 docs state are given plainly; where the docs are silent it says "Not documented".
@@ -136,7 +136,7 @@ Quote `${CLAUDE_PLUGIN_ROOT}` because install paths may contain spaces.
 
 ```json
 "userConfig": {
-  "hub_url": { "type": "string", "title": "Tracery hub URL", "required": true },
+  "hub_url": { "type": "string", "title": "Tracery Graph hub URL", "required": true },
   "api_key": { "type": "string", "title": "Ingest API key", "sensitive": true, "required": true },
   "workspace": { "type": "string", "title": "Workspace", "default": "default" }
 }

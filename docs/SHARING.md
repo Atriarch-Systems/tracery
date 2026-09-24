@@ -1,9 +1,9 @@
 # Sharing
 
 Sharing is the viral loop: a link (or a downloadable image, or a
-standalone `.html` file) that lets someone with no Tracery account and no
+standalone `.html` file) that lets someone with no Tracery Graph account and no
 API key look at one flow or trace. Every surface a share reaches carries a
-small "Tracery" mark and an "Open in Tracery" line — enough to be
+small "Tracery Graph" mark and an "Open in Tracery Graph" line — enough to be
 recognizable, not enough to be obnoxious.
 
 Three ways to hand someone a view of your graph, in increasing order of
@@ -150,7 +150,7 @@ image": `ActivityGraphHandle.toImage({ scale?, background?, mark? })`
 (`@atriarch-systems/tracery-visualizer`) fits the current view, waits a frame, and
 renders the live canvas onto an offscreen one at `scale` (default 2×)
 resolution, optionally over a solid `background` (the graph canvas itself
-is transparent) and with a small "Tracery" mark in the accent color drawn
+is transparent) and with a small "Tracery Graph" mark in the accent color drawn
 in the bottom-right corner (`mark`, default on). The result is a plain
 PNG `Blob` — the web UI turns it into a downloaded file with no server
 round-trip at all. Creating a share also renders and uploads one of these
@@ -190,8 +190,8 @@ The export 404s with a clear `viewer_not_built` message if
   `ActivitySource` (plus `target`, `mode`, `label`, `includeContext`,
   `notFound`) driven by `ShareClient` — one fetch for a snapshot share, a
   live WebSocket (falling back to polling) for a live one.
-  `ActivityExplorer` gains `readOnly` (renders the "Shared from Tracery ·
-  Open in Tracery" footer) and `lockedTarget` (hides the flow picker
+  `ActivityExplorer` gains `readOnly` (renders the "Shared from Tracery Graph ·
+  Open in Tracery Graph" footer) and `lockedTarget` (hides the flow picker
   sidebar — there is nothing else to pick, `useShareSource` only ever
   loads the one target's data — and limits the scope switch to what that
   target's data can actually answer: just "This flow" for a flow-target

@@ -1,6 +1,6 @@
 # @atriarch-systems/tracery-client
 
-TypeScript emitter SDK for [Tracery](../../docs/SPEC.md): batches
+TypeScript emitter SDK for [Tracery Graph](../../docs/SPEC.md): batches
 `start`/`update`/`end`/`annotate` events for a flow and its ops, ships them to
 a hub (or straight into an in-process `Journal`), and reads them back through
 a small hub client. See `docs/SPEC.md` §5 for the full contract this

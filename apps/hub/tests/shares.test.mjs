@@ -447,6 +447,7 @@ test('share page: injects OG tags for a valid share and 404s (HTML) for an unkno
     assert.equal(page.statusCode, 200);
     assert.match(page.body, /og:title/);
     assert.match(page.body, /Alpha run/);
+    assert.match(page.body, /og:title" content="Tracery Graph: Alpha run"/);
     assert.match(page.body, /twitter:card.*summary_large_image/);
     assert.match(page.body, new RegExp(`og:url" content="[^"]*${share.token}`));
 

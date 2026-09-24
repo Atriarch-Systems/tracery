@@ -178,7 +178,7 @@ export async function createServer(config: Config, extensions?: HubExtensions): 
   await app.register(swaggerPlugin, {
     openapi: {
       openapi: '3.1.0',
-      info: { title: 'Tracery Hub', version: hubVersion(), description: 'SPEC.md §6 HTTP API.' },
+      info: { title: 'Tracery Graph Hub', version: hubVersion(), description: 'SPEC.md §6 HTTP API.' },
     },
   });
 

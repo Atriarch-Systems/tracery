@@ -13,9 +13,9 @@ import type { HubContext } from '../server-context.js';
 
 function placeholderHtml(): string {
   return `<!doctype html>
-<html><head><meta charset="utf-8"><title>Tracery Hub</title></head>
+<html><head><meta charset="utf-8"><title>Tracery Graph Hub</title></head>
 <body style="font-family: system-ui, sans-serif; max-width: 40rem; margin: 4rem auto; padding: 0 1rem;">
-<h1>Tracery Hub</h1>
+<h1>Tracery Graph Hub</h1>
 <p>The hosted UI is not built. Build <code>apps/hub/web</code> and set
 <code>TRACERY_UI_DIR</code> (or leave it at the default <code>web/dist</code>)
 to serve it here.</p>

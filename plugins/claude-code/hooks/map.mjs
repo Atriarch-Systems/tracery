@@ -1,4 +1,4 @@
-// Pure mapping from a Claude Code hook payload to Tracery events.
+// Pure mapping from a Claude Code hook payload to Tracery Graph events.
 //
 // No I/O, no node: imports beyond node:path (for a display label). Every event
 // this produces must validate against @atriarch-systems/tracery-core's validateEvent

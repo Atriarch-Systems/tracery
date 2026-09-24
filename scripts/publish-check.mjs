@@ -332,12 +332,12 @@ async function main() {
   try {
     const uiRes = await fetch(`${hubUrl}/ui/`);
     const uiText = await uiRes.text();
-    uiOk = uiRes.ok && uiText.includes('Tracery');
+    uiOk = uiRes.ok && uiText.includes('Tracery Graph');
     uiDetail = uiOk ? '' : uiText.slice(0, 200);
   } catch (err) {
     uiDetail = err.message;
   }
-  check('GET /ui/ serves the real hosted UI (contains "Tracery")', uiOk, uiDetail);
+  check('GET /ui/ serves the real hosted UI (contains "Tracery Graph")', uiOk, uiDetail);
 
   // -------------------------------------------------------------------------
   // 3c. demo.mjs-equivalent against the hub, installed packages only

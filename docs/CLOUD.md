@@ -1,6 +1,6 @@
 # Tracery Cloud
 
-Tracery's original community code is Apache-2.0. Third-party code retains its
+Tracery Graph's original community code is Apache-2.0. Third-party code retains its
 own licenses; see [LICENSING.md](LICENSING.md). The source release has no paid
 feature gate and does not require purchasing hosting.
 

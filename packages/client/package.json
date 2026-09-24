@@ -2,14 +2,14 @@
   "name": "@atriarch-systems/tracery-client",
   "version": "0.1.1",
   "license": "Apache-2.0",
-  "description": "Tracery emitter SDK: ActivityTracer, transports and a hub read client.",
+  "description": "Tracery Graph emitter SDK: ActivityTracer, transports and a hub read client.",
   "type": "module",
   "engines": { "node": ">=22.13" },
   "files": ["dist", "README.md", "LICENSE", "NOTICE"],
   "funding": { "type": "ko-fi", "url": "https://ko-fi.com/demonslyr" },
-  "homepage": "https://github.com/atriarch-systems/tracery/tree/main/packages/client#readme",
-  "bugs": { "url": "https://github.com/atriarch-systems/tracery/issues" },
-  "repository": { "type": "git", "url": "https://github.com/atriarch-systems/tracery.git", "directory": "packages/client" },
+  "homepage": "https://github.com/Atriarch-Systems/tracery-graph/tree/main/packages/client#readme",
+  "bugs": { "url": "https://github.com/Atriarch-Systems/tracery-graph/issues" },
+  "repository": { "type": "git", "url": "https://github.com/Atriarch-Systems/tracery-graph.git", "directory": "packages/client" },
   "publishConfig": { "access": "public" },
   "exports": {
     ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" }

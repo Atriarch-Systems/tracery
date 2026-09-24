@@ -36,6 +36,6 @@ export async function sendToHub(hubUrl: string, apiKey: string, workspace: strin
     // blocked cross-origin request, so say so plainly rather than just
     // surfacing "TypeError: Failed to fetch".
     const message = err instanceof Error ? err.message : String(err);
-    return { ok: false, detail: `request failed (${message}) -- check the hub URL is reachable and the hub is running Tracery with CORS enabled (any hub built after this example was added has it; see apps/hub/README.md)` };
+    return { ok: false, detail: `request failed (${message}) -- check the hub URL is reachable and the hub is running Tracery Graph with CORS enabled (any hub built after this example was added has it; see apps/hub/README.md)` };
   }
 }

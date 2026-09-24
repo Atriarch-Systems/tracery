@@ -1,5 +1,5 @@
 /**
- * Tracery wire contract, version 1.
+ * Tracery Graph wire contract, version 1.
  *
  * This file is the source of truth for every producer (TS client, Python client,
  * Virali/Saga adapters), the hub server and the reducers. Changing a field here is

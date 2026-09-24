@@ -1,11 +1,11 @@
 ---
 name: activity
-description: Print the Tracery hub link for this session's live flow graph. Use when asked for the activity dashboard, the hub link, the trace/flow graph link, or where to watch this session.
+description: Print the Tracery Graph hub link for this session's live flow graph. Use when asked for the activity dashboard, the hub link, the trace/flow graph link, or where to watch this session.
 ---
 
 # activity
 
-Print the deep link to this session's flow in the Tracery hub.
+Print the deep link to this session's flow in the Tracery Graph hub.
 
 1. Find the current session id: prefer `$CLAUDE_SESSION_ID` if it is set;
    otherwise list `${CLAUDE_PLUGIN_DATA:-$TMPDIR/tracery}/state/`

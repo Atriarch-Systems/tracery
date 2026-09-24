@@ -56,7 +56,7 @@ Owns: `packages/client`, `clients/python`.
 Deliver: SPEC §5. TS: `ActivityTracer`, `Flow`, `Op`, transports, ULID,
 `HubClient`; tests with a local `node:http` fake hub asserting batching,
 retry/backoff, queue bound + drop counter, `spawnLink`, `durationMs`, flush on
-close. Python: `pyproject.toml` (`atriarch-tracery` 0.1.0, `requires-python >=3.11`,
+close. Python: `pyproject.toml` (`atriarch-tracery-graph` 0.1.0, `requires-python >=3.11`,
 `[project.optional-dependencies] dev = ["pytest"]`), `src/atriarch/activity/`,
 `tests/` with `http.server` fake hub; same assertions plus context managers,
 `contextvars` parent propagation, exception → `error` with class name only.

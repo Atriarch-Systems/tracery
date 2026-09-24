@@ -81,10 +81,10 @@ try {
   Write-Host "[demo-plugin] confirmed: GET /v1/flows/$SessionId -> 200"
   Write-Host $response.Content
 
-  # --- 4. print the deep link pattern the /tracery:activity skill produces ---
+  # --- 4. print the deep link pattern the /tracery-graph:activity skill produces ---
   Write-Host ""
   Write-Host "[demo-plugin] smoke-test flow's deep link: $HubUrl/ui/flows/$SessionId"
-  Write-Host "[demo-plugin] general pattern (what /tracery:activity prints for the running session):"
+  Write-Host "[demo-plugin] general pattern (what /tracery-graph:activity prints for the running session):"
   Write-Host "  $HubUrl/ui/flows/<session_id>"
 
   # --- 5. print the launch command for a new Claude Code session ------------

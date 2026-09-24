@@ -25,7 +25,7 @@ function escapeHtmlAttr(value: string): string {
 
 function shareNotFoundHtml(): string {
   return `<!doctype html>
-<html><head><meta charset="utf-8"><title>Share not found - Tracery</title></head>
+<html><head><meta charset="utf-8"><title>Share not found - Tracery Graph</title></head>
 <body style="font-family: system-ui, sans-serif; max-width: 40rem; margin: 4rem auto; padding: 0 1rem;">
 <h1>This share link isn't available</h1>
 <p>It may have been revoked, expired, or never existed.</p>
@@ -50,8 +50,8 @@ export function registerSharePageRoutes(app: FastifyInstance, ctx: HubContext): 
     const url = `${baseUrl}/s/${share.token}`;
     const imageUrl = share.preview !== null ? `${baseUrl}/v1/shares/${share.token}/preview.png` : `${baseUrl}${DEFAULT_PREVIEW_PATH}`;
     const label = await shareLabel(ctx, share);
-    const title = `Tracery: ${label}`;
-    const description = 'An agent activity graph shared from Tracery by Atriarch Systems.';
+    const title = `Tracery Graph: ${label}`;
+    const description = 'An agent activity graph shared from Tracery Graph by Atriarch Systems.';
 
     const metaTags = [
       `<meta property="og:title" content="${escapeHtmlAttr(title)}">`,

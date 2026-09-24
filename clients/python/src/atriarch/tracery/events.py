@@ -1,4 +1,4 @@
-"""Tracery wire contract, version 1 (Python mirror).
+"""Tracery Graph wire contract, version 1 (Python mirror).
 
 This module mirrors ``packages/core/src/contract.ts``, the source of truth
 for every producer (this client, the TypeScript client, the hub, the

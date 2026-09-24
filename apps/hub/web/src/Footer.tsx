@@ -2,10 +2,10 @@ import { useEffect, useState } from 'react';
 import { fetchHubInfo } from './info.js';
 
 const KO_FI_URL = 'https://ko-fi.com/demonslyr';
-// `atriarch-systems/tracery` is this repo's intended future GitHub
+// `Atriarch-Systems/tracery-graph` is this repo's intended future GitHub
 // location (see README.md "Quick start: Claude Code plugin"); update here
 // alongside that once it actually lives there.
-const DOCS_URL = 'https://github.com/atriarch-systems/tracery';
+const DOCS_URL = 'https://github.com/Atriarch-Systems/tracery-graph';
 
 /**
  * Static, non-dismissible footer for the hosted UI. Checks `GET /v1/info`
@@ -48,7 +48,7 @@ export function Footer() {
         fontSize: 11,
       }}
     >
-      <span>Tracery by Atriarch Systems</span>
+      <span>Tracery Graph by Atriarch Systems</span>
       {!licensed && (
         <a
           data-testid="hub-footer-kofi"

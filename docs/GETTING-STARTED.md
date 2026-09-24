@@ -17,8 +17,8 @@ managed service this guide doesn't need.
 ### Source checkout (Node.js >=22.13, no Docker or keys)
 
 ```sh
-git clone --branch v0.1.0 https://github.com/Atriarch-Systems/tracery.git
-cd tracery
+git clone --branch v0.1.0 https://github.com/Atriarch-Systems/tracery-graph.git
+cd tracery-graph
 npm ci
 npm run build
 node apps/hub/bin/hub.mjs
@@ -35,7 +35,7 @@ reach it.
 ### Build and run a local Docker image
 
 Clone the repository above first and run these commands at its root. No public
-Tracery image is available to pull yet; Docker builds it locally:
+Tracery Graph image is available to pull yet; Docker builds it locally:
 
 ```sh
 docker build -f apps/hub/Dockerfile -t atriarchsystems/tracery-hub:dev .   # from the repo root
@@ -163,7 +163,7 @@ parent's `llm:main` op to the subagent's root node. Full API:
 ### Python
 
 ```sh
-python -m pip install atriarch-tracery
+python -m pip install atriarch-tracery-graph
 ```
 
 ```python
@@ -247,8 +247,8 @@ node apps/hub/bin/hub.mjs
 TRACERY_HUB_URL=http://127.0.0.1:8971 claude --plugin-dir ./plugins/claude-code
 ```
 
-(or `/plugin install tracery@<marketplace>` once published to
-one). Configure it with environment variables or the prompts Claude Code
+(or, inside Claude Code, `/plugin marketplace add Atriarch-Systems/tracery-graph`
+then `/plugin install tracery-graph@atriarch-systems`). Configure it with environment variables or the prompts Claude Code
 shows when the plugin is enabled:
 
 | Env var | Required | Default |

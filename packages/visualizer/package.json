@@ -7,9 +7,9 @@
   "engines": { "node": ">=22.13" },
   "files": ["dist", "README.md", "LICENSE", "NOTICE"],
   "funding": { "type": "ko-fi", "url": "https://ko-fi.com/demonslyr" },
-  "homepage": "https://github.com/atriarch-systems/tracery/tree/main/packages/visualizer#readme",
-  "bugs": { "url": "https://github.com/atriarch-systems/tracery/issues" },
-  "repository": { "type": "git", "url": "https://github.com/atriarch-systems/tracery.git", "directory": "packages/visualizer" },
+  "homepage": "https://github.com/Atriarch-Systems/tracery-graph/tree/main/packages/visualizer#readme",
+  "bugs": { "url": "https://github.com/Atriarch-Systems/tracery-graph/issues" },
+  "repository": { "type": "git", "url": "https://github.com/Atriarch-Systems/tracery-graph.git", "directory": "packages/visualizer" },
   "publishConfig": { "access": "public" },
   "exports": {
     ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" },

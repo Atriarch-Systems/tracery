@@ -4,7 +4,7 @@
   "private": true,
   "license": "Apache-2.0",
   "type": "module",
-  "description": "Tracery library-mode example: Journal + a scripted synthetic agent, no hub, no network.",
+  "description": "Tracery Graph library-mode example: Journal + a scripted synthetic agent, no hub, no network.",
   "scripts": {
     "dev": "vite",
     "build": "tsc -p tsconfig.json --noEmit && vite build",

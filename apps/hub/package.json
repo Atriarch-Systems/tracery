@@ -2,7 +2,7 @@
   "name": "@atriarch-systems/tracery-hub",
   "version": "0.1.1",
   "license": "Apache-2.0",
-  "description": "Tracery standalone hub server: ingest, storage, retention, live feed and hosted UI.",
+  "description": "Tracery Graph standalone hub server: ingest, storage, retention, live feed and hosted UI.",
   "type": "module",
   "engines": {
     "node": ">=22.13"
@@ -11,13 +11,13 @@
     "type": "ko-fi",
     "url": "https://ko-fi.com/demonslyr"
   },
-  "homepage": "https://github.com/atriarch-systems/tracery/tree/main/apps/hub#readme",
+  "homepage": "https://github.com/Atriarch-Systems/tracery-graph/tree/main/apps/hub#readme",
   "bugs": {
-    "url": "https://github.com/atriarch-systems/tracery/issues"
+    "url": "https://github.com/Atriarch-Systems/tracery-graph/issues"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/atriarch-systems/tracery.git",
+    "url": "https://github.com/Atriarch-Systems/tracery-graph.git",
     "directory": "apps/hub"
   },
   "publishConfig": {

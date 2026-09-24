@@ -76,7 +76,7 @@ export interface ActivityGraphHandle {
    * export"): fits the graph, waits a frame, then captures the live canvas
    * onto an offscreen one at `options.scale` (default 2), optionally over an
    * `options.background` fill (the live canvas itself is transparent) and
-   * with a small "Tracery" mark in the accent colour (`options.mark`,
+   * with a small "Tracery Graph" mark in the accent colour (`options.mark`,
    * default `true`). Rejects if the renderer hasn't mounted a canvas yet
    * (nothing to capture) or the browser has no offscreen 2D canvas support.
    */

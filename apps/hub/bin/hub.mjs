@@ -86,13 +86,13 @@ const authNote =
   config.authMode === 'none'
     ? '(local mode, no auth; set TRACERY_API_KEYS or bind a non-loopback host to require keys)'
     : '(auth: TRACERY_API_KEYS configured)';
-created.app.log.info(`Tracery hub: ${address}  ${authNote}`);
+created.app.log.info(`Tracery Graph hub: ${address}  ${authNote}`);
 if (config.authWarning) {
   created.app.log.warn(config.authWarning);
 }
 created.app.log.info(`store: ${config.store}${config.store === 'sqlite' ? ` (${config.sqlitePath})` : ''}`);
 if (!(extensions?.isLicensed?.() ?? false)) {
-  created.app.log.info('Tracery is open source (Apache-2.0). Docs: https://github.com/atriarch-systems/tracery · Support: https://ko-fi.com/demonslyr');
+  created.app.log.info('Tracery Graph is open source (Apache-2.0). Docs: https://github.com/Atriarch-Systems/tracery-graph · Support: https://ko-fi.com/demonslyr');
 }
 
 const shutdown = async (signal) => {

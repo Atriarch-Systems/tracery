@@ -4,9 +4,9 @@
 > Follow the [source checkout/build instructions](../../README.md) first; run the
 > commands below from the repository root.
 
-Standalone server for Tracery (see [`../../docs/SPEC.md`](../../docs/SPEC.md)
+Standalone server for Tracery Graph (see [`../../docs/SPEC.md`](../../docs/SPEC.md)
 §6). Apps push events with a client SDK (`@atriarch-systems/tracery-client` or the
-Python `atriarch-tracery`); the hub stores, sorts, serves and draws. Nothing
+Python `atriarch-tracery-graph`); the hub stores, sorts, serves and draws. Nothing
 renders in the producing app.
 
 ```

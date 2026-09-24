@@ -105,7 +105,7 @@ test('key entry is skipped once a session is stored, and the flow list shows the
 test('the static footer is present with the product name and a Ko-fi link', async ({ page }) => {
   await primeMockedHub(page);
   await expect(page.getByTestId('hub-footer')).toBeVisible();
-  await expect(page.getByTestId('hub-footer')).toContainText('Tracery by Atriarch Systems');
+  await expect(page.getByTestId('hub-footer')).toContainText('Tracery Graph by Atriarch Systems');
   await expect(page.getByTestId('hub-footer-kofi')).toHaveAttribute('href', 'https://ko-fi.com/demonslyr');
 });
 
@@ -121,7 +121,7 @@ test('the footer is white-label (no Ko-fi link) when GET /v1/info reports editio
     }),
   );
   await primeMockedHub(page);
-  await expect(page.getByTestId('hub-footer')).toContainText('Tracery by Atriarch Systems');
+  await expect(page.getByTestId('hub-footer')).toContainText('Tracery Graph by Atriarch Systems');
   await expect(page.getByTestId('hub-footer-kofi')).toHaveCount(0);
 });
 
@@ -185,7 +185,7 @@ test('an op with an out-of-range ts does not blank the page when inspected', asy
   await page.locator('[data-testid="node-item"][data-node-id="llm:insane"]').first().click();
 
   // The page must still be up (header + flow picker intact), not blanked by a thrown RangeError.
-  await expect(page.getByText('Tracery', { exact: true })).toBeVisible();
+  await expect(page.getByText('Tracery Graph', { exact: true })).toBeVisible();
   await expect(page.getByTestId('explorer-crashed')).toHaveCount(0);
   await expect(page.getByTestId('inspector-op').first()).toBeVisible();
   // formatTs falls back to the raw number for a ts outside Date's range.
@@ -217,7 +217,7 @@ test('two flows that collapse onto the same namespaced node id in trace scope do
   await page.getByTestId('scope-trace').click();
 
   // The page must still be up: the crash used to happen synchronously on switching to trace scope.
-  await expect(page.getByText('Tracery', { exact: true })).toBeVisible();
+  await expect(page.getByText('Tracery Graph', { exact: true })).toBeVisible();
   await expect(page.getByTestId('explorer-crashed')).toHaveCount(0);
   await expect(page.getByTestId('group-legend-item')).toHaveCount(2);
 });
@@ -242,7 +242,7 @@ test('a malformed deep link (stray "%") reached via client-side navigation does 
   // The id segment fails to decode, so the route falls back to the raw,
   // still-encoded segment as a (non-existent) flow id: no flow matches it,
   // so the explorer shows its normal "nothing selected" state -- not a blank page.
-  await expect(page.getByText('Tracery', { exact: true })).toBeVisible();
+  await expect(page.getByText('Tracery Graph', { exact: true })).toBeVisible();
   await expect(page.getByTestId('explorer-crashed')).toHaveCount(0);
   await expect(page.getByTestId('flow-picker-item')).toHaveCount(3);
 });
@@ -272,7 +272,7 @@ test('a malformed deep link (stray "%") reached via client-side navigation does 
 async function cursorAt(page: Page, clientX: number, clientY: number): Promise<string> {
   return page.evaluate(
     ([x, y]) => {
-      const host = document.querySelector('[role="region"][aria-label="Tracery hosted explorer"]') as HTMLElement | null;
+      const host = document.querySelector('[role="region"][aria-label="Tracery Graph hosted explorer"]') as HTMLElement | null;
       if (!host) return '';
       host.dispatchEvent(new PointerEvent('pointermove', { clientX: x, clientY: y, bubbles: true, cancelable: true, pointerId: -1, pointerType: 'mouse', buttons: 0 }));
       return host.style.cursor;
@@ -293,7 +293,7 @@ async function findHullBackgroundPoint(page: Page): Promise<{ x: number; y: numb
   await page.waitForTimeout(750);
   for (let attempt = 0; attempt < 20; attempt++) {
     const point = await page.evaluate(() => {
-      const host = document.querySelector('[role="region"][aria-label="Tracery hosted explorer"]') as HTMLElement | null;
+      const host = document.querySelector('[role="region"][aria-label="Tracery Graph hosted explorer"]') as HTMLElement | null;
       const canvas = host?.querySelector('canvas') as HTMLCanvasElement | null;
       if (!host || !canvas) return null;
       const rect = canvas.getBoundingClientRect();
@@ -387,7 +387,7 @@ test('ancestor group positions survive streamed updates, follow-latest switches,
   // Scope changes resize the canvas as the accessible node list changes height.
   // Record the actual pointer-to-graph displacement: assuming a fixed viewport
   // mistakes a late ResizeObserver/recentering frame for a lost node position.
-  await page.locator('[role="region"][aria-label="Tracery hosted explorer"]').evaluate(el => {
+  await page.locator('[role="region"][aria-label="Tracery Graph hosted explorer"]').evaluate(el => {
     const canvas = el.querySelector('canvas') as HTMLCanvasElement & { __zoom: { x: number; y: number; k: number } };
     const points = { start: { x: 0, y: 0 }, end: { x: 0, y: 0 } };
     (window as unknown as { __dragPoints: typeof points }).__dragPoints = points;
@@ -442,7 +442,7 @@ test('a plain click (no movement) inside a hull\'s empty area still deselects th
 async function findNodeInteriorPoint(page: Page): Promise<{ x: number; y: number }> {
   for (let attempt = 0; attempt < 20; attempt++) {
     const point = await page.evaluate(() => {
-      const host = document.querySelector('[role="region"][aria-label="Tracery hosted explorer"]') as HTMLElement | null;
+      const host = document.querySelector('[role="region"][aria-label="Tracery Graph hosted explorer"]') as HTMLElement | null;
       const canvas = host?.querySelector('canvas') as HTMLCanvasElement | null;
       if (!host || !canvas) return null;
       const cursorAtLocal = (clientX: number, clientY: number) => {
@@ -572,7 +572,7 @@ test('GET /v1/info reporting auth "none" skips key entry, connects with no API k
 // keeps the choice.
 async function accentOf(page: Page): Promise<string> {
   const value = await page.evaluate(() => {
-    const el = document.querySelector('[aria-label="Tracery hosted explorer"]');
+    const el = document.querySelector('[aria-label="Tracery Graph hosted explorer"]');
     return el ? getComputedStyle(el).getPropertyValue('--tracery-accent').trim() : null;
   });
   if (value === null) throw new Error('explorer root element not found');

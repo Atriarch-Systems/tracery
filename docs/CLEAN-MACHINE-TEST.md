@@ -41,8 +41,8 @@ Run each command separately. Stop and preserve the output on an unexpected error
 The examples work in PowerShell and a POSIX shell except where explicitly split.
 
 ```sh
-git clone https://github.com/Atriarch-Systems/tracery.git
-cd tracery
+git clone https://github.com/Atriarch-Systems/tracery-graph.git
+cd tracery-graph
 git rev-parse HEAD
 npm ci
 npx playwright install chromium

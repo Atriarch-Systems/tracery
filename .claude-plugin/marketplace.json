@@ -1,23 +1,23 @@
 {
   "$schema": "https://code.claude.com/schema/marketplace.json",
-  "name": "tracery",
+  "name": "atriarch-systems",
   "owner": {
     "name": "Atriarch Systems",
     "url": "https://github.com/atriarch-systems"
   },
-  "description": "Tracery by Atriarch Systems: agent activity graphs. This marketplace publishes the Claude Code plugin that streams a running session's tool calls and subagents to a Tracery hub as a live flow graph.",
+  "description": "Tracery Graph by Atriarch Systems: agent activity graphs. This marketplace publishes the Claude Code plugin that streams a running session's tool calls and subagents to a Tracery Graph hub as a live flow graph.",
   "plugins": [
     {
-      "name": "tracery",
+      "name": "tracery-graph",
       "source": "./plugins/claude-code",
-      "displayName": "Tracery",
-      "description": "Streams Claude Code session, tool-call and subagent activity to a Tracery hub for live graph visualization.",
+      "displayName": "Tracery Graph",
+      "description": "Streams Claude Code session, tool-call and subagent activity to a Tracery Graph hub for live graph visualization.",
       "version": "0.1.0",
       "author": {
         "name": "Atriarch Systems"
       },
-      "homepage": "https://github.com/atriarch-systems/tracery",
-      "repository": "https://github.com/atriarch-systems/tracery",
+      "homepage": "https://github.com/Atriarch-Systems/tracery-graph",
+      "repository": "https://github.com/Atriarch-Systems/tracery-graph",
       "license": "Apache-2.0",
       "keywords": ["observability", "agent", "activity", "visualization", "hooks"],
       "category": "observability"

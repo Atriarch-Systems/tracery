@@ -4,7 +4,7 @@
 > Follow the [source checkout/build instructions](../README.md) first; run the
 > commands below from the repository root.
 
-Three ways to see Tracery run, one per distribution mode from the root
+Three ways to see Tracery Graph run, one per distribution mode from the root
 [README](../README.md#usage-modes): the Claude Code plugin, the npm library
 (no server), and the standalone hub — plus a fourth section on sharing
 (`docs/SHARING.md`), a feature of the hub rather than its own distribution
@@ -40,7 +40,7 @@ session itself — just the plugin's twelve hooks mapping to Activity events
 session: it checks the hub is up, pipes a `SessionStart` and one
 `PreToolUse`/`PostToolUse` pair through the plugin's real
 `hooks/emit.mjs` for a synthetic session id, confirms the resulting flow
-landed on the hub, and prints both the deep link `/tracery:activity` would
+landed on the hub, and prints both the deep link `/tracery-graph:activity` would
 give you and the exact command to launch a real session against the same
 hub.
 
@@ -64,7 +64,7 @@ JSON (a `session` root op with one linked `tool:Bash` op), then:
 
 ```
 [demo-plugin] smoke-test flow's deep link: http://127.0.0.1:8971/ui/flows/demo-plugin-smoke
-[demo-plugin] general pattern (what /tracery:activity prints for the running session):
+[demo-plugin] general pattern (what /tracery-graph:activity prints for the running session):
   http://127.0.0.1:8971/ui/flows/<session_id>
 
 [demo-plugin] launch command for a new Claude Code session with the plugin
@@ -125,7 +125,7 @@ npm run preview -w tracery-example-embedded    # http://localhost:4312
 ```
 
 **What the viewer should see**: a full-screen explorer under a one-line
-header ("Tracery embedded example: no hub, no network"). Within a couple of
+header ("Tracery Graph embedded example: no hub, no network"). Within a couple of
 seconds a flow ("Plan the investigation") appears and starts running; a few
 seconds later two more flows ("Plan research angle" x2) spawn from its
 search node, one of which ends in `error`. Connection status reads `live`
@@ -224,7 +224,7 @@ UI's **Share** button turning one flow into a link nobody needs an API key
 to open, with producer context hidden by default. `/s/<token>` serves the
 same `ActivityExplorer` in a read-only, locked-to-that-flow mode: no flow
 picker (there is nothing else to pick — the share only ever carries its
-own target's data), a "Shared from Tracery · Open in Tracery" footer, and
+own target's data), a "Shared from Tracery Graph · Open in Tracery Graph" footer, and
 a "Context hidden by the sharer" notice wherever redacted context would
 otherwise show up as a JSON blob.
 
@@ -262,4 +262,4 @@ values themselves.
 | Expiry / revocation | 7/30/90 days or never, set at creation; revoke any time via `DELETE /v1/shares/:id`; an unknown, expired, or revoked token 404s identically |
 | Rate limit | 60 requests/minute per source IP on every public route, in-memory (not shared across `postgres`-backed multi-replica deployments) |
 | Offline fallback | `GET /v1/flows/:id/export.html` / `/v1/traces/:id/export.html` — a single downloadable, fully self-contained `.html` file with no network dependency at all, for local mode or anywhere a link can't reach |
-| Image export | `ActivityGraphHandle.toImage()` renders the current view (with the Tracery mark) to a PNG, client-side, no server round trip |
+| Image export | `ActivityGraphHandle.toImage()` renders the current view (with the Tracery Graph mark) to a PNG, client-side, no server round trip |

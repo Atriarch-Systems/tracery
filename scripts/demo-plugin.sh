@@ -74,10 +74,10 @@ cat /tmp/demo-plugin-flow.json
 echo ""
 rm -f /tmp/demo-plugin-flow.json
 
-# --- 4. print the deep link pattern the /tracery:activity skill produces ----
+# --- 4. print the deep link pattern the /tracery-graph:activity skill produces ----
 echo ""
 echo "[demo-plugin] smoke-test flow's deep link: $HUB_URL/ui/flows/$SESSION_ID"
-echo "[demo-plugin] general pattern (what /tracery:activity prints for the running session):"
+echo "[demo-plugin] general pattern (what /tracery-graph:activity prints for the running session):"
 echo "  $HUB_URL/ui/flows/<session_id>"
 
 # --- 5. print the launch command for a new Claude Code session -------------

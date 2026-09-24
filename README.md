@@ -1,4 +1,4 @@
-# Tracery
+# Tracery Graph
 
 > **v0.1.0 is available from source. npm/PyPI packages and Docker images are not published yet.**
 > The current checkout prepares v0.1.1; see [Publishing](docs/PUBLISHING.md) for the GitHub Actions release and credential setup.
@@ -7,8 +7,8 @@
 > [hosted demo](https://atriarch.systems/demos/tracery/). See [release notes](CHANGELOG.md).
 
 ```sh
-git clone --branch v0.1.0 https://github.com/Atriarch-Systems/tracery.git
-cd tracery
+git clone --branch v0.1.0 https://github.com/Atriarch-Systems/tracery-graph.git
+cd tracery-graph
 npm ci
 npm run build
 node apps/hub/bin/hub.mjs
@@ -18,11 +18,11 @@ Open http://127.0.0.1:8971/ui/ for the local hub.
 
 
 <p align="center">
-  <a href="https://github.com/Atriarch-Systems/tracery/actions/workflows/ci.yaml"><img src="https://github.com/Atriarch-Systems/tracery/actions/workflows/ci.yaml/badge.svg?branch=main" alt="CI status"></a>
+  <a href="https://github.com/Atriarch-Systems/tracery-graph/actions/workflows/ci.yaml"><img src="https://github.com/Atriarch-Systems/tracery-graph/actions/workflows/ci.yaml/badge.svg?branch=main" alt="CI status"></a>
 </p>
 
 <p align="center">
-  <img src="docs/images/hero.gif" alt="Tracery drawing a live trace: an orchestrator plans and searches, spawns two subagents (one succeeds, one errors), while a guard check and a human approval run concurrently — all rendered live as the graph grows" width="900">
+  <img src="docs/images/hero.gif" alt="Tracery Graph drawing a live trace: an orchestrator plans and searches, spawns two subagents (one succeeds, one errors), while a guard check and a human approval run concurrently — all rendered live as the graph grows" width="900">
 </p>
 
 <p align="center">
@@ -31,7 +31,7 @@ Open http://127.0.0.1:8971/ui/ for the local hub.
   More in <a href="docs/DEMOS.md">docs/DEMOS.md</a>.</em>
 </p>
 
-Tracery by Atriarch Systems turns agent activity events into live, inspectable graphs.
+Tracery Graph by Atriarch Systems turns agent activity events into live, inspectable graphs.
 An application pushes small events ("op X started on node Y in flow Z"); the
 library or the hub turns them into flows, node histories, and a drawable
 graph you can render live or replay after the fact. When one flow spawns
@@ -160,7 +160,7 @@ required. Check a box to also push the same events to a running hub
 the library view against the standalone hub's UI side by side.
 
 ```
-git clone https://github.com/Atriarch-Systems/tracery.git && cd tracery
+git clone https://github.com/Atriarch-Systems/tracery-graph.git && cd tracery-graph
 npm ci
 npm run build
 npm run dev -w tracery-example-generator
@@ -183,11 +183,11 @@ or, from this repo as a marketplace (see
 [`.claude-plugin/marketplace.json`](.claude-plugin/marketplace.json)):
 
 ```
-/plugin marketplace add Atriarch-Systems/tracery
-/plugin install tracery@tracery
+/plugin marketplace add Atriarch-Systems/tracery-graph
+/plugin install tracery-graph@atriarch-systems
 ```
 
-(A local checkout works too: `/plugin marketplace add /path/to/tracery`.)
+(A local checkout works too: `/plugin marketplace add /path/to/tracery-graph`.)
 `TRACERY_HUB_URL` (env var or the plugin's own
 `hub_url` config prompt) is the only thing required; `TRACERY_API_KEY`/
 `api_key` is only needed against a hub configured with `TRACERY_API_KEYS`.
@@ -204,7 +204,7 @@ at the moment you shared it (`snapshot`, the default) or live-updating
 time. No hub reachable from outside your machine? **Export .html** gives
 you a single, fully self-contained file that renders the same explorer
 offline, straight from disk. Either way, **Download image** turns the
-current view into a PNG with a small "Tracery" mark, ready to paste
+current view into a PNG with a small "Tracery Graph" mark, ready to paste
 anywhere. See [`docs/SHARING.md`](docs/SHARING.md) for the full picture —
 redaction rules, expiry/revocation, rate limits, Open Graph previews, and
 `TRACERY_PUBLIC_URL`.
@@ -217,10 +217,10 @@ redaction rules, expiry/revocation, rate limits, Open Graph previews, and
 | `@atriarch-systems/tracery-visualizer` | `packages/visualizer` | 0.3.1 | Apache-2.0 |
 | `@atriarch-systems/tracery-client` | `packages/client` | 0.1.1 | Apache-2.0 |
 | `@atriarch-systems/tracery-react` | `packages/react` | 0.1.1 | Apache-2.0 |
-| `atriarch-tracery` (Python, `atriarch.tracery`) | `clients/python` | 0.1.0 | Apache-2.0 |
+| `atriarch-tracery-graph` (Python, `atriarch.tracery`) | `clients/python` | 0.1.0 | Apache-2.0 |
 | `@atriarch-systems/tracery-hub` | `apps/hub` | 0.1.1 | Apache-2.0 |
 | `@atriarch-systems/tracery-hub-web` (hosted UI, not published) | `apps/hub/web` | 0.1.1 | Apache-2.0 |
-| `tracery` (Claude Code plugin) | `plugins/claude-code` | 0.1.0 | Apache-2.0 |
+| `tracery-graph` (Claude Code plugin) | `plugins/claude-code` | 0.1.0 | Apache-2.0 |
 
 ## Event model
 
@@ -262,7 +262,7 @@ licensing expectations.
 
 ## Licensing
 
-**Tracery's original code is licensed under Apache License 2.0.** Every Tracery package in this repository — ingest,
+**Tracery Graph's original code is licensed under Apache License 2.0.** Every Tracery Graph package in this repository — ingest,
 storage, retention, the live feed, the hosted UI, the client SDKs, and the
 Claude Code plugin — works unlicensed and unmodified; there is no commercial
 layer, license key, or feature flag anywhere in this repository. Third-party dependencies and vendored code retain their own licenses; see [licensing and redistribution](docs/LICENSING.md). See
@@ -277,7 +277,7 @@ billing, or managed-backup availability. See [Cloud architecture](docs/CLOUD.md)
 
 ## Support
 
-☕ Tracery is free and open source. If it saves you time, [buy me a coffee](https://ko-fi.com/demonslyr).
+☕ Tracery Graph is free and open source. If it saves you time, [buy me a coffee](https://ko-fi.com/demonslyr).
 
 [![ko-fi](https://img.shields.io/badge/Ko--fi-Buy%20me%20a%20coffee-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/demonslyr)
 

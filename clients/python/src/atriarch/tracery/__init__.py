@@ -1,4 +1,4 @@
-"""Tracery: Python emitter SDK for the Tracery contract.
+"""Tracery Graph: Python emitter SDK for the Tracery Graph contract.
 
 Stdlib only at runtime. See docs/SPEC.md §5 for the API this implements and
 the repo README for a quick start (a parent flow spawning a subagent flow

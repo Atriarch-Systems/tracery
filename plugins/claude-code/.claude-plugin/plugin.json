@@ -1,7 +1,7 @@
 {
-  "name": "tracery",
+  "name": "tracery-graph",
   "version": "0.1.0",
-  "description": "Streams Claude Code session, tool-call and subagent activity to a Tracery hub for live graph visualization.",
+  "description": "Streams Claude Code session, tool-call and subagent activity to a Tracery Graph hub for live graph visualization.",
   "author": {
     "name": "Atriarch Systems",
     "url": "https://atriarch.systems"
@@ -11,22 +11,22 @@
   "userConfig": {
     "hub_url": {
       "type": "string",
-      "title": "Tracery hub URL",
-      "description": "Base URL of the Tracery hub, e.g. https://tracery.example.com (no trailing slash needed).",
+      "title": "Tracery Graph hub URL",
+      "description": "Base URL of the Tracery Graph hub, e.g. https://tracery.example.com (no trailing slash needed).",
       "default": "http://127.0.0.1:8971",
       "required": true
     },
     "api_key": {
       "type": "string",
       "title": "Ingest API key",
-      "description": "Tracery hub API key with the ingest role, sent as an Authorization: Bearer header. Leave empty for a local hub (one started with `npx @atriarch-systems/tracery-hub` and no TRACERY_API_KEYS -- it runs with auth off).",
+      "description": "Tracery Graph hub API key with the ingest role, sent as an Authorization: Bearer header. Leave empty for a local hub (one started with `npx @atriarch-systems/tracery-hub` and no TRACERY_API_KEYS -- it runs with auth off).",
       "sensitive": true,
       "required": false
     },
     "workspace": {
       "type": "string",
       "title": "Workspace",
-      "description": "Tracery hub workspace to ingest events into.",
+      "description": "Tracery Graph hub workspace to ingest events into.",
       "default": "default"
     },
     "include_prompts": {

@@ -47,14 +47,14 @@ async function exists(path) {
   }
 }
 
-test('repo-root marketplace.json parses and lists the tracery plugin', async () => {
+test('repo-root marketplace.json parses and lists the tracery-graph plugin', async () => {
   const marketplace = await readJson(join(repoRoot, '.claude-plugin', 'marketplace.json'));
-  assert.equal(typeof marketplace.name, 'string');
+  assert.equal(marketplace.name, 'atriarch-systems');
   assert.ok(marketplace.owner && typeof marketplace.owner.name === 'string', 'owner.name is required');
   assert.ok(Array.isArray(marketplace.plugins) && marketplace.plugins.length > 0);
 
-  const entry = marketplace.plugins.find((p) => p.name === 'tracery');
-  assert.ok(entry, 'marketplace.json must list a plugin named "tracery"');
+  const entry = marketplace.plugins.find((p) => p.name === 'tracery-graph');
+  assert.ok(entry, 'marketplace.json must list a plugin named "tracery-graph"');
   assert.equal(entry.source, './plugins/claude-code');
   assert.match(entry.name, KEBAB_CASE_RE, `marketplace plugin entry "name" must be kebab-case, got "${entry.name}"`);
   assertValidAuthor(entry.author, 'marketplace.json plugins[].author');
@@ -72,7 +72,7 @@ test('repo-root marketplace.json parses and lists the tracery plugin', async () 
 
 test('plugin.json parses, its manifest fields are well-formed, and its hooks/skills paths resolve to real files', async () => {
   const plugin = await readJson(join(pluginRoot, '.claude-plugin', 'plugin.json'));
-  assert.equal(plugin.name, 'tracery');
+  assert.equal(plugin.name, 'tracery-graph');
   assert.match(plugin.name, KEBAB_CASE_RE, `plugin.json "name" must be kebab-case, got "${plugin.name}"`);
   // Regression: plugin.json's `author` previously shipped as a bare string
   // ("Atriarch Systems"), which only failed when Claude Code actually tried

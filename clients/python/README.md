@@ -1,6 +1,6 @@
-# atriarch-tracery
+# atriarch-tracery-graph
 
-Python emitter SDK for [Tracery](../../docs/SPEC.md) (module
+Python emitter SDK for [Tracery Graph](../../docs/SPEC.md) (module
 `atriarch.tracery`): batches `start`/`update`/`end`/`annotate` events for a
 flow and its ops and ships them to a hub, stdlib only. See `docs/SPEC.md` §5
 for the full contract this implements, and `../../packages/client` for the

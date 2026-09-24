@@ -4,7 +4,7 @@
 > Follow the [source checkout/build instructions](../README.md) first; run the
 > commands below from the repository root.
 
-`plugins/claude-code` turns a running Claude Code session into a Tracery by
+`plugins/claude-code` turns a running Claude Code session into a Tracery Graph by
 Atriarch Systems flow: session start/end, every tool call, and every subagent
 as its own linked child flow. It is a thin, zero-dependency adapter from [Claude
 Code's hooks](https://code.claude.com/docs/en/hooks.md) to the [wire
@@ -30,12 +30,18 @@ repo root's [`.claude-plugin/marketplace.json`](../.claude-plugin/marketplace.js
 lists this plugin with `source: "./plugins/claude-code"`, so a marketplace
 install resolves to the same directory as the `--plugin-dir` path above --
 there's no separate build or publish step. This repo is live at
-[github.com/Atriarch-Systems/tracery](https://github.com/Atriarch-Systems/tracery):
+[github.com/Atriarch-Systems/tracery-graph](https://github.com/Atriarch-Systems/tracery-graph):
 
 ```
-/plugin marketplace add atriarch-systems/tracery
-/plugin install tracery@tracery
+/plugin marketplace add Atriarch-Systems/tracery-graph
+/plugin install tracery-graph@atriarch-systems
 ```
+
+The marketplace is named `atriarch-systems` and the plugin `tracery-graph`,
+so its skill runs as `/tracery-graph:activity`. Before the rename to
+Tracery Graph both names were `tracery`; an install made then
+(`tracery@tracery`) needs a one-time uninstall and reinstall, described in
+[`plugins/claude-code/README.md`](../plugins/claude-code/README.md).
 
 A local clone can be added as a marketplace the same way, with a path
 instead of a `owner/repo` shorthand: `/plugin marketplace add

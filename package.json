@@ -2,7 +2,7 @@
   "name": "atriarch-tracery",
   "private": true,
   "version": "0.1.1",
-  "description": "Tracery: agent activity graphs. Event contract, reducers, React visualizer, emitter SDKs and a standalone hub server.",
+  "description": "Tracery Graph: agent activity graphs. Event contract, reducers, React visualizer, emitter SDKs and a standalone hub server.",
   "type": "module",
   "workspaces": [
     "packages/visualizer",

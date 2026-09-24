@@ -1,6 +1,6 @@
-# Tracery — specification (v1)
+# Tracery Graph — specification (v1)
 
-Tracery by Atriarch Systems turns agent activity events into live, inspectable graphs. An
+Tracery Graph by Atriarch Systems turns agent activity events into live, inspectable graphs. An
 application pushes small events ("op X started on node Y in flow Z"); the library
 or the hub turns them into flows, node histories and a drawable graph. When one
 flow spawns another (an agent starting a subagent), the child links to its parent
@@ -29,7 +29,7 @@ packages/core          @atriarch-systems/tracery-core        contract, validatio
 packages/visualizer    @atriarch-systems/tracery-visualizer  the canvas component (moved from agentkit, Apache-2.0)
 packages/react         @atriarch-systems/tracery-react       ActivityExplorer composite + hooks (live feed, hub client)
 packages/client        @atriarch-systems/tracery-client      TS emitter SDK (batching HTTP transport) + hub read client
-clients/python         atriarch-tracery               Python emitter SDK, stdlib only, namespace package atriarch.tracery
+clients/python         atriarch-tracery-graph               Python emitter SDK, stdlib only, namespace package atriarch.tracery
 apps/hub               @atriarch-systems/tracery-hub         standalone server + hosted UI (apps/hub/web) + Dockerfile + k8s
 docs/                  SPEC.md (this), PLAN.md (workstreams), CLOUD.md
 ```
@@ -254,7 +254,7 @@ generated locally (no dependency; implement the 26-char Crockford ULID).
 `HubClient` (read side): `listFlows`, `getFlow`, `getTrace`, `events(flow, after)`,
 `live(filter, onFrame)` returning a disposer; Node and browser (`WebSocket` global).
 
-### Python (`clients/python`, distribution `atriarch-tracery`, module `atriarch.tracery`)
+### Python (`clients/python`, distribution `atriarch-tracery-graph`, module `atriarch.tracery`)
 
 Same shape: `ActivityTracer`, `Flow`, `Op`, `HttpTransport` (background thread,
 `queue.Queue`, `urllib.request`, bounded, never blocks the producer),
@@ -364,7 +364,7 @@ served by the hub as static files. First load asks for a read key (kept in
 
 ## 7. Extensions and Tracery Cloud
 
-Original Tracery code is **Apache-2.0**; third-party files retain their own licenses.
+Original Tracery Graph code is **Apache-2.0**; third-party files retain their own licenses.
 There is no commercial layer or runtime commercial-license
 gate in the community hub. The hub exposes exactly one seam for
 anything beyond what ships here: `HubExtensions`
@@ -420,7 +420,7 @@ repo, executed by the integration workstream:
 
 ## 9. Decisions owed to Dan
 
-- Product name and npm org. Working name "Tracery", scope `@atriarch-systems/tracery-*`, hub image `atriarchsystems/tracery-hub`.
+- Product name and npm org. Working name "Tracery Graph", scope `@atriarch-systems/tracery-*`, hub image `atriarchsystems/tracery-hub`.
 - Commercial/license terms for Tracery Cloud and self-hosted enterprise -- now entirely
   the private `tracery-cloud` repository's concern, not this one's.
 - Whether to publish to npmjs.com or only the internal Nexus.

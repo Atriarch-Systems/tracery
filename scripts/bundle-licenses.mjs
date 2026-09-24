@@ -42,7 +42,7 @@ export function bundleLicenses() {
         sections.push(name + ' (' + pkg.license + ')\n' + texts.join('\n'));
       }
       if (missing.length) this.error('Missing upstream license text: ' + missing.join(', '));
-      const notices = 'Tracery third-party notices\nGenerated from the resolved build modules and Vite runtime helpers. Original package licenses follow.\n\n' + sections.join('\n\n----------------------------------------\n\n');
+      const notices = 'Tracery Graph third-party notices\nGenerated from the resolved build modules and Vite runtime helpers. Original package licenses follow.\n\n' + sections.join('\n\n----------------------------------------\n\n');
       this.emitFile({ type: 'asset', fileName: 'THIRD-PARTY-NOTICES.txt', source: notices });
       for (const asset of Object.values(bundle)) {
         if (asset.type !== 'asset' || !asset.fileName.endsWith('.html')) continue;

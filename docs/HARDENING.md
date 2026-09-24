@@ -6,7 +6,7 @@
 > `tracery-cloud` repository (see `docs/CLOUD.md`) and no longer lives here.
 > The findings and fixes are kept verbatim for reference.
 
-This document records a review/verify/fix/extend pass run against Tracery on
+This document records a review/verify/fix/extend pass run against Tracery Graph on
 2026-09-17. Every finding below was produced by an initial review, then run
 through two independent Opus refuters before any fix was written -- a finding
 only counts as **confirmed** if neither refuter could show it was already
@@ -29,7 +29,7 @@ diligence ahead of a purchase or license decision.
 - [Final verification](#final-verification)
 
 Severity counts and the areas above sum to 87 findings surfaced across the six
-packages that make up Tracery's runtime (core reducer, React/visualizer UI,
+packages that make up Tracery Graph's runtime (core reducer, React/visualizer UI,
 the two SDKs, the hub server, the commercial `apps/hub/ee` layer, and the
 Claude Code plugin). 31 were confirmed and fixed, 24 were refuted after
 adversarial review (documented below with the refuters' reasoning, not just

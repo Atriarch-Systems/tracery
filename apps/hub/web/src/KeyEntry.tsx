@@ -34,7 +34,7 @@ export function KeyEntry({ onReady, ssoAvailable }: KeyEntryProps) {
           onReady({ baseUrl: baseUrl.trim() || window.location.origin, apiKey: apiKey.trim(), workspace: workspace.trim() || undefined });
         }}
       >
-        <h1 style={{ fontSize: 16, margin: 0 }}>Tracery</h1>
+        <h1 style={{ fontSize: 16, margin: 0 }}>Tracery Graph</h1>
         <p style={{ fontSize: 12, color: '#8892a6', margin: 0 }}>
           This self-hosted hub was started with its own API keys. Ask
           whoever runs it for one, or check its <code>TRACERY_API_KEYS</code>{' '}

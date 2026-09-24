@@ -1,11 +1,11 @@
-# tracery (Claude Code plugin)
+# tracery-graph (Claude Code plugin)
 
 > **Source release:** npm packages and prebuilt Docker images are not published yet.
 > Follow the [source checkout/build instructions](../../README.md) first; run the
 > commands below from the repository root.
 
-Streams Claude Code session, tool-call and subagent activity to an
-[Tracery](../../docs/SPEC.md) hub, so a running session shows up as a
+Streams Claude Code session, tool-call and subagent activity to a
+[Tracery Graph](../../docs/SPEC.md) hub, so a running session shows up as a
 live flow graph instead of only scrollback. See
 [`../../docs/CLAUDE-CODE-PLUGIN.md`](../../docs/CLAUDE-CODE-PLUGIN.md) for the
 full reference (mapping table, privacy details, troubleshooting). This file is
@@ -20,13 +20,13 @@ claude --plugin-dir ./plugins/claude-code
 ```
 
 From a marketplace: this repo's own [`.claude-plugin/marketplace.json`](../../.claude-plugin/marketplace.json)
-lists this plugin as `tracery`. The repo is live at
-[github.com/Atriarch-Systems/tracery](https://github.com/Atriarch-Systems/tracery),
+lists this plugin as `tracery-graph`, in a marketplace named `atriarch-systems`. The repo is live at
+[github.com/Atriarch-Systems/tracery-graph](https://github.com/Atriarch-Systems/tracery-graph),
 so this works today:
 
 ```
-/plugin marketplace add atriarch-systems/tracery
-/plugin install tracery@tracery
+/plugin marketplace add Atriarch-Systems/tracery-graph
+/plugin install tracery-graph@atriarch-systems
 ```
 
 See [`../../docs/CLAUDE-CODE-PLUGIN.md`](../../docs/CLAUDE-CODE-PLUGIN.md#install-and-configure)
@@ -81,17 +81,34 @@ dependencies, and the repo is already public on GitHub.
 itself when the plugin changes:
 
 ```
-/plugin marketplace add atriarch-systems/tracery
-/plugin install tracery@tracery
+/plugin marketplace add Atriarch-Systems/tracery-graph
+/plugin install tracery-graph@atriarch-systems
 ```
 
-`atriarch-systems/tracery` is the `owner/repo` GitHub location; `tracery@tracery`
-is `<plugin-name>@<marketplace-name>`, both of which happen to be `tracery`
-here (the plugin's own name and this repo's marketplace name, both declared
+`Atriarch-Systems/tracery-graph` is the `owner/repo` GitHub location; `tracery-graph@atriarch-systems`
+is `<plugin-name>@<marketplace-name>`: `tracery-graph` is the plugin's own
+name and `atriarch-systems` is this repo's marketplace name, both declared
 in [`../../.claude-plugin/marketplace.json`](../../.claude-plugin/marketplace.json)
 -- read that file's top-level `"name"` rather than assuming it always
-matches the repo name). A local clone works the same way with a path instead
+matches the repo name. A local clone works the same way with a path instead
 of `owner/repo`: `/plugin marketplace add /path/to/this/repo`.
+
+**Upgrading from the earlier `tracery@tracery` install.** The plugin was
+first published as `tracery` in a marketplace also named `tracery`. Both
+names changed with the rename to Tracery Graph, so an existing install does
+not pick up updates. Remove it once and install under the new names:
+
+```
+/plugin uninstall tracery@tracery
+/plugin marketplace remove tracery
+/plugin marketplace add Atriarch-Systems/tracery-graph
+/plugin install tracery-graph@atriarch-systems
+```
+
+The skill is then `/tracery-graph:activity` instead of `/tracery:activity`.
+Configuration set through environment variables (`TRACERY_HUB_URL` and the
+others) carries over unchanged; answers given to the old plugin's `userConfig`
+prompts were saved under its old name, so expect to be prompted again.
 
 **(b) Without GitHub at all** -- zip this directory and hand the zip over;
 the recipient unzips it anywhere and points Claude Code straight at the
@@ -140,7 +157,7 @@ mapping table, the correlation heuristic, and what never leaves the machine:
 ## The `activity` skill
 
 Ask "what's the activity link for this session" (or run
-`/tracery:activity`) to get the hub deep link for the running
+`/tracery-graph:activity`) to get the hub deep link for the running
 session's flow.
 
 ## Troubleshooting
@@ -185,4 +202,4 @@ process against a fake hub; `tests/e2e.test.mjs` starts the real hub
 
 ## Support
 
-☕ Tracery is free and open source. If it saves you time, [buy me a coffee](https://ko-fi.com/demonslyr).
+☕ Tracery Graph is free and open source. If it saves you time, [buy me a coffee](https://ko-fi.com/demonslyr).

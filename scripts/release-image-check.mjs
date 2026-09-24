@@ -43,7 +43,7 @@ try {
   assert.equal(docker('exec', name, 'node', '-p', 'process.arch'), expectedArch === 'amd64' ? 'x64' : 'arm64');
   assert.equal(info.auth, 'none');
   const ui = await (await fetch(`${base}/ui/`)).text();
-  assert(ui.includes('Tracery') && ui.includes('tracery-licenses'), 'Hosted UI and embedded notices required');
+  assert(ui.includes('Tracery Graph') && ui.includes('tracery-licenses'), 'Hosted UI and embedded notices required');
   const uid = docker('exec', name, 'node', '-p', 'process.getuid()');
   assert.notEqual(uid, '0', 'Runtime must be non-root');
   docker('exec', name, 'node', '-e', `const fs=require('fs'); for(const p of ['/app/LICENSE','/app/NOTICE','/app/RUNTIME-NOTICES.txt','/app/THIRD-PARTY-NOTICES.txt','/usr/share/licenses/node/LICENSE']) if(fs.statSync(p).size<100) throw Error(p); for(const p of ['/usr/local/lib/node_modules/npm','/usr/local/lib/node_modules/corepack','/opt/yarn-v1.22.22']) if(fs.existsSync(p)) throw Error('Unnecessary runtime tooling: '+p)`);

@@ -34,5 +34,5 @@ function modules(directory) {
 }
 modules(path.join(root, 'node_modules'));
 if (!notices.length) throw Error('Empty runtime notice inventory');
-fs.writeFileSync(path.join(root, 'RUNTIME-NOTICES.txt'), `Tracery runtime dependency notices\n\n${notices.sort().join('\n\n----------------------------------------\n\n')}\n`);
+fs.writeFileSync(path.join(root, 'RUNTIME-NOTICES.txt'), `Tracery Graph runtime dependency notices\n\n${notices.sort().join('\n\n----------------------------------------\n\n')}\n`);
 console.log(`Preserved full license text for ${notices.length} runtime packages`);

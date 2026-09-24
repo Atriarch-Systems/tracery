@@ -9,7 +9,7 @@ remain supported. No additional personal GitHub token is required.
 ## One-time account setup
 
 Create these GitHub organization **Actions secrets**, with repository access
-restricted to `Atriarch-Systems/tracery`:
+restricted to `Atriarch-Systems/tracery-graph`:
 
 | Secret | Value to obtain |
 | --- | --- |
@@ -57,7 +57,7 @@ and that warning is expected. Keep the token's blast radius small:
   package-level restriction only once the packages exist.
 - Set expiration to 30–90 days and rotate on schedule.
 - Store it only as the `Atriarch-Systems` organization Actions secret
-  `NPMJS_TOKEN`, with repository access limited to `tracery`.
+  `NPMJS_TOKEN`, with repository access limited to `tracery-graph`.
 - The workflow reads it only in the publication job, after every artifact
   checksum and the `npm whoami` check.
 
@@ -147,7 +147,7 @@ private enterprise images, or deploy the hosted website.
 
 The release workflow never uploads to PyPI. The Python client is published by
 hand from a maintainer's machine, after the npm/Docker release or independently
-of it. It lives in `clients/python`, with distribution name `atriarch-tracery`,
+of it. It lives in `clients/python`, with distribution name `atriarch-tracery-graph`,
 import name `atriarch.tracery`, and its version in
 `clients/python/pyproject.toml` — currently `0.1.0`, intentionally independent
 of the npm packages' `0.1.1`.
@@ -158,12 +158,12 @@ One-time account setup:
 - An API token. It must be **account-scoped for the first upload**, because
   project-scoped tokens can only be created for projects that already exist.
   After the first successful upload, create a project-scoped token for
-  `atriarch-tracery` and delete the account-scoped one.
+  `atriarch-tracery-graph` and delete the account-scoped one.
 - Tooling: `python -m pip install build twine`.
 
 Before uploading, run `npm run publish:check:python`. It builds the wheel,
 installs it into a fresh virtual environment and imports it
-(`scripts/publish-check-python.mjs`). The name `atriarch-tracery` is unclaimed
+(`scripts/publish-check-python.mjs`). The name `atriarch-tracery-graph` is unclaimed
 until the first upload claims it. PyPI never allows re-uploading a version
 number, not even one that has been yanked, so bump
 `clients/python/pyproject.toml` deliberately before uploading.
@@ -182,7 +182,7 @@ username and the full `pypi-...` token as the password. Non-interactively, set
 
 After the first upload succeeds, change the Python install line in
 [README.md](../README.md) from the checkout form
-(`python -m pip install ./clients/python`) to `pip install atriarch-tracery`,
+(`python -m pip install ./clients/python`) to `pip install atriarch-tracery-graph`,
 and make the same change in `clients/python/README.md`. That is a follow-up to
 the first upload, not a preparation step.
 

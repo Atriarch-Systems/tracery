@@ -92,14 +92,14 @@ for archive in sorted((root / 'distfiles').rglob('*')):
 
 shutil.copy('/runtime-installed', root / 'installed.apk.txt')
 (root / 'packages.json').write_text(json.dumps(packages, indent=2) + '\n')
-(root / 'README.txt').write_text('''Corresponding sources for the Alpine components in this Tracery image.
+(root / 'README.txt').write_text('''Corresponding sources for the Alpine components in this Tracery Graph image.
 
 packages.json records each installed binary package, version, declared license,
 architecture, source origin and exact Alpine aports commit. recipes/ contains
 that commit's APKBUILD, patches and configuration. distfiles/ contains the
 upstream source archives verified by abuild against that recipe's checksums.
 notices/ exposes common license texts; full archives retain all original notices.
-No base-package source was modified by Tracery.
+No base-package source was modified by Tracery Graph.
 
 To rebuild a package, use an Alpine 3.24 environment of the recorded architecture
 with alpine-sdk and the dependencies listed in its APKBUILD. Copy the recipe to
@@ -114,8 +114,8 @@ docker create --name tracery-sources IMAGE:VERSION
 docker cp tracery-sources:/usr/share/tracery/sources.tar.gz .
 docker rm tracery-sources
 
-Tracery is Apache-2.0. These independent operating-system components retain
-their own licenses; they are not relicensed by Tracery. Node's complete license
+Tracery Graph is Apache-2.0. These independent operating-system components retain
+their own licenses; they are not relicensed by Tracery Graph. Node's complete license
 and bundled notices are at /usr/share/licenses/node/LICENSE in the image.
 ''')
 hashes = []

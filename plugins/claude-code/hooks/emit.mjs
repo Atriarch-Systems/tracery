@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Tracery Claude Code plugin: telemetry hook.
+// Tracery Graph Claude Code plugin: telemetry hook.
 //
 // Reads one hook payload from stdin, maps it to Activity events (hooks/map.mjs),
 // appends them to a durable on-disk spool, then tries to drain the whole spool

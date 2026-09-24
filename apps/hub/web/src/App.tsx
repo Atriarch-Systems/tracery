@@ -163,7 +163,7 @@ function Explorer({ session, route, onSignOut }: { readonly session: HubSession;
           fontSize: 13,
         }}
       >
-        <strong>Tracery</strong>
+        <strong>Tracery Graph</strong>
         <span>
           workspace: <span data-testid="workspace-name">{session.workspace ?? 'default'}</span>
         </span>
@@ -224,7 +224,7 @@ function Explorer({ session, route, onSignOut }: { readonly session: HubSession;
           <ActivityExplorer
             source={source}
             initialScope={initialScope}
-            ariaLabel="Tracery hosted explorer"
+            ariaLabel="Tracery Graph hosted explorer"
             graphRef={graphRef}
             theme={theme}
             // No persistence logic lives here today for either callback to plug into. Rather

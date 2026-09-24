@@ -1,6 +1,6 @@
 # Licensing and redistribution
 
-Tracery's original code is licensed under the [Apache License 2.0](../LICENSE).
+Tracery Graph's original code is licensed under the [Apache License 2.0](../LICENSE).
 Third-party dependencies and vendored files retain their own licenses. An
 Apache-2.0 package declaration does not replace those licenses.
 
@@ -29,16 +29,16 @@ For each release:
 
 1. Record the source commit and resolved dependency versions. Review missing,
    changed, or unfamiliar licenses and upstream copyright notices.
-2. Confirm that Tracery has the right to distribute imported source and assets.
+2. Confirm that Tracery Graph has the right to distribute imported source and assets.
    A dependency scanner cannot establish authorship or employer ownership.
 3. Inspect the actual npm tarballs and Python wheel. Include the applicable
-   Tracery LICENSE and NOTICE, and preserve notices for any copied or bundled
+   Tracery Graph LICENSE and NOTICE, and preserve notices for any copied or bundled
    third-party code. Separately installed npm dependencies are not the same as
    code copied into a package's browser bundle.
 4. Include readable, complete third-party license and copyright notices with
    the hosted UI. Preserve them inside standalone HTML exports as well: the
    exported file must carry its notices when detached from the server.
-5. Include Tracery's LICENSE and NOTICE in the final container, along with the
+5. Include Tracery Graph's LICENSE and NOTICE in the final container, along with the
    notices required for bundled software. Review the base image and operating
    system packages separately; an npm scan does not cover them.
 6. Repeat artifact inspection after dependency or bundler changes. Keeping a
@@ -82,7 +82,7 @@ licenses), emit THIRD-PARTY-NOTICES.txt and embed a readable
 Open-source licenses disclosure in each HTML artifact. Missing packaged license
 text fails the build; reviewed upstream fallbacks live in licenses/vendor with
 pinned source references. The container Dockerfile copies the resulting notices
-and Tracery's own LICENSE/NOTICE. Node's complete upstream license is retained
+and Tracery Graph's own LICENSE/NOTICE. Node's complete upstream license is retained
 separately. The container includes verified matching source archives, Alpine
 build recipes, patches and notices for its operating-system packages at
 `/usr/share/tracery/sources.tar.gz`. Sources therefore accompany each image.

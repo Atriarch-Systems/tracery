@@ -1,4 +1,4 @@
-# CLAUDE.md — Tracery
+# CLAUDE.md — Tracery Graph
 
 Agent activity graphs: an event contract, pure reducers, a React canvas
 visualizer, emitter SDKs (TS + Python) and a standalone hub server that stores
@@ -15,7 +15,7 @@ the wire contract; a change there is a versioned contract change with a golden t
 | `packages/visualizer` | `@atriarch-systems/tracery-visualizer` | canvas component (moved here from atriarch-agentkit). |
 | `packages/react` | `@atriarch-systems/tracery-react` | `ActivityExplorer` composite + live-source hooks. |
 | `packages/client` | `@atriarch-systems/tracery-client` | TS emitter SDK + hub read client. |
-| `clients/python` | `atriarch-tracery` | Python emitter SDK, stdlib only, `atriarch.tracery`. |
+| `clients/python` | `atriarch-tracery-graph` | Python emitter SDK, stdlib only, `atriarch.tracery`. |
 | `apps/hub` | `@atriarch-systems/tracery-hub` | Fastify server, stores, live feed, hosted UI, Docker, k8s. |
 
 Tracery Cloud (accounts, SSO, audit log, RBAC, managed retention/backups) is
@@ -31,7 +31,7 @@ loaded through `TRACERY_EXTENSIONS_MODULE`) -- see `docs/SPEC.md` §7 and
 - Consumer inputs are `readonly` and never mutated. No `any` in exports.
 - Node >= 22.13 (`node:sqlite`). Python 3.11 is the supported interpreter.
 - CI runs on self-hosted runners only. Never `runs-on: ubuntu-latest`.
-- Licensing: original Tracery code is Apache-2.0; third-party files retain their
+- Licensing: original Tracery Graph code is Apache-2.0; third-party files retain their
   own licenses. No enterprise implementation or runtime commercial-license gate
   lives in this repository. Release license-compliance checks are required.
 

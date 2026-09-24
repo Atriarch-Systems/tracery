@@ -1,4 +1,4 @@
-Tracery Hub ({{ include "tracery-hub.fullname" . }}) is deploying to namespace {{ .Release.Namespace }}.
+Tracery Graph Hub ({{ include "tracery-hub.fullname" . }}) is deploying to namespace {{ .Release.Namespace }}.
 
 Store: {{ .Values.config.store }}
 Replicas: {{ .Values.replicaCount }}

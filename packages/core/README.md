@@ -1,7 +1,7 @@
 # @atriarch-systems/tracery-core
 
 Contract, validation, journal, flow reducers, trace assembly and visualizer
-projection for Tracery. Pure TypeScript, no DOM, no React, no I/O.
+projection for Tracery Graph. Pure TypeScript, no DOM, no React, no I/O.
 Runs in Node and browsers. See [`../../docs/SPEC.md`](../../docs/SPEC.md) §1–§2
 for the full semantics; this README is a usage guide.
 

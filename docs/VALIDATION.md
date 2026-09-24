@@ -90,7 +90,7 @@ npm run preview -w tracery-example-embedded
 Observe: prints a local URL, normally `http://localhost:4312/`. Open it (or,
 headless, `curl -s http://localhost:4312/ | grep -o '<title>[^<]*'`) and
 confirm the page loads. In a browser: a full-screen graph explorer under a
-one-line header reading "Tracery embedded example: no hub, no network."
+one-line header reading "Tracery Graph embedded example: no hub, no network."
 Within a couple of seconds a flow labeled "Plan the investigation" appears
 and animates (nodes pulse while running); a few seconds later two more flows
 spawn from its search node. This is `docs/DEMOS.md`'s "npm library (no
@@ -129,7 +129,7 @@ producers push to, viewed through its own hosted UI.
 node apps/hub/bin/hub.mjs
 ```
 
-Observe: a log line `Tracery hub: http://127.0.0.1:8971  (local mode, no
+Observe: a log line `Tracery Graph hub: http://127.0.0.1:8971  (local mode, no
 auth; ...)` and `store: memory`. Leave it running in this terminal; open a
 second terminal for the rest of this section.
 
@@ -143,7 +143,7 @@ Observe: `{"product":"tracery","version":"...","edition":"community","auth":"non
 curl -s http://127.0.0.1:8971/ui/ | grep -o '<title>[^<]*'
 ```
 
-Observe: `<title>Tracery`. If instead you see a page mentioning "UI not
+Observe: `<title>Tracery Graph`. If instead you see a page mentioning "UI not
 built," the hosted UI (`apps/hub/web`) was never built — run `npm run build
 -w @atriarch-systems/tracery-hub-web` (needs `@atriarch-systems/tracery-core`,
 `@atriarch-systems/tracery-client`, `@atriarch-systems/tracery-react`,
@@ -163,7 +163,7 @@ node scripts/demo.mjs
 Observe: `[demo] ALL CHECKS PASSED` and `9/9 checks passed` just above it.
 This spawns a Python subprocess for one of its three flows
 (`scripts/demo_child.py`) — if it fails with `ModuleNotFoundError: No module
-named 'atriarch'`, the `python` on your `PATH` doesn't have `atriarch-tracery`
+named 'atriarch'`, the `python` on your `PATH` doesn't have `atriarch-tracery-graph`
 installed; either `pip install -e clients/python[dev]` into whatever
 interpreter `python` resolves to, or point the script at one that already
 has it: `PYTHON=/path/to/venv/bin/python node scripts/demo.mjs`. This is an
@@ -253,6 +253,17 @@ Observe: Claude Code starts normally (the plugin is silent by design — see
 `docs/CLAUDE-CODE-PLUGIN.md` "Privacy"). Note the session id if Claude Code's
 UI shows one, or you can recover it in step 3.4 below.
 
+To validate the marketplace install instead of `--plugin-dir`, start
+`claude` with the same `TRACERY_HUB_URL` and run, inside the session:
+
+```
+/plugin marketplace add Atriarch-Systems/tracery-graph
+/plugin install tracery-graph@atriarch-systems
+```
+
+Observe: the plugin installs as `tracery-graph` from the `atriarch-systems`
+marketplace. Restart the session if Claude Code asks you to.
+
 ### 3.3 Run one prompt that uses a tool, then one that spawns a subagent
 
 Prompt 1 (uses a tool directly):
@@ -273,7 +284,8 @@ there is no visible sign the plugin is doing anything, which is correct
 
 ### 3.4 Confirm the flow and the child flow landed on the hub
 
-Ask Claude Code directly (this invokes the plugin's own `activity` skill):
+Ask Claude Code directly (this invokes the plugin's own `activity` skill;
+running `/tracery-graph:activity` invokes it explicitly):
 
 ```
 What's the activity link for this session?

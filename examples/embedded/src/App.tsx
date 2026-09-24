@@ -21,10 +21,10 @@ export function App() {
           fontSize: 13,
         }}
       >
-        Tracery embedded example: no hub, no network
+        Tracery Graph embedded example: no hub, no network
       </header>
       <div style={{ flex: '1 1 auto', minHeight: 0 }}>
-        <ActivityExplorer source={source} ariaLabel="Tracery embedded example explorer" />
+        <ActivityExplorer source={source} ariaLabel="Tracery Graph embedded example explorer" />
       </div>
     </div>
   );

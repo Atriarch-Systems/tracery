@@ -2,6 +2,12 @@
 
 ## v0.1.1 — release candidate (registries pending)
 
+- Renamed the product to Tracery Graph (the name Tracery belongs to Kate
+  Compton's long-standing story-grammar library). Code-level names are
+  unchanged: npm packages @atriarch-systems/tracery-*, the tracery-hub command,
+  TRACERY_* variables and the Docker image. The Python distribution is now
+  atriarch-tracery-graph (import atriarch.tracery is unchanged), and the Claude
+  Code plugin installs as tracery-graph@atriarch-systems.
 - Publish tested npm packages and Docker images through tag-triggered GitHub
   Actions, with manual validate/publish controls and retained SBOM/scan evidence.
 - Create annotated release tags and draft GitHub releases from the manual workflow.

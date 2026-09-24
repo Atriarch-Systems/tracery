@@ -1,8 +1,8 @@
-# Tracery event generator
+# Tracery Graph event generator
 
 An interactive example: pick a sample flow, click **Generate**, and watch it
 draw itself in a real `ActivityExplorer` -- no hub required. Check
-**Also send to a hub** to push the exact same events to a running Tracery
+**Also send to a hub** to push the exact same events to a running Tracery Graph
 hub over HTTP at the same time, so you can compare the in-process library
 view against the standalone hub's hosted UI side by side.
 

@@ -64,7 +64,7 @@ export function Viewer() {
           fontSize: 13,
         }}
       >
-        <strong>Tracery</strong>
+        <strong>Tracery Graph</strong>
         <span data-testid="share-label">{data.meta?.label ?? 'Offline export'}</span>
         <span data-testid="export-notice" style={{ color: '#8892a6' }}>
           exported {data.meta ? new Date(data.meta.createdAt).toISOString().slice(0, 10) : ''} — no live updates
@@ -76,7 +76,7 @@ export function Viewer() {
         )}
       </header>
       <div style={{ flex: '1 1 auto', minHeight: 0 }}>
-        <ActivityExplorer source={source} readOnly lockedTarget={data.meta?.target} ariaLabel="Tracery offline export" />
+        <ActivityExplorer source={source} readOnly lockedTarget={data.meta?.target} ariaLabel="Tracery Graph offline export" />
       </div>
       <Footer />
     </div>
