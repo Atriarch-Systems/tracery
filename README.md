@@ -42,9 +42,7 @@ The graph is `Workspace → Trace → Flow → Node → Op`.
 
 ## Install
 
-> v0.1.0 is a source release. This checkout prepares v0.1.1; its npm, Docker Hub and PyPI publication is pending
-> ([CHANGELOG](CHANGELOG.md), [publishing runbook](docs/PUBLISHING.md)). Until then, install from source.
-> There is also a [hosted demo](https://atriarch.systems/demos/tracery/).
+> Tracery Graph is not on npm, PyPI or Docker Hub yet. Install from source for now; the registry commands below work once v0.1.1 is released.
 
 **From source** (Node.js >=22.13, which provides `node:sqlite`):
 
@@ -61,14 +59,14 @@ The Python client installs from the same checkout (Python >=3.11, no dependencie
 python -m pip install ./clients/python
 ```
 
-**From registries (after the v0.1.1 release is published).** Nothing is on a registry today; these commands fail until then:
+**From package registries (v0.1.1, not released yet):**
 
 ```sh
 npm install @atriarch-systems/tracery-client                                # emitter SDK + hub read client
 npm install @atriarch-systems/tracery-core @atriarch-systems/tracery-react   # embed the explorer
 npx @atriarch-systems/tracery-hub                                          # run the hub
 docker pull atriarchsystems/tracery-hub:0.1.1
-pip install atriarch-tracery-graph                                         # uploaded to PyPI by hand, separately
+pip install atriarch-tracery-graph
 ```
 
 ## Quick start
@@ -454,7 +452,7 @@ Image facts (from [`apps/hub/Dockerfile`](apps/hub/Dockerfile)):
 - Ships the hosted UI and license notices. The matching Alpine package sources are under `/usr/share/tracery/`.
 - Released images are built and tested natively for `linux/amd64` and `linux/arm64`.
 
-Tags after the v0.1.1 release is published ([docs/PUBLISHING.md](docs/PUBLISHING.md)):
+Image tags (from v0.1.1, not released yet):
 
 | Tag | Contents |
 |---|---|

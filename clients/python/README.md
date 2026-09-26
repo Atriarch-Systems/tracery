@@ -8,7 +8,7 @@ TypeScript sibling.
 
 ## Install
 
-For v0.1.0, install from a source checkout (PyPI publication is pending):
+It is not on PyPI yet. Install it from a source checkout:
 
 ```sh
 # From the repository root:

@@ -1,8 +1,8 @@
 # Demos
 
-> **Source release:** npm packages and prebuilt Docker images are not published yet.
-> Follow the [source checkout/build instructions](../README.md) first; run the
-> commands below from the repository root.
+> **Not on npm or Docker Hub yet.** Build from source first
+> ([README](../README.md#install)), then run the commands below from the
+> repository root.
 
 Three ways to see Tracery Graph run, one per distribution mode from the root
 [README](../README.md#usage-modes): the Claude Code plugin, the npm library

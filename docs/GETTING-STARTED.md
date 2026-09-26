@@ -1,9 +1,9 @@
 # Getting started
 
-**v0.1.0 is a source release. npm/PyPI packages and prebuilt Docker images are
-not published yet.** The hub instructions below build from source. SDK registry
-install commands later in this guide apply only after publication; use this
-checkout's examples meanwhile.
+**Tracery Graph is not on npm, PyPI or Docker Hub yet.** The hub instructions
+below build from source ([README](../README.md#install)). The registry install
+commands later in this guide work once v0.1.1 is released; until then, use the
+examples in the repository.
 
 A longer walkthrough than the root [`README.md`](../README.md)'s quick
 starts: running the hub with Docker Compose and a real keys file, emitting

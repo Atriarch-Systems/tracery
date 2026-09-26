@@ -1,8 +1,8 @@
 # Claude Code plugin
 
-> **Source release:** npm packages and prebuilt Docker images are not published yet.
-> Follow the [source checkout/build instructions](../README.md) first; run the
-> commands below from the repository root.
+> **Not on npm or Docker Hub yet.** Build from source first
+> ([README](../README.md#install)), then run the commands below from the
+> repository root.
 
 `plugins/claude-code` turns a running Claude Code session into a Tracery Graph by
 Atriarch Systems flow: session start/end, every tool call, and every subagent
