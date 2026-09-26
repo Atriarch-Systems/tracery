@@ -1,9 +1,5 @@
 # tracery-graph (Claude Code plugin)
 
-> **Not on npm or Docker Hub yet.** Build from source first
-> ([README](../../README.md#install)), then run the commands below from the
-> repository root.
-
 Streams Claude Code session, tool-call and subagent activity to a
 [Tracery Graph](../../docs/SPEC.md) hub, so a running session shows up as a
 live flow graph instead of only scrollback. See
@@ -32,19 +28,24 @@ so this works today:
 See [`../../docs/CLAUDE-CODE-PLUGIN.md`](../../docs/CLAUDE-CODE-PLUGIN.md#install-and-configure)
 for the local-path variant of `/plugin marketplace add`.
 
-## Quick start: built source, no key
+## Quick start: local hub, no key
 
 Point the plugin at a hub started with no configuration at all -- it runs
 loopback-only with auth off (SPEC.md §6 "Auth mode"), so there is no key to
 generate, copy, or configure:
 
 ```sh
-node apps/hub/bin/hub.mjs
+npx @atriarch-systems/tracery-hub
 ```
 
+With the plugin installed from the marketplace (above):
+
 ```sh
-TRACERY_HUB_URL=http://127.0.0.1:8971 claude --plugin-dir ./plugins/claude-code
+TRACERY_HUB_URL=http://127.0.0.1:8971 claude
 ```
+
+From a clone, `TRACERY_HUB_URL=http://127.0.0.1:8971 claude --plugin-dir ./plugins/claude-code`
+loads it without installing.
 
 That's the whole setup. `TRACERY_HUB_URL` (or the `hub_url` userConfig
 prompt) is the only thing this needs against a local hub; leave `api_key`
@@ -69,7 +70,7 @@ With no `hub_url` at all, every hook is a silent no-op -- installing the
 plugin without configuring it does nothing. `api_key` is only needed against
 a hub running with `TRACERY_API_KEYS` configured (needs the `ingest` role,
 see `apps/hub/README.md`); against a local-mode hub (no `TRACERY_API_KEYS`,
-the `node apps/hub/bin/hub.mjs` default) it should be left empty.
+the `npx @atriarch-systems/tracery-hub` default) it should be left empty.
 
 ## Sharing the plugin with someone
 
@@ -128,11 +129,10 @@ directory containing this plugin's own `plugin.json`, `hooks/`, and
 
 **(c) Either way, your friend also needs a hub to point it at.** The plugin
 only ever talks to whatever `TRACERY_HUB_URL` names -- it does not ship one.
-For v0.1.0, have them follow the root README's source checkout/build steps,
-then start their own local hub from the repository root:
+They can start their own local hub with Node.js >=22.13:
 
 ```sh
-node apps/hub/bin/hub.mjs
+npx @atriarch-systems/tracery-hub
 ```
 
 Either way, whatever `hub_url` (or `TRACERY_HUB_URL`) they configure the

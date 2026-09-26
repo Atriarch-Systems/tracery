@@ -1,22 +1,18 @@
 # @atriarch-systems/tracery-hub
 
-> **Not on npm or Docker Hub yet.** Build from source first
-> ([README](../../README.md#install)), then run the commands below from the
-> repository root.
-
 Standalone server for Tracery Graph (see [`../../docs/SPEC.md`](../../docs/SPEC.md)
 §6). Apps push events with a client SDK (`@atriarch-systems/tracery-client` or the
 Python `atriarch-tracery-graph`); the hub stores, sorts, serves and draws. Nothing
 renders in the producing app.
 
 ```
-node apps/hub/bin/hub.mjs
+npx @atriarch-systems/tracery-hub
 ```
 
-starts the server bound to `127.0.0.1:8971` with an in-memory store and
+(or `node apps/hub/bin/hub.mjs` from a built source checkout) starts the server bound to `127.0.0.1:8971` with an in-memory store and
 **no authentication of its own** ("local mode" -- see "Auth mode" below): a
 single `default` workspace, no key to generate, copy, or configure. Every
-other setting below has a default once the source and hosted UI are built.
+other setting below has a default.
 
 ## Environment variables
 
@@ -272,12 +268,8 @@ generous for genuinely long-running work).
 
 ## Docker
 
-Build from the **repository root** (the image needs `packages/core` and,
-optionally, `apps/hub/web`):
-
 ```
-docker build -f apps/hub/Dockerfile -t atriarchsystems/tracery-hub:dev .
-docker run --rm -p 127.0.0.1:8971:8971 -e TRACERY_AUTH=none atriarchsystems/tracery-hub:dev
+docker run --rm -p 127.0.0.1:8971:8971 -e TRACERY_AUTH=none atriarchsystems/tracery-hub:0.1.1
 ```
 
 The local example explicitly opts out of authentication and publishes the port
@@ -287,7 +279,14 @@ configure a real key:
 ```
 docker run --rm -p 8971:8971 \
   -e TRACERY_API_KEYS='[{"id":"me","key":"CHANGE_ME","workspace":"default","roles":["ingest","read","admin"]}]' \
-  atriarchsystems/tracery-hub:dev
+  atriarchsystems/tracery-hub:0.1.1
+```
+
+To build the image yourself, run this from the **repository root** (the image
+needs `packages/core` and, optionally, `apps/hub/web`):
+
+```
+docker build -f apps/hub/Dockerfile -t atriarchsystems/tracery-hub:dev .
 ```
 
 or with compose (also root-context; its services configure a keys file):

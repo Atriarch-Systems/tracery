@@ -1,6 +1,9 @@
 # Changelog
 
-## v0.1.1 — release candidate (registries pending)
+## v0.1.1 — released 2026-09-26
+
+The npm packages and the multi-arch Docker Hub image (atriarchsystems/tracery-hub)
+are published. The Python client is not on PyPI yet; install it from a checkout.
 
 - Renamed the product to Tracery Graph (the name Tracery belongs to Kate
   Compton's long-standing story-grammar library). Code-level names are

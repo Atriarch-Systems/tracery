@@ -1,9 +1,7 @@
 # Getting started
 
-**Tracery Graph is not on npm, PyPI or Docker Hub yet.** The hub instructions
-below build from source ([README](../README.md#install)). The registry install
-commands later in this guide work once v0.1.1 is released; until then, use the
-examples in the repository.
+The npm packages and the Docker image install from their registries. The
+Python client is not on PyPI yet; install it from a checkout (§2).
 
 A longer walkthrough than the root [`README.md`](../README.md)'s quick
 starts: running the hub with Docker Compose and a real keys file, emitting
@@ -14,10 +12,16 @@ managed service this guide doesn't need.
 
 ## 1. Run the hub
 
-### Source checkout (Node.js >=22.13, no Docker or keys)
+### npx or a source checkout (Node.js >=22.13, no Docker or keys)
 
 ```sh
-git clone --branch v0.1.0 https://github.com/Atriarch-Systems/tracery-graph.git
+npx @atriarch-systems/tracery-hub
+```
+
+Or from a source checkout:
+
+```sh
+git clone --branch v0.1.1 https://github.com/Atriarch-Systems/tracery-graph.git
 cd tracery-graph
 npm ci
 npm run build
@@ -32,14 +36,10 @@ fastest way to try the hub or point the Claude Code plugin at one (§4
 below); reach for Docker once more than one machine or process needs to
 reach it.
 
-### Build and run a local Docker image
-
-Clone the repository above first and run these commands at its root. No public
-Tracery Graph image is available to pull yet; Docker builds it locally:
+### Docker
 
 ```sh
-docker build -f apps/hub/Dockerfile -t atriarchsystems/tracery-hub:dev .   # from the repo root
-docker run --rm -p 127.0.0.1:8971:8971 -e TRACERY_AUTH=none atriarchsystems/tracery-hub:dev
+docker run --rm -p 127.0.0.1:8971:8971 -e TRACERY_AUTH=none atriarchsystems/tracery-hub:0.1.1
 ```
 
 The local example explicitly disables authentication and publishes only on
@@ -48,8 +48,12 @@ loopback. For network access, configure real keys:
 ```sh
 docker run --rm -p 8971:8971 \
   -e TRACERY_API_KEYS='[{"id":"me","key":"CHANGE_ME","workspace":"default","roles":["ingest","read","admin"]}]' \
-  atriarchsystems/tracery-hub:dev
+  atriarchsystems/tracery-hub:0.1.1
 ```
+
+To build the image yourself, run
+`docker build -f apps/hub/Dockerfile -t atriarchsystems/tracery-hub:dev .`
+from the repository root.
 
 This mode keeps everything in memory (`TRACERY_STORE=memory`, the default);
 nothing survives a restart. Full environment variable reference:
@@ -162,8 +166,11 @@ parent's `llm:main` op to the subagent's root node. Full API:
 
 ### Python
 
+The Python client is not on PyPI yet. Install it from a checkout:
+
 ```sh
-python -m pip install atriarch-tracery-graph
+git clone https://github.com/Atriarch-Systems/tracery-graph.git
+python -m pip install ./tracery-graph/clients/python
 ```
 
 ```python
@@ -240,15 +247,19 @@ watch any other producer's activity. One command each, no key needed against
 the local-mode hub from §1:
 
 ```sh
-node apps/hub/bin/hub.mjs
+npx @atriarch-systems/tracery-hub
 ```
+
+Inside Claude Code, run `/plugin marketplace add Atriarch-Systems/tracery-graph`
+then `/plugin install tracery-graph@atriarch-systems`, and start the session with
+the hub URL:
 
 ```sh
-TRACERY_HUB_URL=http://127.0.0.1:8971 claude --plugin-dir ./plugins/claude-code
+TRACERY_HUB_URL=http://127.0.0.1:8971 claude
 ```
 
-(or, inside Claude Code, `/plugin marketplace add Atriarch-Systems/tracery-graph`
-then `/plugin install tracery-graph@atriarch-systems`). Configure it with environment variables or the prompts Claude Code
+(From a clone, `claude --plugin-dir ./plugins/claude-code` loads the plugin
+without installing it.) Configure it with environment variables or the prompts Claude Code
 shows when the plugin is enabled:
 
 | Env var | Required | Default |
@@ -272,7 +283,7 @@ never leaves the machine), and troubleshooting:
 - [`docs/CLOUD.md`](CLOUD.md) — Tracery Cloud (the managed service): SSO, an
   audit log, and RBAC scopes if you need to restrict what a key can see or
   ingest, plus how self-hosted enterprise works.
-- `node scripts/demo.mjs` — a scripted end-to-end run (a parent flow
+- `node scripts/demo.mjs` (from a clone) — a scripted end-to-end run (a parent flow
   spawning one TypeScript and one Python child) against a hub you already
   have running, useful as a working example of everything on this page at
   once.

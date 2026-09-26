@@ -1,7 +1,7 @@
 # Demos
 
-> **Not on npm or Docker Hub yet.** Build from source first
-> ([README](../README.md#install)), then run the commands below from the
+> These demos use scripts and examples from the repository. Build a clone
+> first ([README](../README.md#install)), then run the commands below from the
 > repository root.
 
 Three ways to see Tracery Graph run, one per distribution mode from the root

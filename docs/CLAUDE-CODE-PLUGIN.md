@@ -1,9 +1,5 @@
 # Claude Code plugin
 
-> **Not on npm or Docker Hub yet.** Build from source first
-> ([README](../README.md#install)), then run the commands below from the
-> repository root.
-
 `plugins/claude-code` turns a running Claude Code session into a Tracery Graph by
 Atriarch Systems flow: session start/end, every tool call, and every subagent
 as its own linked child flow. It is a thin, zero-dependency adapter from [Claude
@@ -49,14 +45,17 @@ instead of a `owner/repo` shorthand: `/plugin marketplace add
 
 Either install path needs only `hub_url` (`userConfig` prompt, or
 `TRACERY_HUB_URL`) against a hub running in local mode -- one started with
-`node apps/hub/bin/hub.mjs` and no `TRACERY_API_KEYS` runs loopback-only with
+`npx @atriarch-systems/tracery-hub` and no `TRACERY_API_KEYS` runs loopback-only with
 auth off, so there is no key to configure at all:
 
 ```sh
-node apps/hub/bin/hub.mjs
-# In a second terminal, also at the repository root:
-TRACERY_HUB_URL=http://127.0.0.1:8971 claude --plugin-dir ./plugins/claude-code
+npx @atriarch-systems/tracery-hub
+# In a second terminal, with the plugin installed from the marketplace:
+TRACERY_HUB_URL=http://127.0.0.1:8971 claude
 ```
+
+From a clone, add `--plugin-dir ./plugins/claude-code` to load the plugin
+without installing it.
 
 `api_key` (`TRACERY_API_KEY`) is only needed against a hub that requires
 keys (`TRACERY_API_KEYS`/`_FILE` configured -- needs the `ingest` role). With

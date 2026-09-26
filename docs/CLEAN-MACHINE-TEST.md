@@ -75,8 +75,9 @@ PASS:
   React rendering, starts the packaged CLI/UI, and verifies live parent/child
   traces. It removes its temporary consumer and stops its hub when finished.
 
-This proves tarball installation, not registry availability. Do not run
-`npx @atriarch-systems/tracery-hub` yet: the public package is not published.
+This proves tarball installation, not registry availability. Check the
+published package separately with `npx @atriarch-systems/tracery-hub` and
+record it as "Public npm install" in the report.
 
 ## 3. Manual explorer check
 
