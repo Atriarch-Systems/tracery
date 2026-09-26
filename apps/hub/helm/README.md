@@ -31,11 +31,25 @@ helm install tracery-hub apps/hub/helm \
 - **ServiceMonitor** (optional, `serviceMonitor.enabled`) scraping
   `GET /metrics`.
 
+The image tag defaults to the chart's `appVersion`, the matching published
+release.
+
 This chart deploys the open-source community hub only. Tracery Cloud's
 extensions module (SPEC.md §7 "Extensions and Tracery Cloud") is a separate
 concern -- it plugs in at runtime via `TRACERY_EXTENSIONS_MODULE`, which this
 chart does not currently template; set it via `config` (a custom
 `extraEnv`-style override, or your own values patch) if you deploy it.
+
+## Security settings
+
+Keep the default `podSecurityContext`, `securityContext` and `tmpDir`. If you
+override them, keep uid/gid `10001` with `runAsNonRoot`, the read-only root
+filesystem, `drop: ["ALL"]`, `allowPrivilegeEscalation: false` and the
+`RuntimeDefault` seccomp profile. The hub writes only to `/tmp` (the
+`emptyDir`) and `/data` (the PVC, writable through `fsGroup: 10001`). These
+defaults also work with the 0.1.1 image. From v0.1.2 the image has no shell;
+use `kubectl exec <pod> -c hub -- node -e "..."` or `kubectl debug` with an
+ephemeral container to look inside.
 
 ## Storage and `replicaCount`
 

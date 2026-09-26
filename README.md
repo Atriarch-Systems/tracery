@@ -425,14 +425,17 @@ The image binds `0.0.0.0`, so it needs keys or an explicit opt-out. For a local 
 docker run --rm -p 127.0.0.1:8971:8971 -e TRACERY_AUTH=none atriarchsystems/tracery-hub:0.1.1
 ```
 
-For anything another person or machine reaches, configure keys and keep data on a named volume:
+For anything another person or machine reaches, configure keys, keep data on a named volume and lock the container down:
 
 ```sh
 docker run -d --name tracery-hub -p 8971:8971 \
+  --read-only --tmpfs /tmp --cap-drop ALL --security-opt no-new-privileges \
   -e TRACERY_STORE=sqlite -v tracery-data:/data \
   -e TRACERY_API_KEYS='[{"id":"me","key":"CHANGE_ME","workspace":"default","roles":["ingest","read","admin"]}]' \
   atriarchsystems/tracery-hub:0.1.1
 ```
+
+Use `--read-only --tmpfs /tmp --cap-drop ALL --security-opt no-new-privileges` for every hub container. The hub writes only to `/data` and `/tmp`, needs no Linux capabilities and never needs to gain privileges.
 
 To build the image yourself, run this from the repository root:
 
@@ -440,16 +443,20 @@ To build the image yourself, run this from the repository root:
 docker build -f apps/hub/Dockerfile -t atriarchsystems/tracery-hub:dev .
 ```
 
-`TRACERY_API_KEYS_FILE` also works with a Docker secret or a read-only bind mount. [`apps/hub/docker-compose.yaml`](apps/hub/docker-compose.yaml) runs the hub with SQLite and a keys file, and its `postgres` profile adds a throwaway Postgres.
+`TRACERY_API_KEYS_FILE` also works with a Docker secret or a read-only bind mount. [`apps/hub/docker-compose.yaml`](apps/hub/docker-compose.yaml) runs the hub with SQLite and a keys file, and its `postgres` profile adds a throwaway Postgres. Its services use the same read-only, no-capabilities settings.
 
-Image facts (from [`apps/hub/Dockerfile`](apps/hub/Dockerfile)):
+Image facts (from [`apps/hub/Dockerfile`](apps/hub/Dockerfile)). These describe the hardened image, which ships from v0.1.2; notes in brackets say how 0.1.1 differs.
 
-- Runtime: `alpine:3.24.2` with the Node 22.23.2 binary copied from `node:22.23.2-alpine3.24`, both pinned by digest. No npm, Corepack or Yarn in the final image.
-- Runs as the non-root user `tracery`. Entry point `node bin/hub.mjs` in `/app/apps/hub`.
+- Runtime: `FROM scratch` with the Node 22.23.2 binary from `node:22.23.2-alpine3.24` and only the six Alpine packages it needs (musl, libgcc, libstdc++, ca-certificates-bundle, alpine-release, alpine-keys), all pinned. No shell, busybox, apk, npm, Corepack or Yarn. [0.1.1: an `alpine:3.24.2` base that includes busybox.]
+- Runs as uid/gid `10001`. The `USER` is numeric, so Kubernetes `runAsNonRoot` can verify it. App code under `/app` is owned by root and read-only to the hub; only `/data` belongs to uid 10001. [0.1.1: the non-root user `tracery`, uid 100.] Entry point `node bin/hub.mjs` in `/app/apps/hub`.
+- Only the hub's production dependencies are installed.
 - Defaults: `TRACERY_HOST=0.0.0.0`, `TRACERY_PORT=8971`, `TRACERY_STORE=memory`, `TRACERY_SQLITE_PATH=/data/tracery.db`.
-- `EXPOSE 8971`, `VOLUME /data`, and a `HEALTHCHECK` every 30 s that fetches `/healthz` with Node (no curl in the image).
-- Ships the hosted UI and license notices. The matching Alpine package sources are under `/usr/share/tracery/`.
+- `EXPOSE 8971`, `VOLUME /data`, and an exec-form `HEALTHCHECK` every 30 s that fetches `/healthz` with Node.
+- Ships the hosted UI and license notices. The matching Alpine package sources are published as the `<version>-sources` image tags and as GitHub release assets, and `/usr/share/tracery/SOURCES.txt` in the image says where. [0.1.1: the sources are inside the image under `/usr/share/tracery/`.]
+- Size (amd64): 53 MB compressed, 166 MB unpacked. [0.1.1: 231 MB and 422 MB.]
 - Released images are built and tested natively for `linux/amd64` and `linux/arm64`.
+
+From v0.1.2 the image has no shell, so `docker exec ... sh` does not work. Run Node instead, for example `docker exec tracery-hub node -p "process.getuid()"`, or use `docker debug tracery-hub` if your Docker has it.
 
 Image tags:
 
@@ -458,14 +465,61 @@ Image tags:
 | `0.1.1`, `latest` | Multi-platform; Docker picks amd64 or arm64. |
 | `0.1.1-amd64`, `latest-amd64` | Linux amd64 only. |
 | `0.1.1-arm64`, `latest-arm64` | Linux arm64 only. |
+| `<version>-sources`, `<version>-sources-amd64`, `<version>-sources-arm64` | Matching OS package sources (not runnable). From v0.1.2. |
 
 ## Kubernetes
 
-[`apps/hub/helm`](apps/hub/helm/README.md) is a Helm chart (Deployment, Service, optional Ingress and ServiceMonitor, keys inline or from an existing Secret), and [`apps/hub/k8s`](apps/hub/k8s) has plain manifests. Both default to SQLite on a PVC with one replica; the chart refuses `replicaCount > 1` unless `config.store` is `postgres`. Set `image.tag` to a published tag such as `0.1.1`, or push a locally built image to your registry and set `image.repository` and `image.tag`.
+[`apps/hub/helm`](apps/hub/helm/README.md) is a Helm chart (Deployment, Service, optional Ingress and ServiceMonitor, keys inline or from an existing Secret), and [`apps/hub/k8s`](apps/hub/k8s) has plain manifests. Both default to SQLite on a PVC with one replica; the chart refuses `replicaCount > 1` unless `config.store` is `postgres`. Both use the matching published image (`0.1.1`) by default. To run your own build, push it to your registry and set `image.repository` and `image.tag`.
 
 ```sh
 helm install tracery-hub apps/hub/helm --namespace tracery --create-namespace -f my-values.yaml
 ```
+
+The chart and the manifests run the hub as a non-root, locked-down container:
+
+- uid/gid `10001` with `runAsNonRoot: true`
+- a read-only root filesystem
+- all Linux capabilities dropped and no privilege escalation
+- the `RuntimeDefault` seccomp profile
+- an `emptyDir` at `/tmp` as the only scratch space
+
+Keep the same settings if you write your own manifests. They work with 0.1.1 and later. With SQLite, `/data` needs a writable volume (a PVC), and `fsGroup: 10001` makes it writable by the hub:
+
+```yaml
+spec:
+  template:
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: hub
+          image: atriarchsystems/tracery-hub:0.1.1
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: data
+              mountPath: /data
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi
+        - name: data
+          persistentVolumeClaim:
+            claimName: tracery-hub-data
+```
+
+From v0.1.2 the image has no shell. To look inside a pod, run Node (`kubectl exec <pod> -c hub -- node -p "process.getuid()"`) or attach an ephemeral debug container with `kubectl debug -it <pod> --image=busybox --target=hub`.
 
 ## Claude Code plugin
 

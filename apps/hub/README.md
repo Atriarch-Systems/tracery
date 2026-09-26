@@ -278,9 +278,14 @@ configure a real key:
 
 ```
 docker run --rm -p 8971:8971 \
+  --read-only --tmpfs /tmp --cap-drop ALL --security-opt no-new-privileges \
   -e TRACERY_API_KEYS='[{"id":"me","key":"CHANGE_ME","workspace":"default","roles":["ingest","read","admin"]}]' \
   atriarchsystems/tracery-hub:0.1.1
 ```
+
+Use `--read-only --tmpfs /tmp --cap-drop ALL --security-opt no-new-privileges`
+for every hub container. The hub writes only to `/data` and `/tmp` and needs
+no Linux capabilities. The compose services below use the same settings.
 
 To build the image yourself, run this from the **repository root** (the image
 needs `packages/core` and, optionally, `apps/hub/web`):
@@ -295,12 +300,21 @@ or with compose (also root-context; its services configure a keys file):
 docker compose -f apps/hub/docker-compose.yaml up --build
 ```
 
-The image is `node:22-alpine`, runs as a non-root user, keeps only
-production dependencies, exposes `8971`, declares `VOLUME /data`, and has a
-`HEALTHCHECK` against `/healthz` (via Node's built-in `fetch`, no `curl`
-dependency in the image). If `apps/hub/web` does not exist yet in the build
-context, the image still builds and serves the plain placeholder page at
-`/ui` (see `apps/hub/src/routes/ui.ts`).
+From v0.1.2 the image is `FROM scratch` with the Node binary and six Alpine
+runtime packages: no shell, busybox or apk. It runs as uid/gid `10001`, the app
+code is owned by root and read-only to the hub, and only `/data` is writable.
+It keeps only the hub's production dependencies, exposes `8971`, declares
+`VOLUME /data`, and has an exec-form `HEALTHCHECK` against `/healthz` (via
+Node's built-in `fetch`). The matching OS package sources are published as the
+`<version>-sources` image tags and GitHub release assets;
+`/usr/share/tracery/SOURCES.txt` in the image says where. There is no `sh`, so
+to look inside a running container use `docker exec <name> node -e "..."`.
+(0.1.1 is Alpine-based, runs as the non-root user `tracery`, uid 100, and
+carries the sources inside the image.)
+
+If `apps/hub/web` does not exist yet in the build context, the image still
+builds and serves the plain placeholder page at `/ui` (see
+`apps/hub/src/routes/ui.ts`).
 
 `TRACERY_API_KEYS_FILE` mounts well as a Docker secret or a read-only bind
 mount; see `docker-compose.yaml` and `keys.example.json` for the shape.
@@ -318,6 +332,12 @@ docker compose -f apps/hub/docker-compose.yaml --profile postgres up --build pos
 Plain manifests in `k8s/` (Kustomize-friendly, no Helm); a Helm chart
 covering the same deployment (plus Ingress, ServiceMonitor and templated
 secrets) is at [`helm/`](helm/README.md).
+
+Both run the hub as uid/gid `10001` with a read-only root filesystem, all
+capabilities dropped, no privilege escalation, `RuntimeDefault` seccomp and an
+`emptyDir` at `/tmp`. Keep those settings in your own manifests. The root
+[README's Kubernetes section](../../README.md#kubernetes) has a copy-paste
+`securityContext` example.
 
 ```
 kubectl create namespace tracery

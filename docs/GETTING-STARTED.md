@@ -47,9 +47,14 @@ loopback. For network access, configure real keys:
 
 ```sh
 docker run --rm -p 8971:8971 \
+  --read-only --tmpfs /tmp --cap-drop ALL --security-opt no-new-privileges \
   -e TRACERY_API_KEYS='[{"id":"me","key":"CHANGE_ME","workspace":"default","roles":["ingest","read","admin"]}]' \
   atriarchsystems/tracery-hub:0.1.1
 ```
+
+Keep `--read-only --tmpfs /tmp --cap-drop ALL --security-opt no-new-privileges`
+on every hub container. The hub runs as a non-root user, writes only to
+`/data` and `/tmp`, and needs no Linux capabilities.
 
 To build the image yourself, run
 `docker build -f apps/hub/Dockerfile -t atriarchsystems/tracery-hub:dev .`
@@ -71,8 +76,9 @@ opt-out; it has no unauthenticated default:
 docker compose -f apps/hub/docker-compose.yaml up --build
 ```
 
-This starts the hub with `TRACERY_STORE=sqlite` (durable across restarts,
-volume `tracery-data`) and `TRACERY_API_KEYS_FILE` pointed at
+This starts the hub with a read-only root filesystem, a `/tmp` tmpfs, all
+capabilities dropped, `no-new-privileges`, `TRACERY_STORE=sqlite` (durable
+across restarts, volume `tracery-data`) and `TRACERY_API_KEYS_FILE` pointed at
 `./keys.example.json`, mounted read-only. **Copy that file and replace the
 placeholder keys before using this anywhere but a laptop**:
 
@@ -105,6 +111,12 @@ Plain manifests in `apps/hub/k8s/` (both configure real
 [`apps/hub/helm/`](../apps/hub/helm/README.md) (`config.authNone: true` is
 the equivalent opt-out there, off by default -- see its README's "API keys"
 section).
+
+Both run the hub as uid/gid `10001` with a read-only root filesystem, all
+capabilities dropped, no privilege escalation, `RuntimeDefault` seccomp and
+an `emptyDir` at `/tmp`. Keep those settings if you write your own
+manifests. The root README's [Kubernetes section](../README.md#kubernetes)
+has a copy-paste example.
 
 Whichever way you started it, confirm it's up:
 

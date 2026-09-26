@@ -1,5 +1,32 @@
 # Changelog
 
+## Unreleased
+
+- The hub image is now shell-less: a FROM scratch runtime with the Node binary
+  and six pinned Alpine packages (musl, libgcc, libstdc++, ca-certificates-bundle,
+  alpine-release, alpine-keys). No shell, busybox, apk, wget, nc or su. It keeps
+  only the hub's production dependencies and uses an exec-form HEALTHCHECK. Size
+  (amd64): 422 MB to 166 MB unpacked, 231 MB to 53 MB compressed.
+- The image runs as a fixed numeric user, uid/gid 10001, so Kubernetes
+  runAsNonRoot can verify it. App code is owned by root and read-only to that
+  user; only /data belongs to it. The 0.1.1 image let the runtime user modify
+  the app code.
+- OS package sources moved out of the runtime image. They are published as
+  <version>-sources Docker Hub tags and as GitHub release assets, and
+  /usr/share/tracery/SOURCES.txt in the image says where to get them.
+- The Helm chart and apps/hub/k8s/deployment.yaml run the hub as uid 10001 with
+  a read-only root filesystem, a /tmp emptyDir, all capabilities dropped, no
+  privilege escalation and RuntimeDefault seccomp. apps/hub/docker-compose.yaml
+  uses a read-only root filesystem, a /tmp tmpfs, no capabilities and
+  no-new-privileges. These settings also work with the 0.1.1 image.
+- Fixed the Helm chart appVersion (the default image tag) and the
+  apps/hub/k8s/deployment.yaml image tag, which pointed at 0.1.0, a tag that was
+  never published. Both now use 0.1.1, and the chart version is 0.1.1.
+- The release workflow now fails if the Helm appVersion or the k8s manifest
+  image tag differ from the package version.
+- The Docker, Kubernetes and getting-started docs recommend the non-root user,
+  a read-only root filesystem and dropped capabilities, with examples.
+
 ## v0.1.1 — released 2026-09-26
 
 The npm packages and the multi-arch Docker Hub image (atriarchsystems/tracery-hub)

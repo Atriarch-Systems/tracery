@@ -70,6 +70,15 @@ attestations.
 1. Prepare the package versions and dependent ranges, update the lockfile and
    CHANGELOG, and push to `main`. Root and hub versions must agree. Require CI
    to pass. The workflow does not silently bump versions or commit changes.
+   Bump these with the version too, or the release fails:
+   - `appVersion` in `apps/hub/helm/Chart.yaml` (the chart's default image
+     tag). Also bump the chart's own `version` when the chart changed.
+   - The `atriarchsystems/tracery-hub:<version>` image in
+     `apps/hub/k8s/deployment.yaml`.
+
+   `scripts/release-context.mjs` checks both against the root `package.json`
+   version in the prepare job, and `scripts/release-context.test.mjs` checks
+   them in CI and in the validate job.
 2. Open **Actions → release → Run workflow**, select **main**, and leave
    **operation** as **validate**. This tests the npm packages and both native
    container architectures without creating tags, releases or registry uploads.

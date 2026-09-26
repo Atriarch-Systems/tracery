@@ -36,6 +36,8 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with: { node-version: '22.23.2' }
       - run: git merge-base --is-ancestor HEAD origin/main
+      # Also fails unless the hub package, Helm appVersion and k8s manifest
+      # image tag all equal the root package.json version.
       - id: context
         run: node scripts/release-context.mjs
         env:
