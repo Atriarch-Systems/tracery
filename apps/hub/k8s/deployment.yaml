@@ -22,12 +22,23 @@ spec:
       labels:
         app.kubernetes.io/name: tracery-hub
     spec:
+      # The image runs as uid/gid 10001; fsGroup makes /data writable by it.
       securityContext:
         runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: hub
           image: atriarchsystems/tracery-hub:0.1.0
           imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
           ports:
             - name: http
               containerPort: 8971
@@ -65,6 +76,9 @@ spec:
             #       name: tracery-hub-postgres # provision via OpenBao/ExternalSecret; a postgres:// URL, e.g. postgres://tracery:PASSWORD@tracery-postgres:5432/tracery
             #       key: url
           volumeMounts:
+            # Writable scratch space; the root filesystem is read-only.
+            - name: tmp
+              mountPath: /tmp
             - name: data
               mountPath: /data
             - name: keys
@@ -89,6 +103,9 @@ spec:
             limits:
               memory: 512Mi
       volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi
         - name: data
           persistentVolumeClaim:
             claimName: tracery-hub-data

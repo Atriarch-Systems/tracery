@@ -104,7 +104,7 @@ From the repository root:
 docker build -f apps/hub/Dockerfile -t tracery-release-test:local .
 docker image inspect tracery-release-test:local --format "{{.Id}} {{.Os}}/{{.Architecture}}"
 docker volume create tracery-release-test-data
-docker run -d --name tracery-release-test -p 127.0.0.1:18971:8971 -e TRACERY_AUTH=none -e TRACERY_STORE=sqlite -v tracery-release-test-data:/data tracery-release-test:local
+docker run -d --name tracery-release-test --read-only --tmpfs /tmp --cap-drop ALL --security-opt no-new-privileges -p 127.0.0.1:18971:8971 -e TRACERY_AUTH=none -e TRACERY_STORE=sqlite -v tracery-release-test-data:/data tracery-release-test:local
 ```
 
 The explicit auth opt-out is only for this loopback-bound synthetic-data test.
@@ -114,14 +114,16 @@ Wait for startup, then open these in a browser:
 - <http://127.0.0.1:18971/v1/info>: community edition, auth `none`.
 - <http://127.0.0.1:18971/ui/>: actual explorer, no missing-build page or login prompt.
 
-Check identity and bundled notices:
+Check identity and bundled notices. The image has no shell, `id` or `ls`, so
+use Node:
 
 ```sh
-docker exec tracery-release-test id
-docker exec tracery-release-test ls -l /app/LICENSE /app/NOTICE /app/THIRD-PARTY-NOTICES.txt
+docker exec tracery-release-test node -p "process.getuid() + ':' + process.getgid()"
+docker exec tracery-release-test node -e "for (const f of ['/app/LICENSE', '/app/NOTICE', '/app/THIRD-PARTY-NOTICES.txt', '/usr/share/tracery/SOURCES.txt']) console.log(f, require('fs').statSync(f).size)"
 ```
 
-PASS: the app runs as a non-root user and all three notice files exist.
+PASS: the app runs as `10001:10001` (non-root) and all four notice files exist
+with a non-zero size.
 
 Emit a synthetic trace using the same acceptance fixture as the npm check.
 In PowerShell:

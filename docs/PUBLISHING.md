@@ -98,11 +98,14 @@ version and point to a commit on `main`'s history.
 | `0.1.1`, `latest` | Multi-platform image: Docker selects Linux AMD64 or ARM64 automatically. |
 | `0.1.1-amd64`, `latest-amd64` | Linux AMD64 only. |
 | `0.1.1-arm64`, `latest-arm64` | Linux ARM64 only. |
+| `0.1.1-sources` | Multi-platform companion image with the matching Alpine package sources (`/sources.tar.gz`); not runnable. |
+| `0.1.1-sources-amd64`, `0.1.1-sources-arm64` | The same, per architecture. There is no `latest-sources`. |
 
 AMD64 builds and smoke tests run on `[self-hosted, Linux, X64, arc-amd64]`;
 ARM64 runs on `[self-hosted, Linux, ARM64, arc-pi]`. Both the runner and Docker
 daemon architecture are checked. No emulation is used. Each image gets its own
-license/vulnerability/secret scan, source archive, inventory, SBOM and checksums.
+license/vulnerability/secret scan, source archive and source image, inventory,
+SBOM and checksums.
 Both must pass before **any** registry publication. A failed or unavailable ARM
 runner blocks the release instead of silently publishing only AMD64.
 
@@ -122,9 +125,15 @@ Each tarball must contain LICENSE and NOTICE; the hub must include its hosted UI
 and third-party notices. Publication uses those exact tarballs with lifecycle
 scripts disabled, rather than repacking them. Private workspaces are not published.
 
-The pinned Node/Alpine containers omit unused npm/Yarn runtime tooling and include
-corresponding Alpine sources. Native acceptance tests verify architecture,
-non-root operation, UI/notices, source checksums, live tracing, SQLite persistence
+The pinned Node/Alpine containers have no shell, apk, npm or Yarn. The runtime
+image does not contain the corresponding Alpine sources; the same build's
+`sources-image` target produces the `<version>-sources` image, which the
+publish job pushes before the runtime tags, and the source archive is also a
+GitHub release asset. Native acceptance tests (`scripts/release-image-check.mjs
+IMAGE SOURCES_IMAGE [dir] [arch]`) run the image with `--read-only`,
+`--cap-drop ALL` and `no-new-privileges` and verify architecture, uid/gid
+10001, root-owned read-only app code, absent OS tooling, UI/notices, the source
+archive's checksums against the runtime image, live tracing, SQLite persistence
 and fail-closed authentication. Trivy rejects unreviewed licenses, source-policy
 drift, secrets and HIGH/CRITICAL vulnerabilities. See [LICENSING.md](LICENSING.md)
 and the [container review](../licenses/CONTAINER-REVIEW.md). GPL/LGPL operating-system
@@ -137,9 +146,10 @@ job verifies all three before loading the saved images and forming the combined
 manifest from immutable digests. It does not rebuild either image.
 
 GitHub release assets include npm tarballs, source/report evidence and separately
-named `container-amd64-*` and `container-arm64-*` source archives, inventories and
-reports. Saved image archives remain in Actions and are distributed through Docker
-Hub. `SHA256SUMS` records the original artifact paths, including those image archives.
+named `container-amd64-*` and `container-arm64-*` source archives
+(`container-<arch>-sources.tar.gz`, required), inventories and reports. Saved
+runtime and source image archives remain in Actions and are distributed through
+Docker Hub. `SHA256SUMS` records the original artifact paths, including those image archives.
 The workflow does not publish Python/PyPI (see "PyPI (manual)" below), GHCR,
 private enterprise images, or deploy the hosted website.
 

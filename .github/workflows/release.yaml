@@ -108,6 +108,7 @@ jobs:
     env:
       ARCH: ${{ matrix.arch }}
       LOCAL_IMAGE: tracery-release:${{ github.run_id }}-${{ matrix.arch }}
+      LOCAL_SOURCES_IMAGE: tracery-release-sources:${{ github.run_id }}-${{ matrix.arch }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with: { persist-credentials: false }
@@ -123,10 +124,20 @@ jobs:
       - run: npm ci && npm run build -w @atriarch-systems/tracery-core -w @atriarch-systems/tracery-client
       - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
         with: { driver: docker, version: v0.37.1 }
-      - name: Build and natively test the image with matching sources
+      # The runtime image does not contain its OS sources; the same build's
+      # sources-image target is published beside it as <version>-sources, and
+      # SOURCES.txt inside the runtime image names both published locations.
+      - name: Build and natively test the image and its matching source image
+        env:
+          SOURCE_IMAGE_REPOSITORY: ${{ vars.DOCKERHUB_IMAGE }}
         run: |
-          docker buildx build --load --platform "linux/$ARCH" --provenance=false -f apps/hub/Dockerfile -t "$LOCAL_IMAGE" .
-          node scripts/release-image-check.mjs "$LOCAL_IMAGE" "artifacts/container/$ARCH" "$ARCH"
+          set -euo pipefail
+          build=(docker buildx build --load --platform "linux/$ARCH" --provenance=false -f apps/hub/Dockerfile
+            --build-arg "SOURCE_IMAGE_REPOSITORY=${SOURCE_IMAGE_REPOSITORY:-atriarchsystems/tracery-hub}"
+            --build-arg "SOURCE_RELEASE_REPOSITORY=$GITHUB_REPOSITORY")
+          "${build[@]}" -t "$LOCAL_IMAGE" .
+          "${build[@]}" --target sources-image -t "$LOCAL_SOURCES_IMAGE" .
+          node scripts/release-image-check.mjs "$LOCAL_IMAGE" "$LOCAL_SOURCES_IMAGE" "artifacts/container/$ARCH" "$ARCH"
       - uses: aquasecurity/setup-trivy@81e514348e19b6112ce2a7e3ecbafe19c1e1f567 # v0.3.1
         with: { version: v0.74.0, cache: false }
       - name: Gate this architecture and record its SBOM
@@ -135,11 +146,13 @@ jobs:
           trivy image --image-src docker --scanners vuln,license,secret --license-full --list-all-pkgs --skip-version-check --format json --output "$dir/image-scan.json" "$LOCAL_IMAGE"
           node scripts/release-license-gate.mjs "$dir/image-scan.json" "$dir/alpine-packages.json" "$dir/NODE-LICENSE" "$ARCH"
           trivy image --image-src docker --scanners license --skip-version-check --format cyclonedx --output "$dir/image-sbom.cdx.json" "$LOCAL_IMAGE"
-      - name: Save the tested image and checksums
+      - name: Save the tested images and checksums
         run: |
           dir="artifacts/container/$ARCH"
           docker save "$LOCAL_IMAGE" | gzip > "$dir/image.tar.gz"
           docker image inspect "$LOCAL_IMAGE" --format '{{.Id}}' > "$dir/image-id.txt"
+          docker save "$LOCAL_SOURCES_IMAGE" | gzip > "$dir/sources-image.tar.gz"
+          docker image inspect "$LOCAL_SOURCES_IMAGE" --format '{{.Id}}' > "$dir/sources-image-id.txt"
           git rev-parse HEAD > "$dir/source-commit.txt"
           cd artifacts
           find "container/$ARCH" -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > "container/$ARCH/SHA256SUMS"
@@ -151,9 +164,9 @@ jobs:
           path: artifacts/
           if-no-files-found: error
           retention-days: 30
-      - name: Remove the local image tag
+      - name: Remove the local image tags
         if: always()
-        run: docker image rm "$LOCAL_IMAGE" || true
+        run: docker image rm "$LOCAL_IMAGE" "$LOCAL_SOURCES_IMAGE" || true
 
   publish:
     if: needs.prepare.outputs.publish == 'true'
@@ -198,6 +211,13 @@ jobs:
             image="tracery-release:$GITHUB_RUN_ID-$arch"
             test "$(docker image inspect "$image" --format '{{.Id}}')" = "$(cat "artifacts/container/$arch/image-id.txt")"
             test "$(docker image inspect "$image" --format '{{.Os}}/{{.Architecture}}')" = "linux/$arch"
+            gzip -dc "artifacts/container/$arch/sources-image.tar.gz" | docker load
+            sources_image="tracery-release-sources:$GITHUB_RUN_ID-$arch"
+            test "$(docker image inspect "$sources_image" --format '{{.Id}}')" = "$(cat "artifacts/container/$arch/sources-image-id.txt")"
+            test "$(docker image inspect "$sources_image" --format '{{.Os}}/{{.Architecture}}')" = "linux/$arch"
+            # The image's SOURCES.txt must name the places this job publishes the sources.
+            grep -qF "$DOCKERHUB_IMAGE:$RELEASE_VERSION-sources" "artifacts/container/$arch/SOURCES.txt" || { echo "SOURCES.txt does not name $DOCKERHUB_IMAGE:$RELEASE_VERSION-sources"; exit 1; }
+            grep -qF "github.com/$GITHUB_REPOSITORY/releases/tag/$RELEASE_TAG" "artifacts/container/$arch/SOURCES.txt" || { echo 'SOURCES.txt does not name this GitHub release'; exit 1; }
           done
           npm whoami --registry https://registry.npmjs.org
           cd artifacts
@@ -222,7 +242,7 @@ jobs:
         run: node scripts/release-npm.mjs artifacts/npm
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPMJS_TOKEN }}
-      - name: Publish tested architecture images and multi-platform tags
+      - name: Publish tested source images, then architecture images and multi-platform tags
         run: node scripts/release-docker-publish.mjs
       - name: Publish GitHub release and evidence
         run: node scripts/release-github.mjs
@@ -232,6 +252,6 @@ jobs:
         if: always()
         run: |
           for arch in amd64 arm64; do
-            docker image rm "tracery-release:$GITHUB_RUN_ID-$arch" || true
-            if [ -n "$DOCKERHUB_IMAGE" ]; then docker image rm "$DOCKERHUB_IMAGE:$RELEASE_VERSION-$arch" || true; fi
+            docker image rm "tracery-release:$GITHUB_RUN_ID-$arch" "tracery-release-sources:$GITHUB_RUN_ID-$arch" || true
+            if [ -n "$DOCKERHUB_IMAGE" ]; then docker image rm "$DOCKERHUB_IMAGE:$RELEASE_VERSION-$arch" "$DOCKERHUB_IMAGE:$RELEASE_VERSION-sources-$arch" || true; fi
           done

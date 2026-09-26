@@ -15,7 +15,9 @@ helm install tracery-hub apps/hub/helm \
 
 - **Deployment** running `atriarchsystems/tracery-hub`, liveness on `/healthz` and
   readiness on `/readyz`, a non-root `securityContext` on both pod and
-  container, resource requests/limits.
+  container (uid/gid `10001`, read-only root filesystem, all capabilities
+  dropped, no privilege escalation, `RuntimeDefault` seccomp), an `emptyDir`
+  at `/tmp`, resource requests/limits.
 - **Service** (ClusterIP by default) on `service.port` (default `8971`).
 - **Ingress** (optional, `ingress.enabled`), with TLS.
 - **ConfigMap** for every non-secret hub setting (`TRACERY_PORT`,
@@ -103,8 +105,9 @@ apiKeys:
 | `imagePullSecrets` | `[]` | Pull secrets for a private registry. |
 | `nameOverride` / `fullnameOverride` | `""` | Override the generated resource-name prefix. |
 | `replicaCount` | `1` | Deployment replicas. See "Storage and `replicaCount`" above. |
-| `podSecurityContext` | non-root, uid/gid/fsGroup `1000` | Pod-level `securityContext`. |
-| `securityContext` | drop `ALL`, no privilege escalation | Container-level `securityContext`. |
+| `podSecurityContext` | non-root, uid/gid/fsGroup `10001` (the image's user), `RuntimeDefault` seccomp | Pod-level `securityContext`. |
+| `securityContext` | drop `ALL`, no privilege escalation, read-only root filesystem | Container-level `securityContext`. |
+| `tmpDir.sizeLimit` | `64Mi` | Size limit of the `emptyDir` mounted at `/tmp` (the root filesystem is read-only). Empty for no limit. |
 | `service.type` / `service.port` | `ClusterIP` / `8971` | Service. |
 | `ingress.enabled` | `false` | Create an Ingress. |
 | `ingress.className`, `.annotations`, `.host`, `.path`, `.pathType` | -- | Ingress fields. |

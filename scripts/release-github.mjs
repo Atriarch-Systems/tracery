@@ -33,11 +33,20 @@ export async function ensureDraftRelease(api, tag, sha) {
     method: 'POST', body: { tag_name: tag, target_commitish: sha, name: `Tracery Graph ${tag}`, generate_release_notes: true, draft: true },
   });
 }
+// Saved image tarballs are published to Docker Hub instead. Each architecture's
+// OS source archive and its record are required evidence: the runtime image no
+// longer contains them, and its SOURCES.txt names this release as a location.
+const dockerHubOnly = new Set(['image.tar.gz', 'sources-image.tar.gz']);
+const requiredContainerEvidence = ['sources.tar.gz', 'sources.tar.gz.sha256', 'SOURCES.txt', 'alpine-packages.json', 'sources-image-id.txt'];
 export function releaseFiles(directory = 'artifacts') {
   const files = [{ file: path.join(directory, 'SHA256SUMS'), name: 'SHA256SUMS' }];
   for (const subdir of ['npm', 'reports', 'container/amd64', 'container/arm64']) {
-    for (const name of readdirSync(path.join(directory, subdir))) {
-      if (name === 'image.tar.gz') continue;
+    const names = readdirSync(path.join(directory, subdir));
+    if (subdir.startsWith('container/')) {
+      for (const required of requiredContainerEvidence) if (!names.includes(required)) throw Error(`Missing ${subdir}/${required}`);
+    }
+    for (const name of names) {
+      if (dockerHubOnly.has(name)) continue;
       files.push({ file: path.join(directory, subdir, name), name: subdir.startsWith('container/') ? `${subdir.replace('/', '-')}-${name}` : name });
     }
   }

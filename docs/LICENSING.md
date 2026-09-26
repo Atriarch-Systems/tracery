@@ -83,9 +83,18 @@ Open-source licenses disclosure in each HTML artifact. Missing packaged license
 text fails the build; reviewed upstream fallbacks live in licenses/vendor with
 pinned source references. The container Dockerfile copies the resulting notices
 and Tracery Graph's own LICENSE/NOTICE. Node's complete upstream license is retained
-separately. The container includes verified matching source archives, Alpine
-build recipes, patches and notices for its operating-system packages at
-`/usr/share/tracery/sources.tar.gz`. Sources therefore accompany each image.
+separately. The container's runtime notices are generated from the
+dependency tree actually shipped (the hub's production closure), not the
+whole workspace.
+
+Verified matching source archives, Alpine build recipes, patches and notices
+for the container's operating-system packages are published with every
+image, from the same places: as the `<version>-sources` tag (and
+`<version>-sources-amd64`/`-arm64`) in the same Docker Hub repository, pushed
+before the image itself, and as the `container-<arch>-sources.tar.gz` asset of
+the GitHub release. The runtime image does not contain the archive; its
+`/usr/share/tracery/SOURCES.txt` lists the packages, names both locations,
+gives the archive's SHA-256 and includes a written offer.
 See the [container redistribution review](../licenses/CONTAINER-REVIEW.md) for
 the exact inventory, GPL/LGPL treatment and Node notice exceptions, and
 [PUBLISHING.md](PUBLISHING.md) for the GitHub Actions release process.

@@ -22,17 +22,28 @@ replicaCount: 1
 podAnnotations: {}
 podLabels: {}
 
+# The image runs as uid/gid 10001 (numeric USER, so runAsNonRoot can verify
+# it). fsGroup makes the /data volume writable by that group; the app code in
+# the image is root-owned and read-only to it either way.
 podSecurityContext:
   runAsNonRoot: true
-  runAsUser: 1000
-  runAsGroup: 1000
-  fsGroup: 1000
+  runAsUser: 10001
+  runAsGroup: 10001
+  fsGroup: 10001
+  seccompProfile:
+    type: RuntimeDefault
 
 securityContext:
   allowPrivilegeEscalation: false
-  readOnlyRootFilesystem: false
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
   capabilities:
     drop: ["ALL"]
+
+# Writable scratch space at /tmp (an emptyDir), needed with
+# readOnlyRootFilesystem: SQLite and Node may create temporary files there.
+tmpDir:
+  sizeLimit: 64Mi
 
 service:
   type: ClusterIP

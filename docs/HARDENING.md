@@ -27,6 +27,7 @@ diligence ahead of a purchase or license decision.
 - [Plugin](#plugin-claude-code-plugin) -- 14 findings, 5 confirmed, 5 refuted, 3 lows fixed
 - [Roadmap items delivered](#roadmap-items-delivered)
 - [Final verification](#final-verification)
+- [Container image (2026-09-26)](#container-image-2026-09-26)
 
 Severity counts and the areas above sum to 87 findings surfaced across the six
 packages that make up Tracery Graph's runtime (core reducer, React/visualizer UI,
@@ -292,3 +293,28 @@ A from-scratch verification pass was run after all fixes and roadmap extensions 
 6. No compiled artifacts left under any `src/` tree, verified by direct filesystem scan (the literal `git status --short` step was substituted with an equivalent read-only filesystem check, since this run operated under a "never run any git command" constraint -- see note below).
 
 **Process note:** this run operated under an explicit "never run any git command" instruction. Step 6 of the verification plan called for a literal `git status --short`; that was substituted with a direct filesystem scan for build byproducts under every `src/` tree, cross-checked against `.gitignore`, which reached the same conclusion (nothing untracked and visible). One agent, while confirming scope on the plugin-marketplace extension, ran a single read-only `git status --short` before this constraint was internalized for that session -- it changed no repository state, but is recorded here for completeness.
+
+---
+
+## Container image (2026-09-26)
+
+A later, separate pass on `apps/hub/Dockerfile`, measured against the published
+`atriarchsystems/tracery-hub:0.1.1` (amd64): 422 MB unpacked, 231 MB compressed.
+
+| Finding | Fix |
+|---|---|
+| `RUN chown -R tracery:tracery /data /app` made the app code owned and writable by the runtime user (it could create files in `/app/apps/hub/dist`), and duplicated `/app` in a 60 MB layer. | App files are copied without `--chown` and stay root-owned; only `/data` belongs to the runtime user. `scripts/release-image-check.mjs` walks `/app` and fails on any file not owned by root or writable by group/others. |
+| `USER tracery` was a name (uid 100), which Kubernetes `runAsNonRoot` cannot verify; the Helm chart ran as uid 1000 with a writable root filesystem. | Fixed `USER 10001:10001`. Helm and `k8s/deployment.yaml` run as 10001 with `readOnlyRootFilesystem`, all capabilities dropped, no privilege escalation, `RuntimeDefault` seccomp and an `emptyDir` at `/tmp`; compose sets `read_only`, a `/tmp` tmpfs, `cap_drop: [ALL]` and `no-new-privileges`. |
+| The runtime shipped busybox (`sh`, `wget`, `nc`, `su`), apk-tools, scanelf and musl-utils. | The final stage is `FROM scratch` plus a root filesystem made with `apk add --root` (musl, libgcc, libstdc++, ca-certificates-bundle, alpine-release, alpine-keys) and the Node binary. The APK database lists exactly those 6 packages, so Trivy still reports the OS. The health check is exec form. |
+| `node_modules` held the whole workspace's production dependencies (react-dom, force-graph, ...), 55 MB. | `npm ci --omit=dev -w @atriarch-systems/tracery-hub` installs only the hub's closure (107 third-party packages, about 30 MB); RUNTIME-NOTICES.txt is generated from that tree. |
+| The 153 MB OS source archive was inside every image. | Published beside the image instead, as `<version>-sources` in the same Docker Hub repository (pushed first) and as a GitHub release asset. The image keeps `/usr/share/tracery/SOURCES.txt` with the locations, the archive's SHA-256 and a written offer. See `licenses/CONTAINER-REVIEW.md`. |
+
+Result for amd64: 166 MB unpacked (was 422 MB), 53 MB compressed (was 231 MB).
+The companion source image is 103 MB compressed, almost all of it the GCC
+source archive. Verified by building the image, running it with `--read-only
+--tmpfs /tmp --cap-drop ALL --security-opt no-new-privileges` and SQLite on a
+volume until the Docker health check reported healthy, then ingest, flows, UI,
+share preview PNG upload/download, `release-image-check.mjs`, Trivy (0
+vulnerabilities, 0 secrets) and the license gate. ARM64 was checked for the
+root filesystem stage only (package pins, source commits and the Node binary
+under emulation); the full ARM64 image is covered by the native release runner.

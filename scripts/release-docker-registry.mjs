@@ -3,13 +3,19 @@ import { createHash } from 'node:crypto';
 
 export const architectures = ['amd64', 'arm64'];
 const digestPattern = /^sha256:[0-9a-f]{64}$/;
-export function releaseImages(directory = 'artifacts/container') {
+export function releaseImages(directory = 'artifacts/container', file = 'image-id.txt') {
   return Object.fromEntries(architectures.map(arch => {
-    const digest = readFileSync(`${directory}/${arch}/image-id.txt`, 'utf8').trim();
-    if (!digestPattern.test(digest)) throw Error(`Invalid saved ${arch} image ID`);
+    const digest = readFileSync(`${directory}/${arch}/${file}`, 'utf8').trim();
+    if (!digestPattern.test(digest)) throw Error(`Invalid saved ${arch} ${file}`);
     return [arch, digest];
   }));
 }
+// The companion OS-source images (Dockerfile target sources-image), one per architecture.
+export function releaseSourceImages(directory = 'artifacts/container') {
+  return releaseImages(directory, 'sources-image-id.txt');
+}
+// Sources are published under the same repository: <version>-sources(-<arch>).
+export const sourcesTag = version => `${version}-sources`;
 export function dockerContext(env = process.env) {
   const repository = env.DOCKERHUB_IMAGE, version = env.RELEASE_VERSION;
   if (!/^[a-z0-9][a-z0-9_-]*\/[a-z0-9][a-z0-9._-]*$/.test(repository ?? '') || !/^0\.\d+\.\d+$/.test(version ?? '')) throw Error('Invalid release image or version');
@@ -56,14 +62,16 @@ export async function assertMultiPlatformImage(client, manifest, expected) {
     assertArchitectureImage(await client.manifest(entry.digest), arch, expected);
   }
 }
-export async function checkVersionTags(client, version, expected) {
+// `tag` is the combined tag (a version, or its sources tag); each
+// architecture is `<tag>-<arch>`. All of them are immutable.
+export async function checkVersionTags(client, tag, expected) {
   const images = {};
   // Preflight EVERY immutable tag before publishing any new one.
   for (const arch of architectures) {
-    images[arch] = await client.manifest(`${version}-${arch}`);
+    images[arch] = await client.manifest(`${tag}-${arch}`);
     if (images[arch]) assertArchitectureImage(images[arch], arch, expected);
   }
-  const combined = await client.manifest(version);
+  const combined = await client.manifest(tag);
   if (combined) await assertMultiPlatformImage(client, combined, expected);
   return { images, combined };
 }

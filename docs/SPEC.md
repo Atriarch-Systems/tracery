@@ -355,11 +355,20 @@ served by the hub as static files. First load asks for a read key (kept in
 
 ### Packaging
 
-- `apps/hub/Dockerfile`: multi-stage, builds workspaces, final pinned Alpine/Node runtime
-  image with only production deps, non-root user, `VOLUME /data`, `EXPOSE 8971`,
-  `HEALTHCHECK` on `/healthz`.
-- `apps/hub/docker-compose.yaml`: hub + volume, example keys file.
+- `apps/hub/Dockerfile`: multi-stage, builds workspaces, final shell-less runtime
+  (`FROM scratch` + the pinned Node binary + the pinned Alpine libraries it links
+  against, installed with `apk --root`; no busybox or apk) with only the hub's
+  production dependency closure. App code is root-owned and read-only to the
+  numeric non-root user `10001:10001`; only `/data` belongs to it. `VOLUME /data`,
+  `EXPOSE 8971`, exec-form `HEALTHCHECK` on `/healthz`. Runs under
+  `--read-only --tmpfs /tmp --cap-drop ALL --security-opt no-new-privileges`.
+  The `sources-image` target builds the companion `<version>-sources` image with
+  the matching OS package sources (`licenses/CONTAINER-REVIEW.md`).
+- `apps/hub/docker-compose.yaml`: hub + volume, example keys file; read-only root,
+  `/tmp` tmpfs, all capabilities dropped, `no-new-privileges`.
 - `apps/hub/k8s/`: Deployment, Service, PVC, example Secret; plain manifests (Kustomize-friendly).
+  The Deployment (and the Helm chart) runs as `10001`, read-only root filesystem,
+  capabilities dropped, with an `emptyDir` at `/tmp`.
 - `npx @atriarch-systems/tracery-hub` starts the server (bin entry).
 
 ## 7. Extensions and Tracery Cloud

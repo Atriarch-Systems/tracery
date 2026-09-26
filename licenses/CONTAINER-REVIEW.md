@@ -1,7 +1,8 @@
 # Container redistribution review
 
-Reviewed for the release candidate on 2026-09-23. This records the engineering
-basis for distribution; it is not a legal opinion or a guarantee of ownership.
+Reviewed for the release candidate on 2026-09-23 and updated on 2026-09-26 for
+the slimmed, shell-less runtime image. This records the engineering basis for
+distribution; it is not a legal opinion or a guarantee of ownership.
 
 ## Application and commercial use
 
@@ -19,8 +20,8 @@ community artifacts, not a future private enterprise distribution.
 
 The release matrix applies this review independently to Linux AMD64 and ARM64.
 Each native image must match the reviewed package versions and source commits;
-its recorded APK architecture must match the tested image. Each carries its own
-source archive and retained scan/SBOM evidence.
+its recorded APK architecture must match the tested image. Each has its own
+published source archive and retained scan/SBOM evidence.
 
 ## Exact runtime
 
@@ -28,8 +29,21 @@ source archive and retained scan/SBOM evidence.
   Copy its unmodified binary and the complete reviewed upstream LICENSE from
   licenses/vendor; the official ARM image omits /usr/local/LICENSE. npm, Corepack and
   Yarn are absent from the final image, including its base layers.
-- Alpine 3.24.2, digest pinned. The exact 18 packages, source commits and declared
-  licenses are recorded in [container-policy.json](container-policy.json).
+- Alpine 3.24.2 packages, version pinned, installed with `apk --root` into an
+  empty root filesystem (the final stage is `FROM scratch`). The exact 6
+  packages, source commits and declared licenses are recorded in
+  [container-policy.json](container-policy.json): musl, libgcc, libstdc++ (the
+  libraries the Node binary links against), ca-certificates-bundle, and
+  alpine-release with its dependency alpine-keys (OS identification for
+  scanners). The APK database lists exactly these, so Trivy and SBOM tools see
+  every installed package.
+- There is no shell, busybox, apk-tools, wget, nc, su, scanelf, musl-utils,
+  OpenSSL or zlib package in the image (Node bundles its own OpenSSL and zlib).
+  The health check runs `node` in exec form. `/etc/passwd` and `/etc/group`
+  are three-line files written by the build, not a package.
+- The application's `node_modules` is only the hub's production dependency
+  closure, installed from the lockfile with `npm ci --omit=dev -w
+  @atriarch-systems/tracery-hub`. RUNTIME-NOTICES.txt is generated from that tree.
 - Changes to that inventory or Node's full license-text digest fail the release
   gate until the new material is reviewed. This is not a blanket GPL exception
   for application code.
@@ -44,11 +58,15 @@ They do still have their own redistribution obligations.
 
 | Source origin | Scope and treatment |
 | --- | --- |
-| alpine-baselayout, apk-tools, busybox, pax-utils | GPL-2.0 components; full corresponding source, Alpine patches/configuration and build recipes accompany the binaries. |
-| musl | MIT libc plus utilities with MIT/BSD/GPL notices; all origin sources and recipes accompany the image. |
-| gcc | Alpine metadata combines GPL/LGPL labels. libgcc/libstdc++ carry GCC runtime permissions; retain all source and notices, including COPYING.RUNTIME. No application source exemption is inferred solely from Alpine's metadata. |
-| ca-certificates | MPL-2.0/MIT certificate material; matching source and notices accompany the image. |
-| alpine-base, alpine-keys, openssl, zlib | Permissive components; full matching source, recipe and notices are retained as well. |
+| gcc (libgcc, libstdc++) | The only GPL/LGPL-family packages left. Alpine metadata combines GPL/LGPL labels; the libraries carry GCC runtime permissions. Full corresponding source (the GCC release archive), notices including COPYING.RUNTIME, Alpine patches/configuration and build recipes are published with the binaries. No application source exemption is inferred solely from Alpine's metadata. |
+| musl | MIT libc; all origin sources and recipes are published as well. |
+| ca-certificates | MPL-2.0/MIT certificate material; matching source and notices are published with the image. |
+| alpine-base (alpine-release), alpine-keys | Permissive components; full matching source, recipe and notices are published as well. |
+
+The earlier 18-package runtime also shipped alpine-baselayout, apk-tools,
+busybox and pax-utils (GPL-2.0), musl-utils, OpenSSL and zlib. None of them is
+in the image any more, so they carry no source obligation for new releases.
+Images already published keep their embedded source archives.
 
 The [GCC Runtime Library Exception](https://www.gnu.org/licenses/gcc-exception-3.1.html)
 permits qualifying independent programs to use the runtime under their own
@@ -61,13 +79,43 @@ as a reason to omit the libraries' own source material.
 each origin's exact aports revision, and verifies every source against its
 APKBUILD checksums using `abuild`. Recipes, patches, configuration, upstream
 archives, common license texts and an inventory are archived together.
+The archive is reproducible: entries are written in sorted order with zeroed
+timestamps and owners and normalized modes, and the gzip header carries no
+timestamp or file name. The same verified sources always give the same
+`sources.tar.gz` and SHA-256, whichever build produced them, so the runtime
+image and the separately built source image agree even without a shared
+build cache.
 
-The archive is **inside every image**, at `/usr/share/tracery/sources.tar.gz`.
-Recipients get source together with object code; no email request, account or
-external source-server availability is required. Instructions are included at
-`/usr/share/tracery/SOURCES.txt`. The release smoke test extracts the archive,
-checks every recorded checksum and compares its package database with the live
-image. The same archive is also attached to the GitHub release.
+The archive is **not inside the runtime image**. It is published with each
+release from the same places as the binaries, as GPLv2 section 3 and LGPL-2.1
+section 4 allow ("equivalent access to copy the source code from the same
+place"):
+
+- **Docker Hub**, same repository: `<version>-sources-amd64`,
+  `<version>-sources-arm64` and the multi-platform `<version>-sources`. Each
+  is a `FROM scratch` image holding only `/sources.tar.gz`, `SOURCES.txt`,
+  `alpine-packages.json` and `sources.tar.gz.sha256`, built by the
+  Dockerfile's `sources-image` target in the same build as the runtime image.
+  The release pushes these tags **before** the runtime tags, and all of them
+  are immutable.
+- **GitHub release**: `container-<arch>-sources.tar.gz`, plus its
+  `SOURCES.txt` and checksum. `scripts/release-github.mjs` refuses to
+  publish a release without them.
+
+The runtime image carries `/usr/share/tracery/SOURCES.txt` (and
+`alpine-packages.json`, `sources.tar.gz.sha256`): the package list and
+licenses, both published locations, the archive's SHA-256, extraction
+instructions and a three-year written offer. The release smoke test
+(`scripts/release-image-check.mjs`) copies the archive out of the source image,
+checks it against the SHA-256 recorded in the runtime image, verifies every
+SHA256SUMS entry (and that nothing is unlisted), and compares its inventory and
+APK database with the live runtime image. The publish job checks that each
+SOURCES.txt names the Docker Hub repository and GitHub release it publishes to.
+
+Keep the `-sources` tags and release assets available for as long as the
+matching runtime tags are offered. Do not delete them while the image is
+still pullable. The written offer names GitHub issues as the request channel;
+a postal or email contact can be added there if one is preferred.
 
 ## Node's bundled notices
 

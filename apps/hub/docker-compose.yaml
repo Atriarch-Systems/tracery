@@ -18,6 +18,14 @@ services:
       dockerfile: apps/hub/Dockerfile
     image: atriarchsystems/tracery-hub:dev
     restart: unless-stopped
+    # Hardening: read-only root filesystem (only /data and a /tmp tmpfs are
+    # writable), no Linux capabilities, no privilege escalation.
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
     ports:
       - "8971:8971"
     environment:
@@ -71,6 +79,12 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
     ports:
       - "8972:8971"
     environment:
